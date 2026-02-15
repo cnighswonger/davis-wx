@@ -1,6 +1,12 @@
 """Application configuration using Pydantic Settings."""
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# Resolve .env from the project root (one level above backend/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -42,7 +48,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    model_config = {"env_prefix": "DAVIS_", "env_file": ".env"}
+    model_config = {"env_prefix": "DAVIS_", "env_file": str(_ENV_FILE)}
 
 
 settings = Settings()
