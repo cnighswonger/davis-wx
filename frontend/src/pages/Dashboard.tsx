@@ -18,39 +18,41 @@ export default function Dashboard() {
   const cc = currentConditions;
 
   // Extract scalar values from ValueWithUnit objects for each gauge.
-  const tempOutside = cc?.temperature.outside?.value ?? null;
-  const tempOutsideUnit = cc?.temperature.outside?.unit ?? "F";
-  const tempInside = cc?.temperature.inside?.value ?? null;
-  const tempInsideUnit = cc?.temperature.inside?.unit ?? "F";
+  // Every nested access must use optional chaining — when running in
+  // demo mode (no serial connection), the API returns sparse/empty data.
+  const tempOutside = cc?.temperature?.outside?.value ?? null;
+  const tempOutsideUnit = cc?.temperature?.outside?.unit ?? "F";
+  const tempInside = cc?.temperature?.inside?.value ?? null;
+  const tempInsideUnit = cc?.temperature?.inside?.unit ?? "F";
 
-  const baroValue = cc?.barometer.value ?? null;
-  const baroUnit = cc?.barometer.unit ?? "inHg";
-  const baroTrend = cc?.barometer.trend as
+  const baroValue = cc?.barometer?.value ?? null;
+  const baroUnit = cc?.barometer?.unit ?? "inHg";
+  const baroTrend = cc?.barometer?.trend as
     | "rising"
     | "falling"
     | "steady"
     | null
     | undefined;
-  const baroTrendRate = cc?.barometer.trend_rate ?? null;
+  const baroTrendRate = cc?.barometer?.trend_rate ?? null;
 
-  const windDirection = cc?.wind.direction?.value ?? null;
-  const windSpeed = cc?.wind.speed?.value ?? null;
-  const windGust = cc?.wind.gust?.value ?? null;
-  const windUnit = cc?.wind.speed?.unit ?? "mph";
-  const windCardinal = cc?.wind.cardinal ?? null;
+  const windDirection = cc?.wind?.direction?.value ?? null;
+  const windSpeed = cc?.wind?.speed?.value ?? null;
+  const windGust = cc?.wind?.gust?.value ?? null;
+  const windUnit = cc?.wind?.speed?.unit ?? "mph";
+  const windCardinal = cc?.wind?.cardinal ?? null;
 
-  const humidityOutside = cc?.humidity.outside?.value ?? null;
-  const humidityInside = cc?.humidity.inside?.value ?? null;
+  const humidityOutside = cc?.humidity?.outside?.value ?? null;
+  const humidityInside = cc?.humidity?.inside?.value ?? null;
 
-  const rainRate = cc?.rain.rate?.value ?? null;
-  const rainDaily = cc?.rain.daily?.value ?? null;
-  const rainYearly = cc?.rain.yearly?.value ?? null;
-  const rainUnit = cc?.rain.daily?.unit ?? "in";
+  const rainRate = cc?.rain?.rate?.value ?? null;
+  const rainDaily = cc?.rain?.daily?.value ?? null;
+  const rainYearly = cc?.rain?.yearly?.value ?? null;
+  const rainUnit = cc?.rain?.daily?.unit ?? "in";
 
   const solarRadiation = cc?.solar_radiation?.value ?? null;
   const uvIndex = cc?.uv_index?.value ?? null;
-  const hasSolar = cc?.solar_radiation !== null && cc?.solar_radiation !== undefined;
-  const hasUV = cc?.uv_index !== null && cc?.uv_index !== undefined;
+  const hasSolar = cc?.solar_radiation != null;
+  const hasUV = cc?.uv_index != null;
   const showSolarUV = hasSolar || hasUV;
 
   return (
