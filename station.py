@@ -237,15 +237,32 @@ def cmd_run(_args: argparse.Namespace) -> int:
     step("Server at http://localhost:8000")
     step("Press Ctrl+C to stop\n")
 
+    # Use Popen so we can explicitly terminate the child on Ctrl+C.
+    # subprocess.run() on Windows doesn't reliably forward the interrupt.
+    proc = subprocess.Popen(
+        [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
+         "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"],
+        cwd=str(BACKEND_DIR),
+    )
+
+    def _shutdown(signum=None, frame=None):
+        proc.terminate()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+    if IS_WINDOWS:
+        signal.signal(signal.SIGBREAK, _shutdown)
+
     try:
-        return run_cmd(
-            [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
-             "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"],
-            cwd=BACKEND_DIR,
-            check=False,
-        ).returncode
+        rc = proc.wait()
     except KeyboardInterrupt:
-        return 0
+        proc.terminate()
+        try:
+            rc = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            rc = proc.wait()
+    return rc
 
 
 def cmd_dev(_args: argparse.Namespace) -> int:

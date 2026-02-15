@@ -54,10 +54,15 @@ class LinkDriver:
         self.calibration = CalibrationOffsets()
         self.is_rev_e = False
         self._connected = False
+        self._stop_requested = False
 
     @property
     def connected(self) -> bool:
         return self._connected and self.serial.is_open
+
+    def request_stop(self) -> None:
+        """Signal the blocking poll_loop thread to exit early."""
+        self._stop_requested = True
 
     def open(self) -> None:
         """Open serial port and initialize connection."""
@@ -176,6 +181,9 @@ class LinkDriver:
             raise RuntimeError("Station type not detected. Call detect_station_type() first.")
 
         for attempt in range(MAX_RETRIES + 1):
+            if self._stop_requested:
+                logger.info("LOOP poll aborted (stop requested)")
+                return None
             try:
                 reading = self._send_loop_once()
                 if reading is not None:

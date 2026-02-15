@@ -90,6 +90,7 @@ class Poller:
 
     def stop(self) -> None:
         self._running = False
+        self.driver.request_stop()
 
     async def _process_reading(self, reading: SensorReading) -> None:
         """Compute derived values, store to DB, broadcast to WS clients."""
