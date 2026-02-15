@@ -219,9 +219,17 @@ class LinkDriver:
         for attempt in range(MAX_RETRIES + 1):
             try:
                 cmd = build_wrd_command(n_nibbles, bank, address)
+                logger.debug(
+                    "WRD %d nibbles bank %d addr 0x%02X -> TX: %s",
+                    n_nibbles, bank, address, cmd.hex(),
+                )
                 self.serial.send(cmd)
 
                 if not self.serial.wait_for_ack():
+                    logger.warning(
+                        "WRD bank %d addr 0x%02X attempt %d: no ACK",
+                        bank, address, attempt + 1,
+                    )
                     continue
 
                 # Number of bytes = ceil(n_nibbles / 2)
@@ -229,8 +237,13 @@ class LinkDriver:
                 # Rev E includes 2-byte CRC
                 read_size = n_bytes + (2 if self.is_rev_e else 0)
                 data = self.serial.receive(read_size)
+                logger.debug("WRD RX: %s (%d bytes)", data.hex(), len(data))
 
                 if len(data) < n_bytes:
+                    logger.warning(
+                        "WRD bank %d addr 0x%02X attempt %d: short read %d/%d",
+                        bank, address, attempt + 1, len(data), n_bytes,
+                    )
                     continue
 
                 if self.is_rev_e and len(data) >= n_bytes + 2:

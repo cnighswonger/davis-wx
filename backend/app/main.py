@@ -35,6 +35,10 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
 
     # Try to connect to serial port
+    logger.info(
+        "Connecting to serial port %s at %d baud (timeout=%.1fs)",
+        settings.serial_port, settings.baud_rate, settings.serial_timeout,
+    )
     try:
         _driver = LinkDriver(
             port=settings.serial_port,
@@ -42,23 +46,30 @@ async def lifespan(app: FastAPI):
             timeout=settings.serial_timeout,
         )
         _driver.open()
+        logger.info("Serial port %s opened", settings.serial_port)
 
-        # Detect station type
+        # Detect station type via WRD read of model nibble
+        logger.info("Detecting station type...")
         station_type = await _driver.async_detect_station_type()
-        logger.info("Connected to %s", station_type.name)
+        logger.info(
+            "Station detected: %s (model code %d)",
+            station_type.name, station_type.value,
+        )
 
         # Read calibration
+        logger.info("Reading calibration offsets...")
         await _driver.async_read_calibration()
 
         # Start poller
         _poller = Poller(_driver, poll_interval=settings.poll_interval_sec)
         _poller_task = asyncio.create_task(_poller.run())
+        logger.info("Poller started (%ds interval)", settings.poll_interval_sec)
 
         # Set references for API endpoints
         station_api.set_poller(_poller, _driver)
 
     except Exception as e:
-        logger.warning("Could not connect to serial port: %s", e)
+        logger.warning("Could not connect to serial port: %s", e, exc_info=True)
         logger.info("Running in demo mode (no serial connection)")
 
     yield
