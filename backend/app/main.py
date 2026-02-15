@@ -15,7 +15,7 @@ from .protocol.link_driver import LinkDriver
 from .services.poller import Poller
 from .api.router import api_router
 from .api import station as station_api
-from .ws.handler import websocket_endpoint
+from .ws.handler import websocket_endpoint, set_driver as ws_set_driver
 
 # Configure logging for our app (uvicorn only configures its own loggers)
 logging.basicConfig(
@@ -70,8 +70,9 @@ async def lifespan(app: FastAPI):
         _poller_task = asyncio.create_task(_poller.run())
         logger.info("Poller started (%ds interval)", settings.poll_interval_sec)
 
-        # Set references for API endpoints
+        # Set references for API endpoints and WebSocket handler
         station_api.set_poller(_poller, _driver)
+        ws_set_driver(_driver)
 
     except Exception as e:
         logger.warning("Could not connect to serial port: %s", e, exc_info=True)

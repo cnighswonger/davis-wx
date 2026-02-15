@@ -180,8 +180,10 @@ class LinkDriver:
                 reading = self._send_loop_once()
                 if reading is not None:
                     return self.apply_calibration(reading)
+                else:
+                    logger.warning("LOOP attempt %d/%d: no response", attempt + 1, MAX_RETRIES + 1)
             except Exception as e:
-                logger.warning("LOOP attempt %d failed: %s", attempt + 1, e)
+                logger.warning("LOOP attempt %d/%d failed: %s", attempt + 1, MAX_RETRIES + 1, e)
 
             if attempt < MAX_RETRIES:
                 self.serial.flush()
