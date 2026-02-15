@@ -234,8 +234,10 @@ class LinkDriver:
 
                 # Number of bytes = ceil(n_nibbles / 2)
                 n_bytes = (n_nibbles + 1) // 2
-                # Rev E includes 2-byte CRC
-                read_size = n_bytes + (2 if self.is_rev_e else 0)
+                # Always read data + 2 CRC bytes — the WeatherLink
+                # sends trailing CRC regardless of revision, and leaving
+                # them in the buffer corrupts subsequent reads.
+                read_size = n_bytes + 2
                 data = self.serial.receive(read_size)
                 logger.debug("WRD RX: %s (%d bytes)", data.hex(), len(data))
 
@@ -246,10 +248,12 @@ class LinkDriver:
                     )
                     continue
 
-                if self.is_rev_e and len(data) >= n_bytes + 2:
-                    if not crc_validate(data[:n_bytes + 2]):
-                        logger.warning("WRD CRC validation failed")
-                        continue
+                # Validate CRC if we got the full response
+                if len(data) >= n_bytes + 2:
+                    if crc_validate(data[:n_bytes + 2]):
+                        logger.debug("WRD CRC OK")
+                    else:
+                        logger.debug("WRD CRC mismatch (non-Rev-E units may not send valid CRC)")
 
                 return data[:n_bytes]
 
@@ -271,16 +275,11 @@ class LinkDriver:
                     continue
 
                 n_bytes = (n_nibbles + 1) // 2
-                read_size = n_bytes + (2 if self.is_rev_e else 0)
+                read_size = n_bytes + 2  # always drain trailing CRC
                 data = self.serial.receive(read_size)
 
                 if len(data) < n_bytes:
                     continue
-
-                if self.is_rev_e and len(data) >= n_bytes + 2:
-                    if not crc_validate(data[:n_bytes + 2]):
-                        logger.warning("RRD CRC validation failed")
-                        continue
 
                 return data[:n_bytes]
 

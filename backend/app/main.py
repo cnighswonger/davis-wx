@@ -17,6 +17,11 @@ from .api.router import api_router
 from .api import station as station_api
 from .ws.handler import websocket_endpoint
 
+# Configure logging for our app (uvicorn only configures its own loggers)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(name)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 # Global references for cleanup
