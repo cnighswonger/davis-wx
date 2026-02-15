@@ -11,7 +11,7 @@ interface DerivedItem {
 }
 
 function formatValue(item: ValueWithUnit | null | undefined): string {
-  if (!item) return "--";
+  if (!item || item.value == null) return "--";
   return `${item.value.toFixed(1)} ${item.unit}`;
 }
 

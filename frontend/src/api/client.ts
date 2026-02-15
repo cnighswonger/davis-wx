@@ -64,7 +64,7 @@ export function fetchAstronomy(): Promise<AstronomyResponse> {
 }
 
 export function fetchStationStatus(): Promise<StationStatus> {
-  return request<StationStatus>("/api/station/status");
+  return request<StationStatus>("/api/station");
 }
 
 export function fetchConfig(): Promise<ConfigItem[]> {
