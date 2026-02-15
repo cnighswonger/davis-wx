@@ -66,11 +66,18 @@ class Poller:
                     await self._process_reading(reading)
                 else:
                     self._timeouts += 1
+            except asyncio.CancelledError:
+                break
             except Exception as e:
+                if not self._running:
+                    break
                 logger.error("Polling error: %s", e)
                 self._timeouts += 1
 
-            await asyncio.sleep(self.poll_interval)
+            try:
+                await asyncio.sleep(self.poll_interval)
+            except asyncio.CancelledError:
+                break
 
     def stop(self) -> None:
         self._running = False

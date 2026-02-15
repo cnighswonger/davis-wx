@@ -63,17 +63,21 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown: stop poller loop first, then close serial port
     if _poller:
         _poller.stop()
     if _poller_task:
         _poller_task.cancel()
         try:
             await _poller_task
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, Exception):
             pass
+    # Only close serial after poller is fully stopped
     if _driver:
-        _driver.close()
+        try:
+            _driver.close()
+        except Exception:
+            pass
     logger.info("Application shutdown complete")
 
 

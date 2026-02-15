@@ -237,12 +237,15 @@ def cmd_run(_args: argparse.Namespace) -> int:
     step("Server at http://localhost:8000")
     step("Press Ctrl+C to stop\n")
 
-    return run_cmd(
-        [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
-         "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"],
-        cwd=BACKEND_DIR,
-        check=False,
-    ).returncode
+    try:
+        return run_cmd(
+            [str(VENV_PYTHON), "-m", "uvicorn", "app.main:app",
+             "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"],
+            cwd=BACKEND_DIR,
+            check=False,
+        ).returncode
+    except KeyboardInterrupt:
+        return 0
 
 
 def cmd_dev(_args: argparse.Namespace) -> int:
