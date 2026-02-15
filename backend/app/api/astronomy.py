@@ -3,10 +3,12 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from ..config import settings
+from ..models.database import get_db
 from ..services.astronomy import compute_astronomy
+from .config import get_effective_config
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,9 +53,14 @@ def _fmt_change(seconds) -> str:
 
 
 @router.get("/astronomy")
-def get_astronomy():
+def get_astronomy(db: Session = Depends(get_db)):
     """Return sunrise/sunset, twilight, moon phase data."""
-    if settings.latitude == 0.0 and settings.longitude == 0.0:
+    cfg = get_effective_config(db)
+    lat = float(cfg.get("latitude", 0.0))
+    lon = float(cfg.get("longitude", 0.0))
+    elevation = float(cfg.get("elevation", 0.0))
+
+    if lat == 0.0 and lon == 0.0:
         return {
             "sun": {
                 "sunrise": "--", "sunset": "--", "solar_noon": "--",
@@ -69,10 +76,8 @@ def get_astronomy():
         }
 
     try:
-        elevation_m = settings.elevation_ft * 0.3048
-        data = compute_astronomy(
-            settings.latitude, settings.longitude, elevation_m,
-        )
+        elevation_m = elevation * 0.3048
+        data = compute_astronomy(lat, lon, elevation_m)
     except Exception as e:
         logger.error("Astronomy computation failed: %s", e)
         return {"error": str(e)}

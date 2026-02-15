@@ -51,6 +51,12 @@ class ConfigUpdate(BaseModel):
     value: str | int | float | bool
 
 
+def get_effective_config(db: Session) -> dict[str, object]:
+    """Return merged config dict: DB overrides take priority over defaults."""
+    saved = {item.key: _coerce_value(item.value) for item in db.query(StationConfigModel).all()}
+    return {key: saved.get(key, default) for key, default in _DEFAULTS.items()}
+
+
 @router.get("/config")
 def get_config(db: Session = Depends(get_db)):
     """Return all configuration key-value pairs, with defaults for unsaved keys."""

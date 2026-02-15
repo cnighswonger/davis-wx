@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..models.database import get_db
 from ..models.sensor_reading import SensorReadingModel
 from ..services.forecast_local import zambretti_forecast
 from ..services.forecast_nws import fetch_nws_forecast
+from .config import get_effective_config
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -66,10 +66,15 @@ async def get_forecast(db: Session = Depends(get_db)):
     # --- NWS (grid forecast) ---
     nws_forecast = None
 
-    has_location = not (settings.latitude == 0.0 and settings.longitude == 0.0)
-    if settings.nws_enabled and has_location:
+    cfg = get_effective_config(db)
+    lat = float(cfg.get("latitude", 0.0))
+    lon = float(cfg.get("longitude", 0.0))
+    nws_enabled = bool(cfg.get("nws_enabled", False))
+
+    has_location = not (lat == 0.0 and lon == 0.0)
+    if nws_enabled and has_location:
         try:
-            nws = await fetch_nws_forecast(settings.latitude, settings.longitude)
+            nws = await fetch_nws_forecast(lat, lon)
             if nws is not None and nws.periods:
                 nws_forecast = {
                     "source": "nws",
