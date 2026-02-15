@@ -79,7 +79,7 @@ export default function StationStatus() {
     },
     {
       label: "Archive Records",
-      value: stationStatus
+      value: stationStatus?.archive_records != null
         ? stationStatus.archive_records.toLocaleString()
         : "--",
     },
