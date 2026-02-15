@@ -48,7 +48,7 @@ def _coerce_value(raw: str) -> object:
 
 class ConfigUpdate(BaseModel):
     key: str
-    value: str
+    value: str | int | float | bool
 
 
 @router.get("/config")
