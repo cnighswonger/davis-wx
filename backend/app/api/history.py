@@ -3,7 +3,7 @@
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Query, Depends
-from sqlalchemy import func
+from sqlalchemy import func, Integer
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
@@ -48,6 +48,17 @@ SENSOR_UNITS = {
     "uv_index": "tenths UV",
 }
 
+# Frontend uses display-friendly names; map them to DB column names
+SENSOR_ALIASES = {
+    "temperature_inside": "inside_temp",
+    "temperature_outside": "outside_temp",
+    "humidity_inside": "inside_humidity",
+    "humidity_outside": "outside_humidity",
+    "rain_daily": "rain_total",
+    "rain_yearly": "rain_total",
+    "rain_rate": "rain_total",
+}
+
 
 @router.get("/history")
 def get_history(
@@ -58,6 +69,9 @@ def get_history(
     db: Session = Depends(get_db),
 ):
     """Return time-series data for a sensor."""
+    # Resolve frontend display names to DB column names
+    sensor = SENSOR_ALIASES.get(sensor, sensor)
+
     if sensor not in SENSOR_COLUMNS:
         return {"error": f"Unknown sensor: {sensor}", "available": list(SENSOR_COLUMNS.keys())}
 
@@ -98,27 +112,35 @@ def get_history(
         "start": start_dt.isoformat(),
         "end": end_dt.isoformat(),
         "resolution": resolution,
-        "data": data,
+        "points": data,
     }
 
 
 def _aggregate(db, column, start_dt, end_dt, resolution):
-    """Aggregate readings by hour or day."""
-    # Use SQLite strftime for grouping
-    if resolution == "hourly":
-        group_fmt = "%Y-%m-%dT%H:00:00"
+    """Aggregate readings by 5-minute, hourly, or daily buckets."""
+    if resolution == "5m":
+        # Group by epoch seconds rounded to 300s (5 min) boundaries
+        bucket = func.cast(
+            func.strftime("%s", SensorReadingModel.timestamp), Integer
+        ) / 300
+        time_label = func.strftime(
+            "%Y-%m-%dT%H:%M:00", SensorReadingModel.timestamp
+        )
+        group_key = bucket
+    elif resolution == "hourly":
+        group_key = func.strftime("%Y-%m-%dT%H:00:00", SensorReadingModel.timestamp)
+        time_label = group_key
     else:  # daily
-        group_fmt = "%Y-%m-%dT00:00:00"
-
-    time_group = func.strftime(group_fmt, SensorReadingModel.timestamp)
+        group_key = func.strftime("%Y-%m-%dT00:00:00", SensorReadingModel.timestamp)
+        time_label = group_key
 
     results = (
-        db.query(time_group, func.avg(column))
+        db.query(time_label, func.avg(column))
         .filter(SensorReadingModel.timestamp >= start_dt)
         .filter(SensorReadingModel.timestamp <= end_dt)
         .filter(column.isnot(None))
-        .group_by(time_group)
-        .order_by(time_group)
+        .group_by(group_key)
+        .order_by(group_key)
         .all()
     )
 
