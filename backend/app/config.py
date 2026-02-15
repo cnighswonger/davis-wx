@@ -8,8 +8,8 @@ class Settings(BaseSettings):
 
     # Serial port
     serial_port: str = "/dev/ttyUSB0"
-    baud_rate: int = 19200
-    serial_timeout: float = 2.0
+    baud_rate: int = 2400
+    serial_timeout: float = 5.0
 
     # Polling
     poll_interval_sec: int = 10

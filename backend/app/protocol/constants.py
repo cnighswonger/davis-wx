@@ -10,8 +10,8 @@ CAN = 0x18  # CRC checksum failed (Rev E only)
 ESC = 0x1B  # Escape
 SOH = 0x01  # Start of LOOP block header
 
-# Serial defaults
-DEFAULT_BAUD = 19200
+# Serial defaults (2400 is the WeatherLink factory default)
+DEFAULT_BAUD = 2400
 DATA_BITS = 8
 STOP_BITS = 1
 PARITY = "N"
