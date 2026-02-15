@@ -210,9 +210,14 @@ async def fetch_nws_forecast(
         "Accept": "application/geo+json",
     }
 
+    # Round to 4 decimal places (NWS redirects to this precision anyway)
+    lat = round(lat, 4)
+    lon = round(lon, 4)
+
     async with httpx.AsyncClient(
         headers=headers,
         timeout=REQUEST_TIMEOUT,
+        follow_redirects=True,
     ) as client:
         # Step 1: Resolve grid point
         grid = await _resolve_grid_point(client, lat, lon)
