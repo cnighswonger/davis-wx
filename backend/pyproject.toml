@@ -1,0 +1,31 @@
+[project]
+name = "davis-wx-station"
+version = "0.1.0"
+description = "Davis Weather Station cross-platform application"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pyserial>=3.5",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "httpx>=0.25",
+    "astral>=3.2",
+    "pydantic-settings>=2.1",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "httpx",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["../tests/backend"]

@@ -1,0 +1,17 @@
+services:
+  davis-wx:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - davis-data:/app/data
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - DAVIS_SERIAL_PORT=/dev/ttyUSB0
+      - DAVIS_BAUD_RATE=19200
+      - DAVIS_DB_PATH=/app/data/weather.db
+    restart: unless-stopped
+
+volumes:
+  davis-data:
