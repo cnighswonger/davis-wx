@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     elevation_ft: float = 0.0
 
     # Database
-    database_url: str = "sqlite:///davis_wx.db"
+    db_path: str = "davis_wx.db"
+
+    @property
+    def database_url(self) -> str:
+        return f"sqlite:///{self.db_path}"
 
     # Units
     units_temp: str = "F"  # F or C
