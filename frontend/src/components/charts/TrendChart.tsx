@@ -65,7 +65,7 @@ export default function TrendChart({
         gridLineWidth: 0,
       },
       yAxis: {
-        title: { text: null },
+        title: { text: undefined },
         labels: {
           style: { color: mutedColor, fontSize: "9px" },
         },

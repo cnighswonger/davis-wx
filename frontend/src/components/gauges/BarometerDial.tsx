@@ -14,7 +14,7 @@ const RANGES = {
   hPa: { min: 965, max: 1050, step: 10, decimals: 0 },
 };
 
-export default function BarometerDial({ value, unit, trend, trendRate }: BarometerDialProps) {
+export default function BarometerDial({ value, unit, trend }: BarometerDialProps) {
   const range = RANGES[unit as keyof typeof RANGES] || RANGES.inHg;
   const { min, max, step, decimals } = range;
 

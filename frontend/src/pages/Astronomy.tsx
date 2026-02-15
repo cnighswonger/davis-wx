@@ -182,7 +182,6 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
   const frac = illumination / 100;
   // Shadow ellipse x-radius: at 0% -> same as r (full shadow), at 50% -> 0 (half), at 100% -> r (no shadow but flip)
   const shadowRx = Math.abs(1 - 2 * frac) * r;
-  const shadowOnRight = frac < 0.5;
 
   return (
     <svg
@@ -215,7 +214,6 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
         // For waxing: shadow is on the left side
         // For waning: shadow is on the right side
         const clipId = "moon-clip";
-        const clipX = isWaning ? cx : cx - r;
         // Determine which half should be dark
         const shouldDarkenRight = isWaning;
 
@@ -267,9 +265,6 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
             )}
           </>
         );
-
-        // Use clipX to suppress unused variable
-        void clipX;
       })()}
 
       {/* Subtle border */}

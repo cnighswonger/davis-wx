@@ -2,8 +2,6 @@
  * SVG vertical thermometer gauge with mercury fill and hi/lo whiskers.
  * Uses CSS custom properties for theming.
  */
-import { useEffect, useRef } from 'react';
-
 interface TemperatureGaugeProps {
   value: number | null;       // Current temp in display units (e.g. 72.5)
   unit: string;               // 'F' or 'C'
@@ -22,7 +20,6 @@ const DEFAULT_RANGES = {
 function tempColor(value: number, unit: string): string {
   // Map temperature to a color gradient: blue → green → red
   const range = DEFAULT_RANGES[unit as 'F' | 'C'] || DEFAULT_RANGES.F;
-  const mid = (range.min + range.max) / 2;
   const t = Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
 
   if (t < 0.35) {
