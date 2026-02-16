@@ -29,5 +29,11 @@ def get_db() -> Session:
 
 
 def init_database() -> None:
-    """Create all tables."""
+    """Create all tables.
+
+    Models must be imported before create_all() so they register with Base.metadata.
+    """
+    from . import sensor_reading  # noqa: F401
+    from . import station_config  # noqa: F401
+    from . import archive_record  # noqa: F401
     Base.metadata.create_all(bind=engine)
