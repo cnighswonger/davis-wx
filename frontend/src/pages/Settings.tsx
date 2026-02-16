@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation } from "../api/client.ts";
-import type { ConfigItem } from "../api/types.ts";
+import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive } from "../api/client.ts";
+import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
 import { themes } from "../themes/index.ts";
 
@@ -151,14 +151,35 @@ export default function Settings() {
 
   const { themeName, setThemeName } = useTheme();
 
-  // Load config + serial ports
+  // WeatherLink hardware config state
+  const [wlConfig, setWlConfig] = useState<WeatherLinkConfig | null>(null);
+  const [wlArchivePeriod, setWlArchivePeriod] = useState<number>(30);
+  const [wlSamplePeriod, setWlSamplePeriod] = useState<number>(60);
+  const [wlCal, setWlCal] = useState<WeatherLinkCalibration>({
+    inside_temp: 0, outside_temp: 0, barometer: 0, outside_humidity: 0, rain_cal: 100,
+  });
+  const [wlSaving, setWlSaving] = useState(false);
+  const [wlMsg, setWlMsg] = useState<string | null>(null);
+  const [wlError, setWlError] = useState<string | null>(null);
+
+  // Load config + serial ports + weatherlink config
   useEffect(() => {
     setLoading(true);
     setError(null);
-    Promise.all([fetchConfig(), fetchSerialPorts().catch(() => ({ ports: [] }))])
-      .then(([items, portResult]) => {
+    Promise.all([
+      fetchConfig(),
+      fetchSerialPorts().catch(() => ({ ports: [] })),
+      fetchWeatherLinkConfig().catch(() => null),
+    ])
+      .then(([items, portResult, wl]) => {
         setConfigItems(items);
         setPorts(portResult.ports);
+        if (wl && !("error" in wl)) {
+          setWlConfig(wl);
+          if (wl.archive_period != null) setWlArchivePeriod(wl.archive_period);
+          if (wl.sample_period != null) setWlSamplePeriod(wl.sample_period);
+          setWlCal(wl.calibration);
+        }
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -219,6 +240,85 @@ export default function Settings() {
     fetchSerialPorts()
       .then((result) => setPorts(result.ports))
       .catch(() => {});
+  }, []);
+
+  const handleWlSave = useCallback(async () => {
+    setWlSaving(true);
+    setWlMsg(null);
+    setWlError(null);
+    try {
+      const update: Record<string, unknown> = {};
+      if (wlConfig === null || wlArchivePeriod !== wlConfig.archive_period) {
+        update.archive_period = wlArchivePeriod;
+      }
+      if (wlConfig === null || wlSamplePeriod !== wlConfig.sample_period) {
+        update.sample_period = wlSamplePeriod;
+      }
+      const calChanged = wlConfig === null ||
+        wlCal.inside_temp !== wlConfig.calibration.inside_temp ||
+        wlCal.outside_temp !== wlConfig.calibration.outside_temp ||
+        wlCal.barometer !== wlConfig.calibration.barometer ||
+        wlCal.outside_humidity !== wlConfig.calibration.outside_humidity ||
+        wlCal.rain_cal !== wlConfig.calibration.rain_cal;
+      if (calChanged) {
+        update.calibration = wlCal;
+      }
+      if (Object.keys(update).length === 0) {
+        setWlMsg("No changes to save");
+        setWlSaving(false);
+        return;
+      }
+      const resp = await updateWeatherLinkConfig(update);
+      setWlConfig(resp.config);
+      setWlCal(resp.config.calibration);
+      if (resp.config.archive_period != null) setWlArchivePeriod(resp.config.archive_period);
+      if (resp.config.sample_period != null) setWlSamplePeriod(resp.config.sample_period);
+      const failures = Object.entries(resp.results).filter(([, v]) => v !== "ok");
+      if (failures.length > 0) {
+        setWlError("Partial failure: " + failures.map(([k, v]) => `${k}: ${v}`).join(", "));
+      } else {
+        setWlMsg("Saved to WeatherLink");
+      }
+    } catch (err: unknown) {
+      setWlError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWlSaving(false);
+    }
+  }, [wlConfig, wlArchivePeriod, wlSamplePeriod, wlCal]);
+
+  const handleClearRainDaily = useCallback(async () => {
+    if (!confirm("Clear the daily rain accumulator? This cannot be undone.")) return;
+    setWlMsg(null);
+    setWlError(null);
+    try {
+      const resp = await clearRainDaily();
+      setWlMsg(resp.success ? "Daily rain cleared" : "Failed to clear daily rain");
+    } catch (err: unknown) {
+      setWlError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const handleClearRainYearly = useCallback(async () => {
+    if (!confirm("Clear the yearly rain accumulator? This cannot be undone.")) return;
+    setWlMsg(null);
+    setWlError(null);
+    try {
+      const resp = await clearRainYearly();
+      setWlMsg(resp.success ? "Yearly rain cleared" : "Failed to clear yearly rain");
+    } catch (err: unknown) {
+      setWlError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const handleForceArchive = useCallback(async () => {
+    setWlMsg(null);
+    setWlError(null);
+    try {
+      const resp = await forceArchive();
+      setWlMsg(resp.success ? "Archive record written" : "Failed to write archive");
+    } catch (err: unknown) {
+      setWlError(err instanceof Error ? err.message : String(err));
+    }
   }, []);
 
   // Convenience getters
@@ -342,6 +442,170 @@ export default function Settings() {
               tabIndex={-1}
             />
           </div>
+        </div>
+      </div>
+
+      {/* WeatherLink section */}
+      <div style={cardStyle}>
+        <h3 style={sectionTitle}>WeatherLink</h3>
+
+        {/* Timing row */}
+        <div style={gridTwoCol}>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="How often the WeatherLink saves a summary record to its internal memory. Shorter intervals give finer history but fill the buffer faster.">
+              Archive Period (minutes)
+            </label>
+            <select
+              style={selectStyle}
+              value={wlArchivePeriod}
+              onChange={(e) => setWlArchivePeriod(parseInt(e.target.value))}
+            >
+              {[1, 5, 10, 15, 30, 60, 120].map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="How often the WeatherLink reads sensors. Lower values give fresher LOOP data but increase processing load.">
+              Sample Period (seconds)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              min={1}
+              max={255}
+              value={wlSamplePeriod}
+              onChange={(e) => {
+                const v = parseInt(e.target.value);
+                if (!isNaN(v) && v >= 1 && v <= 255) setWlSamplePeriod(v);
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Calibration row */}
+        <div style={gridTwoCol}>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="Added to raw inside temperature reading (tenths of °F). Use to correct a known sensor bias.">
+              Inside Temp Offset (tenths °F)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={wlCal.inside_temp}
+              onChange={(e) => setWlCal({ ...wlCal, inside_temp: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="Added to raw outside temperature reading (tenths of °F).">
+              Outside Temp Offset (tenths °F)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={wlCal.outside_temp}
+              onChange={(e) => setWlCal({ ...wlCal, outside_temp: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="Subtracted from raw barometer reading (thousandths inHg). Adjust to match a known reference.">
+              Barometer Offset (thousandths inHg)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={wlCal.barometer}
+              onChange={(e) => setWlCal({ ...wlCal, barometer: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="Added to raw outside humidity reading (%). Result is clamped to 1-100%.">
+              Humidity Offset (%)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={wlCal.outside_humidity}
+              onChange={(e) => setWlCal({ ...wlCal, outside_humidity: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle} title="Rain collector clicks per inch. Standard: 100 (0.01&quot;/click). Metric: 127. Do not change unless you have a non-standard collector.">
+              Rain Calibration (clicks/inch)
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={wlCal.rain_cal}
+              onChange={(e) => setWlCal({ ...wlCal, rain_cal: parseInt(e.target.value) || 100 })}
+            />
+          </div>
+        </div>
+
+        {/* Actions row */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "8px" }}>
+          <button
+            style={{
+              ...btnPrimary,
+              opacity: wlSaving ? 0.6 : 1,
+              cursor: wlSaving ? "wait" : "pointer",
+            }}
+            onClick={handleWlSave}
+            disabled={wlSaving}
+            title="Write the above settings to the WeatherLink hardware"
+          >
+            {wlSaving ? "Saving..." : "Save to WeatherLink"}
+          </button>
+
+          <button
+            style={{
+              ...btnPrimary,
+              background: "var(--color-bg-secondary)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={handleForceArchive}
+            title="Immediately write current conditions to the archive buffer, regardless of the archive timer"
+          >
+            Force Archive
+          </button>
+
+          <button
+            style={{
+              ...btnPrimary,
+              background: "var(--color-bg-secondary)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={handleClearRainDaily}
+            title="Reset the daily rain accumulator to zero"
+          >
+            Clear Daily Rain
+          </button>
+
+          <button
+            style={{
+              ...btnPrimary,
+              background: "var(--color-bg-secondary)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={handleClearRainYearly}
+            title="Reset the yearly rain accumulator to zero"
+          >
+            Clear Yearly Rain
+          </button>
+
+          {wlMsg && (
+            <span style={{ color: "var(--color-success)", fontSize: "14px", fontFamily: "var(--font-body)" }}>
+              {wlMsg}
+            </span>
+          )}
+          {wlError && (
+            <span style={{ color: "var(--color-danger)", fontSize: "14px", fontFamily: "var(--font-body)" }}>
+              Error: {wlError}
+            </span>
+          )}
         </div>
       </div>
 

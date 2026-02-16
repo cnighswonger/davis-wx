@@ -226,3 +226,25 @@ export interface ReconnectResult {
   station_type?: string;
   error?: string;
 }
+
+// --- WeatherLink Hardware Config ---
+
+export interface WeatherLinkCalibration {
+  inside_temp: number;
+  outside_temp: number;
+  barometer: number;
+  outside_humidity: number;
+  rain_cal: number;
+}
+
+export interface WeatherLinkConfig {
+  archive_period: number | null;
+  sample_period: number | null;
+  calibration: WeatherLinkCalibration;
+}
+
+export interface WeatherLinkConfigUpdate {
+  archive_period?: number;
+  sample_period?: number;
+  calibration?: WeatherLinkCalibration;
+}

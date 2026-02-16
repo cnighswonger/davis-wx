@@ -21,6 +21,9 @@ from .commands import (
     build_stop_command,
     build_start_command,
     build_crc0_command,
+    build_sap_command,
+    build_ssp_command,
+    build_arc_command,
 )
 from .crc import crc_validate, crc_calculate
 from .constants import (
@@ -567,6 +570,169 @@ class LinkDriver:
         self.serial.send(build_start_command())
         return self.serial.wait_for_ack()
 
+    def read_sample_period(self) -> Optional[int]:
+        """Read the sample period in seconds from link memory.
+
+        Raw value is stored as (256 - seconds), so we decode back.
+        """
+        addr = LinkBank1.SAMPLE_PERIOD
+        data = self.read_link_memory(addr.bank, addr.address, addr.nibbles)
+        if data is None or len(data) < 1:
+            return None
+        raw = data[0]
+        return (256 - raw) if raw != 0 else 256
+
+    def set_archive_period(self, minutes: int) -> bool:
+        """Set the archive period (1-120 minutes) via SAP command.
+
+        Sends SAP with io_lock held.  Returns True on ACK.
+        """
+        if not 1 <= minutes <= 120:
+            raise ValueError("Archive period must be 1-120 minutes")
+
+        with self._io_lock:
+            self.serial.flush()
+            cmd = build_sap_command(minutes)
+            self.serial.send(cmd)
+            ok = self.serial.wait_for_ack()
+            if ok:
+                logger.info("Archive period set to %d minutes", minutes)
+            else:
+                logger.warning("SAP command not acknowledged")
+            return ok
+
+    def set_sample_period(self, seconds: int) -> bool:
+        """Set the sample period (1-255 seconds) via SSP command.
+
+        Sends SSP with io_lock held.  Returns True on ACK.
+        """
+        if not 1 <= seconds <= 255:
+            raise ValueError("Sample period must be 1-255 seconds")
+
+        with self._io_lock:
+            self.serial.flush()
+            cmd = build_ssp_command(seconds)
+            self.serial.send(cmd)
+            ok = self.serial.wait_for_ack()
+            if ok:
+                logger.info("Sample period set to %d seconds", seconds)
+            else:
+                logger.warning("SSP command not acknowledged")
+            return ok
+
+    def write_calibration(self, offsets: CalibrationOffsets) -> bool:
+        """Write calibration offsets to station memory.
+
+        Sends STOP, writes each offset via WWR, then START.
+        Updates self.calibration on success.
+        """
+        with self._io_lock:
+            self.stop_polling()
+            try:
+                ok = True
+
+                # Inside temp (signed i16, tenths F)
+                data = struct.pack("<h", offsets.inside_temp)
+                ok &= self.write_station_memory(
+                    BasicBank1.INSIDE_TEMP_CAL.bank,
+                    BasicBank1.INSIDE_TEMP_CAL.address,
+                    BasicBank1.INSIDE_TEMP_CAL.nibbles,
+                    data,
+                )
+
+                # Outside temp (signed i16, tenths F)
+                data = struct.pack("<h", offsets.outside_temp)
+                ok &= self.write_station_memory(
+                    BasicBank1.OUTSIDE_TEMP_CAL.bank,
+                    BasicBank1.OUTSIDE_TEMP_CAL.address,
+                    BasicBank1.OUTSIDE_TEMP_CAL.nibbles,
+                    data,
+                )
+
+                # Barometer (unsigned u16, thousandths inHg)
+                data = struct.pack("<H", offsets.barometer)
+                ok &= self.write_station_memory(
+                    BasicBank1.BAR_CAL.bank,
+                    BasicBank1.BAR_CAL.address,
+                    BasicBank1.BAR_CAL.nibbles,
+                    data,
+                )
+
+                # Outside humidity (signed i16, percent)
+                data = struct.pack("<h", offsets.outside_hum)
+                ok &= self.write_station_memory(
+                    BasicBank1.OUTSIDE_HUMIDITY_CAL.bank,
+                    BasicBank1.OUTSIDE_HUMIDITY_CAL.address,
+                    BasicBank1.OUTSIDE_HUMIDITY_CAL.nibbles,
+                    data,
+                )
+
+                # Rain calibration (unsigned u16, clicks per inch)
+                data = struct.pack("<H", offsets.rain_cal)
+                ok &= self.write_station_memory(
+                    BasicBank1.RAIN_CAL.bank,
+                    BasicBank1.RAIN_CAL.address,
+                    BasicBank1.RAIN_CAL.nibbles,
+                    data,
+                )
+
+            finally:
+                self.start_polling()
+
+        if ok:
+            self.calibration = offsets
+            logger.info("Calibration offsets written: %s", offsets)
+        else:
+            logger.warning("Calibration write partial failure")
+            # Re-read to get actual state
+            self.read_calibration()
+        return ok
+
+    def clear_rain_daily(self) -> bool:
+        """Clear the daily rain accumulator by writing 0x0000."""
+        with self._io_lock:
+            self.stop_polling()
+            try:
+                ok = self.write_station_memory(
+                    BasicBank1.RAIN_DAILY.bank,
+                    BasicBank1.RAIN_DAILY.address,
+                    BasicBank1.RAIN_DAILY.nibbles,
+                    b"\x00\x00",
+                )
+            finally:
+                self.start_polling()
+        if ok:
+            logger.info("Daily rain cleared")
+        return ok
+
+    def clear_rain_yearly(self) -> bool:
+        """Clear the yearly rain accumulator by writing 0x0000."""
+        with self._io_lock:
+            self.stop_polling()
+            try:
+                ok = self.write_station_memory(
+                    BasicBank1.RAIN_YEARLY.bank,
+                    BasicBank1.RAIN_YEARLY.address,
+                    BasicBank1.RAIN_YEARLY.nibbles,
+                    b"\x00\x00",
+                )
+            finally:
+                self.start_polling()
+        if ok:
+            logger.info("Yearly rain cleared")
+        return ok
+
+    def force_archive(self) -> bool:
+        """Send ARC command to force immediate archive write."""
+        with self._io_lock:
+            self.serial.flush()
+            cmd = build_arc_command()
+            self.serial.send(cmd)
+            ok = self.serial.wait_for_ack()
+            if ok:
+                logger.info("Archive write forced")
+            return ok
+
     async def async_poll_loop(self) -> Optional[SensorReading]:
         """Async version of poll_loop."""
         import asyncio
@@ -596,3 +762,45 @@ class LinkDriver:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.write_station_time, dt)
+
+    async def async_read_sample_period(self) -> Optional[int]:
+        """Async version of read_sample_period."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_sample_period)
+
+    async def async_set_archive_period(self, minutes: int) -> bool:
+        """Async version of set_archive_period."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.set_archive_period, minutes)
+
+    async def async_set_sample_period(self, seconds: int) -> bool:
+        """Async version of set_sample_period."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.set_sample_period, seconds)
+
+    async def async_write_calibration(self, offsets: CalibrationOffsets) -> bool:
+        """Async version of write_calibration."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.write_calibration, offsets)
+
+    async def async_clear_rain_daily(self) -> bool:
+        """Async version of clear_rain_daily."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.clear_rain_daily)
+
+    async def async_clear_rain_yearly(self) -> bool:
+        """Async version of clear_rain_yearly."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.clear_rain_yearly)
+
+    async def async_force_archive(self) -> bool:
+        """Async version of force_archive."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.force_archive)

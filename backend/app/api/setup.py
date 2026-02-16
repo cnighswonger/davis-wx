@@ -263,6 +263,8 @@ async def _reconnect(port: str, baud_rate: int) -> dict:
         _app_refs["poller_task"] = new_task
 
         station_api.set_poller(new_poller, new_driver)
+        from . import weatherlink as weatherlink_api
+        weatherlink_api.set_driver(new_driver)
         ws_set_driver(new_driver)
 
         return {
@@ -275,5 +277,7 @@ async def _reconnect(port: str, baud_rate: int) -> dict:
         _app_refs["poller"] = None
         _app_refs["poller_task"] = None
         station_api.set_poller(None, None)
+        from . import weatherlink as weatherlink_api
+        weatherlink_api.set_driver(None)
         ws_set_driver(None)
         return {"success": False, "error": str(e)}

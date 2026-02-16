@@ -135,4 +135,37 @@ export function reconnectStation(): Promise<ReconnectResult> {
   });
 }
 
+// --- WeatherLink Hardware Config ---
+
+import type {
+  WeatherLinkConfig,
+  WeatherLinkConfigUpdate,
+} from "./types.ts";
+
+export function fetchWeatherLinkConfig(): Promise<WeatherLinkConfig> {
+  return request<WeatherLinkConfig>("/api/weatherlink/config");
+}
+
+export function updateWeatherLinkConfig(
+  config: WeatherLinkConfigUpdate,
+): Promise<{ results: Record<string, string>; config: WeatherLinkConfig }> {
+  return request("/api/weatherlink/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}
+
+export function clearRainDaily(): Promise<{ success: boolean }> {
+  return request("/api/weatherlink/clear-rain-daily", { method: "POST" });
+}
+
+export function clearRainYearly(): Promise<{ success: boolean }> {
+  return request("/api/weatherlink/clear-rain-yearly", { method: "POST" });
+}
+
+export function forceArchive(): Promise<{ success: boolean }> {
+  return request("/api/weatherlink/force-archive", { method: "POST" });
+}
+
 export { ApiError };

@@ -18,6 +18,7 @@ from .services.poller import Poller
 from .api.router import api_router
 from .api import station as station_api
 from .api import setup as setup_api
+from .api import weatherlink as weatherlink_api
 from .ws.handler import websocket_endpoint, set_driver as ws_set_driver
 
 # Configure logging for our app (uvicorn only configures its own loggers)
@@ -150,6 +151,7 @@ async def _async_connect(port: str, baud: int):
     _app_refs["poller_task"] = poller_task
 
     station_api.set_poller(poller, driver)
+    weatherlink_api.set_driver(driver)
     ws_set_driver(driver)
 
 
