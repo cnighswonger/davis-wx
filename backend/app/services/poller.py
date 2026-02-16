@@ -237,9 +237,13 @@ class Poller:
                 "trend": trend,
             },
             "rain": {
-                "total": {"value": reading.rain_total, "unit": "clicks"},
+                "daily": (
+                    {"value": round(reading.rain_total * 0.01, 2), "unit": "in"}
+                    if reading.rain_total is not None else None
+                ),
+                "yearly": None,
                 "rate": (
-                    {"value": reading.rain_rate, "unit": "tenths in/hr"}
+                    {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
                     if reading.rain_rate else None
                 ),
             },

@@ -71,8 +71,15 @@ def get_current(db: Session = Depends(get_db)):
             "trend": reading.pressure_trend,
         },
         "rain": {
-            "total": {"value": reading.rain_total, "unit": "clicks"},
-            "rate": {"value": reading.rain_rate, "unit": "tenths in/hr"} if reading.rain_rate else None,
+            "daily": (
+                {"value": round(reading.rain_total * 0.01, 2), "unit": "in"}
+                if reading.rain_total is not None else None
+            ),
+            "yearly": None,
+            "rate": (
+                {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
+                if reading.rain_rate else None
+            ),
         },
         "derived": {
             "heat_index": {"value": _temp_f(reading.heat_index), "unit": "F"},
