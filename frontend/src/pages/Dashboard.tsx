@@ -1,6 +1,9 @@
 /**
  * Main dashboard page composing all weather gauges, derived conditions,
  * and station status into a responsive CSS grid layout.
+ *
+ * Each gauge tile is wrapped in FlipTile — click to flip and see a
+ * 1-hour historical chart for that sensor.
  */
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import TemperatureGauge from "../components/gauges/TemperatureGauge.tsx";
@@ -11,6 +14,7 @@ import RainGauge from "../components/gauges/RainGauge.tsx";
 import SolarUVGauge from "../components/gauges/SolarUVGauge.tsx";
 import CurrentConditions from "../components/panels/CurrentConditions.tsx";
 import StationStatus from "../components/panels/StationStatus.tsx";
+import FlipTile from "../components/common/FlipTile.tsx";
 
 export default function Dashboard() {
   const { currentConditions } = useWeatherData();
@@ -77,22 +81,28 @@ export default function Dashboard() {
           marginBottom: "16px",
         }}
       >
-        <TemperatureGauge
-          value={tempOutside}
-          unit={tempOutsideUnit}
-          label="Outside"
-        />
-        <TemperatureGauge
-          value={tempInside}
-          unit={tempInsideUnit}
-          label="Inside"
-        />
-        <BarometerDial
-          value={baroValue}
-          unit={baroUnit}
-          trend={baroTrend}
-          trendRate={baroTrendRate}
-        />
+        <FlipTile sensor="outside_temp" label="Outside Temperature" unit="°F">
+          <TemperatureGauge
+            value={tempOutside}
+            unit={tempOutsideUnit}
+            label="Outside"
+          />
+        </FlipTile>
+        <FlipTile sensor="inside_temp" label="Inside Temperature" unit="°F">
+          <TemperatureGauge
+            value={tempInside}
+            unit={tempInsideUnit}
+            label="Inside"
+          />
+        </FlipTile>
+        <FlipTile sensor="barometer" label="Barometer" unit="inHg">
+          <BarometerDial
+            value={baroValue}
+            unit={baroUnit}
+            trend={baroTrend}
+            trendRate={baroTrendRate}
+          />
+        </FlipTile>
       </div>
 
       {/* Middle row: Wind + Humidity */}
@@ -104,15 +114,21 @@ export default function Dashboard() {
           marginBottom: "16px",
         }}
       >
-        <WindCompass
-          direction={windDirection}
-          speed={windSpeed}
-          gust={windGust}
-          unit={windUnit}
-          cardinal={windCardinal}
-        />
-        <HumidityGauge value={humidityOutside} label="Outside" />
-        <HumidityGauge value={humidityInside} label="Inside" />
+        <FlipTile sensor="wind_speed" label="Wind Speed" unit="mph">
+          <WindCompass
+            direction={windDirection}
+            speed={windSpeed}
+            gust={windGust}
+            unit={windUnit}
+            cardinal={windCardinal}
+          />
+        </FlipTile>
+        <FlipTile sensor="outside_humidity" label="Outside Humidity" unit="%">
+          <HumidityGauge value={humidityOutside} label="Outside" />
+        </FlipTile>
+        <FlipTile sensor="inside_humidity" label="Inside Humidity" unit="%">
+          <HumidityGauge value={humidityInside} label="Inside" />
+        </FlipTile>
       </div>
 
       {/* Third row: Rain, Solar/UV (conditional), Derived Conditions */}
@@ -124,17 +140,21 @@ export default function Dashboard() {
           marginBottom: "16px",
         }}
       >
-        <RainGauge
-          rate={rainRate}
-          daily={rainDaily}
-          yearly={rainYearly}
-          unit={rainUnit}
-        />
-        {showSolarUV && (
-          <SolarUVGauge
-            solarRadiation={solarRadiation}
-            uvIndex={uvIndex}
+        <FlipTile sensor="rain_total" label="Rain" unit="clicks">
+          <RainGauge
+            rate={rainRate}
+            daily={rainDaily}
+            yearly={rainYearly}
+            unit={rainUnit}
           />
+        </FlipTile>
+        {showSolarUV && (
+          <FlipTile sensor="solar_radiation" label="Solar Radiation" unit="W/m²">
+            <SolarUVGauge
+              solarRadiation={solarRadiation}
+              uvIndex={uvIndex}
+            />
+          </FlipTile>
         )}
         <CurrentConditions />
       </div>
