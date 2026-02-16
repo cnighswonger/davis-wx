@@ -176,23 +176,48 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
 // --- Main component ---
 
 export default function Forecast() {
-  const { forecast } = useWeatherData();
+  const { forecast, refreshForecast } = useWeatherData();
 
   const local = forecast?.local ?? null;
   const nws = forecast?.nws ?? null;
 
   return (
     <div>
-      <h2
+      <div
         style={{
-          margin: "0 0 16px 0",
-          fontSize: "24px",
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
         }}
       >
-        Forecast
-      </h2>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "24px",
+            fontFamily: "var(--font-heading)",
+            color: "var(--color-text)",
+          }}
+        >
+          Forecast
+        </h2>
+        <button
+          onClick={refreshForecast}
+          style={{
+            background: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--gauge-border-radius)",
+            color: "var(--color-text-secondary)",
+            padding: "6px 14px",
+            fontSize: "13px",
+            fontFamily: "var(--font-body)",
+            cursor: "pointer",
+          }}
+          title="Refresh forecast data"
+        >
+          Refresh
+        </button>
+      </div>
 
       {/* Zambretti local forecast */}
       {local ? (

@@ -26,7 +26,7 @@ import {
   fetchAstronomy,
   fetchStationStatus,
 } from "../api/client.ts";
-import { ASTRONOMY_REFRESH_INTERVAL } from "../utils/constants.ts";
+import { ASTRONOMY_REFRESH_INTERVAL, FORECAST_REFRESH_INTERVAL } from "../utils/constants.ts";
 
 // --- Context value shape ---
 
@@ -39,6 +39,8 @@ interface WeatherDataContextValue {
   connected: boolean;
   /** Whether our browser WebSocket to the backend is open. */
   wsConnected: boolean;
+  /** Manually refresh forecast data. */
+  refreshForecast: () => void;
 }
 
 const WeatherDataContext = createContext<WeatherDataContextValue | null>(null);
@@ -61,6 +63,15 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
   const [wsConnected, setWsConnected] = useState(false);
 
   const wsRef = useRef<WebSocketManager | null>(null);
+
+  // Refresh forecast data from REST endpoint.
+  const refreshForecast = useCallback(() => {
+    fetchForecast()
+      .then(setForecast)
+      .catch(() => {
+        /* ignore -- will retry on next interval */
+      });
+  }, []);
 
   // Fetch slow-changing data (astronomy + station status).
   const refreshSlowData = useCallback(() => {
@@ -93,6 +104,9 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     // Periodically refresh astronomy and station status.
     const slowTimer = setInterval(refreshSlowData, ASTRONOMY_REFRESH_INTERVAL);
 
+    // Periodically refresh forecast data.
+    const forecastTimer = setInterval(refreshForecast, FORECAST_REFRESH_INTERVAL);
+
     // --- WebSocket setup ---
     const ws = new WebSocketManager();
     wsRef.current = ws;
@@ -121,11 +135,12 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
 
     return () => {
       clearInterval(slowTimer);
+      clearInterval(forecastTimer);
       clearInterval(wsStateTimer);
       ws.disconnect();
       wsRef.current = null;
     };
-  }, [refreshSlowData]);
+  }, [refreshSlowData, refreshForecast]);
 
   const value: WeatherDataContextValue = {
     currentConditions,
@@ -134,6 +149,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     stationStatus,
     connected,
     wsConnected,
+    refreshForecast,
   };
 
   return (

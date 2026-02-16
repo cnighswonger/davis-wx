@@ -17,6 +17,9 @@ export const POLL_INTERVAL = 5000;
 /** How often to refresh astronomy / station-status data (ms). */
 export const ASTRONOMY_REFRESH_INTERVAL = 300_000; // 5 minutes
 
+/** How often to auto-refresh forecast data (ms). */
+export const FORECAST_REFRESH_INTERVAL = 1_800_000; // 30 minutes
+
 /** Interval between WebSocket keep-alive pings (ms). */
 export const WS_PING_INTERVAL = 30_000;
 
