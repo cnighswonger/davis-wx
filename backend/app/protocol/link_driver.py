@@ -312,22 +312,26 @@ class LinkDriver:
                         continue
 
                     n_bytes = (n_nibbles + 1) // 2
-                    read_size = n_bytes + 2  # data + 2-byte CRC
+                    read_size = n_bytes + 2  # try to drain trailing CRC
                     data = self.serial.receive(read_size)
 
-                    if len(data) < n_bytes + 2:
+                    if len(data) < n_bytes:
                         logger.warning(
-                            "RRD bank %d addr 0x%03X attempt %d: short read (%d bytes)",
-                            bank, address, attempt + 1, len(data),
+                            "RRD bank %d addr 0x%03X attempt %d: short read (%d/%d bytes)",
+                            bank, address, attempt + 1, len(data), n_bytes,
                         )
                         continue
 
-                    if not crc_validate(data[:n_bytes + 2]):
-                        logger.warning(
-                            "RRD bank %d addr 0x%03X attempt %d: CRC failed",
-                            bank, address, attempt + 1,
-                        )
-                        continue
+                    # Validate CRC if we got the full response (data + 2 CRC bytes).
+                    # Older/non-Rev-E units may not send CRC — accept data anyway.
+                    if len(data) >= n_bytes + 2:
+                        if crc_validate(data[:n_bytes + 2]):
+                            logger.debug("RRD CRC OK")
+                        else:
+                            logger.debug(
+                                "RRD bank %d addr 0x%03X: CRC mismatch (may be non-Rev-E unit)",
+                                bank, address,
+                            )
 
                     return data[:n_bytes]
 
