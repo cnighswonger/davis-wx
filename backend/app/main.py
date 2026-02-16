@@ -79,19 +79,28 @@ async def lifespan(app: FastAPI):
     else:
         # Try .env defaults — if it works, this is an existing install
         logger.info("Setup not yet complete — trying .env defaults...")
+        connected = False
         try:
             await _async_connect(settings.serial_port, settings.baud_rate)
+            connected = True
+        except Exception as e:
+            logger.info("Could not connect with .env defaults (%s)", e)
+
+        if connected:
             # Connection worked → auto-mark setup complete (upgrade path)
-            db = SessionLocal()
             try:
-                db.add(StationConfigModel(
-                    key="setup_complete", value="true",
-                ))
-                db.commit()
-                logger.info("Existing install detected — auto-marked setup complete")
-            finally:
-                db.close()
-        except Exception:
+                db = SessionLocal()
+                try:
+                    db.merge(StationConfigModel(
+                        key="setup_complete", value="true",
+                    ))
+                    db.commit()
+                    logger.info("Existing install detected — auto-marked setup complete")
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error("Failed to mark setup complete: %s", e)
+        else:
             logger.info("Waiting for first-run setup wizard")
 
     yield
