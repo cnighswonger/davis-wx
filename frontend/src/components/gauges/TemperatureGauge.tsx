@@ -88,6 +88,8 @@ export default function TemperatureGauge({
       boxShadow: 'var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))',
       border: '1px solid var(--color-border)',
       minWidth: '120px',
+      height: '100%',
+      boxSizing: 'border-box',
     }}>
       {label && (
         <div style={{

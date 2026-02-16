@@ -73,11 +73,14 @@ export default function BarometerDial({ value, unit, trend }: BarometerDialProps
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       padding: '12px',
       background: 'var(--color-bg-card)',
       borderRadius: 'var(--gauge-border-radius, 16px)',
       boxShadow: 'var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))',
       border: '1px solid var(--color-border)',
+      height: '100%',
+      boxSizing: 'border-box',
     }}>
       <div style={{
         fontSize: '12px',

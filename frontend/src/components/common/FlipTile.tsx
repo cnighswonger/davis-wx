@@ -73,7 +73,7 @@ export default function FlipTile({
 
   return (
     <div
-      style={{ perspective: "1000px", cursor: "pointer" }}
+      style={{ perspective: "1000px", cursor: "pointer", height: "100%" }}
       onClick={handleClick}
     >
       <div
@@ -82,10 +82,13 @@ export default function FlipTile({
           transformStyle: "preserve-3d",
           transform: flipped ? "rotateY(180deg)" : "none",
           position: "relative",
+          height: "100%",
         }}
       >
         {/* Front face — the gauge */}
-        <div style={{ backfaceVisibility: "hidden" }}>{children}</div>
+        <div style={{ backfaceVisibility: "hidden", height: "100%" }}>
+          {children}
+        </div>
 
         {/* Back face — the chart */}
         <div

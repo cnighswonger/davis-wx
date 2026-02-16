@@ -33,12 +33,15 @@ export default function RainGauge({ rate, daily, yearly, unit }: RainGaugeProps)
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      justifyContent: 'center',
       padding: '16px',
       background: 'var(--color-bg-card)',
       borderRadius: 'var(--gauge-border-radius, 16px)',
       boxShadow: 'var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))',
       border: '1px solid var(--color-border)',
       minWidth: '160px',
+      height: '100%',
+      boxSizing: 'border-box',
     }}>
       <div style={{
         fontSize: '12px',
