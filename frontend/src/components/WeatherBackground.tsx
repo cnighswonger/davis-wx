@@ -67,6 +67,25 @@ const SCENE_EFFECTS: Record<WeatherScene, ParticleEffect> = {
   snow: "snow",
 };
 
+// --- Hex to rgba helper ---
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// CSS properties to make semi-transparent when backgrounds are active
+const TRANSLUCENT_PROPS = [
+  { prop: "--color-bg-card", key: "bgCard" as const },
+  { prop: "--color-bg-card-hover", key: "bgCardHover" as const },
+  { prop: "--color-bg-secondary", key: "bgSecondary" as const },
+  { prop: "--color-header-bg", key: "headerBg" as const },
+  { prop: "--color-sidebar-bg", key: "sidebarBg" as const },
+];
+
 // --- Component ---
 
 export default function WeatherBackground() {
@@ -79,6 +98,24 @@ export default function WeatherBackground() {
   useEffect(() => {
     prevSceneRef.current = scene;
   }, [scene]);
+
+  // Override card/header/sidebar backgrounds with semi-transparent versions
+  useEffect(() => {
+    const root = document.documentElement;
+    if (enabled) {
+      // Scale card opacity: at intensity 0 → fully opaque; at 100 → most transparent
+      // Card alpha ranges from 0.95 (subtle) to 0.6 (vivid)
+      const alpha = 0.95 - (intensity / 100) * 0.35;
+      for (const { prop, key } of TRANSLUCENT_PROPS) {
+        root.style.setProperty(prop, hexToRgba(theme.colors[key], alpha));
+      }
+    } else {
+      // Restore opaque theme colors
+      for (const { prop, key } of TRANSLUCENT_PROPS) {
+        root.style.setProperty(prop, theme.colors[key]);
+      }
+    }
+  }, [enabled, intensity, theme]);
 
   if (!enabled) return null;
 
