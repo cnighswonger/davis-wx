@@ -312,10 +312,21 @@ class LinkDriver:
                         continue
 
                     n_bytes = (n_nibbles + 1) // 2
-                    read_size = n_bytes + 2  # always drain trailing CRC
+                    read_size = n_bytes + 2  # data + 2-byte CRC
                     data = self.serial.receive(read_size)
 
-                    if len(data) < n_bytes:
+                    if len(data) < n_bytes + 2:
+                        logger.warning(
+                            "RRD bank %d addr 0x%03X attempt %d: short read (%d bytes)",
+                            bank, address, attempt + 1, len(data),
+                        )
+                        continue
+
+                    if not crc_validate(data[:n_bytes + 2]):
+                        logger.warning(
+                            "RRD bank %d addr 0x%03X attempt %d: CRC failed",
+                            bank, address, attempt + 1,
+                        )
                         continue
 
                     return data[:n_bytes]
