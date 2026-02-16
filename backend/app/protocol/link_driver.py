@@ -71,7 +71,7 @@ class LinkDriver:
         self.is_rev_e = False
         self._connected = False
         self._stop_requested = False
-        self._io_lock = threading.Lock()
+        self._io_lock = threading.RLock()
 
     @property
     def connected(self) -> bool:
@@ -251,106 +251,109 @@ class LinkDriver:
 
         Returns raw nibble data as bytes, or None on failure.
         """
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                cmd = build_wrd_command(n_nibbles, bank, address)
-                logger.debug(
-                    "WRD %d nibbles bank %d addr 0x%02X -> TX: %s",
-                    n_nibbles, bank, address, cmd.hex(),
-                )
-                self.serial.send(cmd)
-
-                if not self.serial.wait_for_ack():
-                    logger.warning(
-                        "WRD bank %d addr 0x%02X attempt %d: no ACK",
-                        bank, address, attempt + 1,
+        with self._io_lock:
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    cmd = build_wrd_command(n_nibbles, bank, address)
+                    logger.debug(
+                        "WRD %d nibbles bank %d addr 0x%02X -> TX: %s",
+                        n_nibbles, bank, address, cmd.hex(),
                     )
-                    continue
+                    self.serial.send(cmd)
 
-                # Number of bytes = ceil(n_nibbles / 2)
-                n_bytes = (n_nibbles + 1) // 2
-                # Always read data + 2 CRC bytes — the WeatherLink
-                # sends trailing CRC regardless of revision, and leaving
-                # them in the buffer corrupts subsequent reads.
-                read_size = n_bytes + 2
-                data = self.serial.receive(read_size)
-                logger.debug("WRD RX: %s (%d bytes)", data.hex(), len(data))
+                    if not self.serial.wait_for_ack():
+                        logger.warning(
+                            "WRD bank %d addr 0x%02X attempt %d: no ACK",
+                            bank, address, attempt + 1,
+                        )
+                        continue
 
-                if len(data) < n_bytes:
-                    logger.warning(
-                        "WRD bank %d addr 0x%02X attempt %d: short read %d/%d",
-                        bank, address, attempt + 1, len(data), n_bytes,
-                    )
-                    continue
+                    # Number of bytes = ceil(n_nibbles / 2)
+                    n_bytes = (n_nibbles + 1) // 2
+                    # Always read data + 2 CRC bytes — the WeatherLink
+                    # sends trailing CRC regardless of revision, and leaving
+                    # them in the buffer corrupts subsequent reads.
+                    read_size = n_bytes + 2
+                    data = self.serial.receive(read_size)
+                    logger.debug("WRD RX: %s (%d bytes)", data.hex(), len(data))
 
-                # Validate CRC if we got the full response
-                if len(data) >= n_bytes + 2:
-                    if crc_validate(data[:n_bytes + 2]):
-                        logger.debug("WRD CRC OK")
-                    else:
-                        logger.debug("WRD CRC mismatch (non-Rev-E units may not send valid CRC)")
+                    if len(data) < n_bytes:
+                        logger.warning(
+                            "WRD bank %d addr 0x%02X attempt %d: short read %d/%d",
+                            bank, address, attempt + 1, len(data), n_bytes,
+                        )
+                        continue
 
-                return data[:n_bytes]
+                    # Validate CRC if we got the full response
+                    if len(data) >= n_bytes + 2:
+                        if crc_validate(data[:n_bytes + 2]):
+                            logger.debug("WRD CRC OK")
+                        else:
+                            logger.debug("WRD CRC mismatch (non-Rev-E units may not send valid CRC)")
 
-            except Exception as e:
-                logger.warning("WRD attempt %d failed: %s", attempt + 1, e)
+                    return data[:n_bytes]
 
-        return None
+                except Exception as e:
+                    logger.warning("WRD attempt %d failed: %s", attempt + 1, e)
+
+            return None
 
     def read_link_memory(
         self, bank: int, address: int, n_nibbles: int
     ) -> Optional[bytes]:
         """Read link processor memory using RRD command."""
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                cmd = build_rrd_command(bank, address, n_nibbles)
-                self.serial.send(cmd)
+        with self._io_lock:
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    cmd = build_rrd_command(bank, address, n_nibbles)
+                    self.serial.send(cmd)
 
-                if not self.serial.wait_for_ack():
-                    continue
+                    if not self.serial.wait_for_ack():
+                        continue
 
-                n_bytes = (n_nibbles + 1) // 2
-                read_size = n_bytes + 2  # always drain trailing CRC
-                data = self.serial.receive(read_size)
+                    n_bytes = (n_nibbles + 1) // 2
+                    read_size = n_bytes + 2  # always drain trailing CRC
+                    data = self.serial.receive(read_size)
 
-                if len(data) < n_bytes:
-                    continue
+                    if len(data) < n_bytes:
+                        continue
 
-                return data[:n_bytes]
+                    return data[:n_bytes]
 
-            except Exception as e:
-                logger.warning("RRD attempt %d failed: %s", attempt + 1, e)
+                except Exception as e:
+                    logger.warning("RRD attempt %d failed: %s", attempt + 1, e)
 
-        return None
+            return None
 
     def read_archive(self, address: int, n_bytes: int) -> Optional[bytes]:
         """Read archive/SRAM memory using SRD command with retries."""
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                self.serial.flush()
-                cmd = build_srd_command(address, n_bytes)
-                self.serial.send(cmd)
+        with self._io_lock:
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    self.serial.flush()
+                    cmd = build_srd_command(address, n_bytes)
+                    self.serial.send(cmd)
 
-                if not self.serial.wait_for_ack():
-                    logger.warning("SRD addr 0x%04X attempt %d: no ACK", address, attempt + 1)
-                    continue
+                    if not self.serial.wait_for_ack():
+                        logger.warning("SRD addr 0x%04X attempt %d: no ACK", address, attempt + 1)
+                        continue
 
-                # SRD always returns data + 2-byte CRC
-                data = self.serial.receive(n_bytes + 2)
-                if len(data) < n_bytes + 2:
-                    logger.warning("SRD addr 0x%04X attempt %d: short read", address, attempt + 1)
-                    continue
+                    # SRD always returns data + 2-byte CRC
+                    data = self.serial.receive(n_bytes + 2)
+                    if len(data) < n_bytes + 2:
+                        logger.warning("SRD addr 0x%04X attempt %d: short read", address, attempt + 1)
+                        continue
 
-                if not crc_validate(data):
-                    logger.warning("SRD addr 0x%04X attempt %d: CRC failed", address, attempt + 1)
-                    continue
+                    if not crc_validate(data):
+                        logger.warning("SRD addr 0x%04X attempt %d: CRC failed", address, attempt + 1)
+                        continue
 
-                return data[:n_bytes]
+                    return data[:n_bytes]
 
-            except Exception as e:
-                logger.warning("SRD attempt %d failed: %s", attempt + 1, e)
+                except Exception as e:
+                    logger.warning("SRD attempt %d failed: %s", attempt + 1, e)
 
-        return None
+            return None
 
     def read_archive_pointers(self) -> Optional[tuple]:
         """Read NewPtr and OldPtr from link processor memory.
@@ -422,27 +425,28 @@ class LinkDriver:
 
         Returns True on success (ACK received), False on failure.
         """
-        for attempt in range(MAX_RETRIES + 1):
-            try:
-                cmd = build_wwr_command(n_nibbles, bank, address, data)
-                logger.debug(
-                    "WWR %d nibbles bank %d addr 0x%02X data=%s",
-                    n_nibbles, bank, address, data.hex(),
-                )
-                self.serial.send(cmd)
+        with self._io_lock:
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    cmd = build_wwr_command(n_nibbles, bank, address, data)
+                    logger.debug(
+                        "WWR %d nibbles bank %d addr 0x%02X data=%s",
+                        n_nibbles, bank, address, data.hex(),
+                    )
+                    self.serial.send(cmd)
 
-                if self.serial.wait_for_ack():
-                    logger.debug("WWR ACK OK")
-                    return True
+                    if self.serial.wait_for_ack():
+                        logger.debug("WWR ACK OK")
+                        return True
 
-                logger.warning(
-                    "WWR bank %d addr 0x%02X attempt %d: no ACK",
-                    bank, address, attempt + 1,
-                )
-            except Exception as e:
-                logger.warning("WWR attempt %d failed: %s", attempt + 1, e)
+                    logger.warning(
+                        "WWR bank %d addr 0x%02X attempt %d: no ACK",
+                        bank, address, attempt + 1,
+                    )
+                except Exception as e:
+                    logger.warning("WWR attempt %d failed: %s", attempt + 1, e)
 
-        return False
+            return False
 
     def read_station_time(self) -> Optional[dict]:
         """Read station time and date from processor memory.
