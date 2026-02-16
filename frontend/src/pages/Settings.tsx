@@ -205,30 +205,35 @@ export default function Settings() {
   const [wlMsg, setWlMsg] = useState<string | null>(null);
   const [wlError, setWlError] = useState<string | null>(null);
 
-  // Load config + serial ports + weatherlink config
+  // Load config + serial ports (fast), then weatherlink config (slow, non-blocking)
   useEffect(() => {
     setLoading(true);
     setError(null);
     Promise.all([
       fetchConfig(),
       fetchSerialPorts().catch(() => ({ ports: [] })),
-      fetchWeatherLinkConfig().catch(() => null),
     ])
-      .then(([items, portResult, wl]) => {
+      .then(([items, portResult]) => {
         setConfigItems(items);
         setPorts(portResult.ports);
-        if (wl && !("error" in wl)) {
-          setWlConfig(wl);
-          if (wl.archive_period != null) setWlArchivePeriod(wl.archive_period);
-          if (wl.sample_period != null) setWlSamplePeriod(wl.sample_period);
-          setWlCal(wl.calibration);
-        }
         setLoading(false);
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
         setLoading(false);
       });
+
+    // Load WeatherLink hardware config in background (serial I/O is slow)
+    fetchWeatherLinkConfig()
+      .then((wl) => {
+        if (wl && !("error" in wl)) {
+          setWlConfig(wl);
+          if (wl.archive_period != null) setWlArchivePeriod(wl.archive_period);
+          if (wl.sample_period != null) setWlSamplePeriod(wl.sample_period);
+          setWlCal(wl.calibration);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const updateField = useCallback(

@@ -89,4 +89,4 @@ def update_config(updates: list[ConfigUpdate], db: Session = Depends(get_db)):
             db.add(new_item)
     db.commit()
     items = db.query(StationConfigModel).all()
-    return [{"key": item.key, "value": item.value} for item in items]
+    return [{"key": item.key, "value": _coerce_value(item.value)} for item in items]
