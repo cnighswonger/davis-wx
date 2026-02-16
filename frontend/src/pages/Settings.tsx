@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive } from "../api/client.ts";
 import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
+import { useWeatherBackground } from "../context/WeatherBackgroundContext.tsx";
 import { themes } from "../themes/index.ts";
+import { ALL_SCENES, SCENE_LABELS, SCENE_GRADIENTS } from "../components/WeatherBackground.tsx";
+import { API_BASE } from "../utils/constants.ts";
 
 // --- Shared styles ---
 
@@ -150,6 +153,44 @@ export default function Settings() {
   const [ports, setPorts] = useState<string[]>([]);
 
   const { themeName, setThemeName } = useTheme();
+  const {
+    enabled: bgEnabled,
+    setEnabled: setBgEnabled,
+    intensity: bgIntensity,
+    setIntensity: setBgIntensity,
+    customImages: bgCustomImages,
+    refreshCustomImages: refreshBgImages,
+  } = useWeatherBackground();
+  const [scenesExpanded, setScenesExpanded] = useState(false);
+
+  const handleBgUpload = useCallback(async (scene: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const resp = await fetch(`${API_BASE}/api/backgrounds/${scene}`, {
+        method: "POST",
+        body: form,
+      });
+      if (resp.ok) {
+        refreshBgImages();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [refreshBgImages]);
+
+  const handleBgDelete = useCallback(async (scene: string) => {
+    try {
+      const resp = await fetch(`${API_BASE}/api/backgrounds/${scene}`, {
+        method: "DELETE",
+      });
+      if (resp.ok) {
+        refreshBgImages();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [refreshBgImages]);
 
   // WeatherLink hardware config state
   const [wlConfig, setWlConfig] = useState<WeatherLinkConfig | null>(null);
@@ -741,6 +782,127 @@ export default function Settings() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "8px" }}>
+          <div style={fieldGroup}>
+            <label style={checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={bgEnabled}
+                onChange={(e) => setBgEnabled(e.target.checked)}
+              />
+              Weather Background
+            </label>
+          </div>
+
+          {bgEnabled && (
+            <>
+              <div style={fieldGroup}>
+                <label style={labelStyle} title="How visible the weather background is. Higher values show more of the gradient/image.">
+                  Intensity: {bgIntensity}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={bgIntensity}
+                  onChange={(e) => setBgIntensity(parseInt(e.target.value))}
+                  style={{ width: "100%", cursor: "pointer" }}
+                />
+              </div>
+
+              <div style={fieldGroup}>
+                <label
+                  style={{ ...labelStyle, cursor: "pointer", userSelect: "none" }}
+                  onClick={() => setScenesExpanded((v) => !v)}
+                >
+                  Custom Scene Images {scenesExpanded ? "\u25B2" : "\u25BC"}
+                </label>
+
+                {scenesExpanded && (
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                    gap: "12px",
+                    marginTop: "8px",
+                  }}>
+                    {ALL_SCENES.map((scene) => {
+                      const customUrl = bgCustomImages[scene];
+                      return (
+                        <div key={scene} style={{
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          background: "var(--color-bg-secondary)",
+                        }}>
+                          {/* Preview swatch */}
+                          <div style={{
+                            height: "60px",
+                            background: customUrl
+                              ? `url(${customUrl}) center/cover`
+                              : SCENE_GRADIENTS[scene],
+                          }} />
+                          <div style={{ padding: "8px" }}>
+                            <div style={{
+                              fontSize: "13px",
+                              fontFamily: "var(--font-body)",
+                              color: "var(--color-text)",
+                              marginBottom: "6px",
+                              fontWeight: 500,
+                            }}>
+                              {SCENE_LABELS[scene]}
+                            </div>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              <label style={{
+                                fontSize: "11px",
+                                padding: "3px 8px",
+                                borderRadius: "4px",
+                                border: "1px solid var(--color-border)",
+                                background: "var(--color-bg-card)",
+                                color: "var(--color-text-secondary)",
+                                cursor: "pointer",
+                                fontFamily: "var(--font-body)",
+                              }}>
+                                Upload
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  style={{ display: "none" }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleBgUpload(scene, file);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                              {customUrl && (
+                                <button
+                                  style={{
+                                    fontSize: "11px",
+                                    padding: "3px 8px",
+                                    borderRadius: "4px",
+                                    border: "1px solid var(--color-border)",
+                                    background: "var(--color-bg-card)",
+                                    color: "var(--color-danger)",
+                                    cursor: "pointer",
+                                    fontFamily: "var(--font-body)",
+                                  }}
+                                  onClick={() => handleBgDelete(scene)}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

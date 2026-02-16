@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
+import { WeatherBackgroundProvider } from './context/WeatherBackgroundContext';
 import { WeatherDataProvider, useWeatherData } from './context/WeatherDataContext';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
@@ -85,11 +86,13 @@ function App() {
 
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <WeatherDataProvider>
-          <AppContent />
-        </WeatherDataProvider>
-      </BrowserRouter>
+      <WeatherBackgroundProvider>
+        <BrowserRouter>
+          <WeatherDataProvider>
+            <AppContent />
+          </WeatherDataProvider>
+        </BrowserRouter>
+      </WeatherBackgroundProvider>
     </ThemeProvider>
   );
 }

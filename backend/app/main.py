@@ -19,6 +19,7 @@ from .api.router import api_router
 from .api import station as station_api
 from .api import setup as setup_api
 from .api import weatherlink as weatherlink_api
+from .api import backgrounds as backgrounds_api
 from .ws.handler import websocket_endpoint, set_driver as ws_set_driver
 
 # Configure logging for our app (uvicorn only configures its own loggers)
@@ -177,6 +178,12 @@ def create_app() -> FastAPI:
 
     # WebSocket
     app.websocket("/ws/live")(websocket_endpoint)
+
+    # Custom background images directory (alongside the database)
+    bg_dir = Path(settings.db_path).parent / "backgrounds"
+    bg_dir.mkdir(parents=True, exist_ok=True)
+    backgrounds_api.set_backgrounds_dir(bg_dir)
+    app.mount("/backgrounds", StaticFiles(directory=str(bg_dir)), name="backgrounds")
 
     # Serve frontend static files if built
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
