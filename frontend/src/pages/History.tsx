@@ -30,7 +30,7 @@ const SENSOR_UNITS: Record<string, string> = {
 
 // --- Date range helpers ---
 
-type Preset = "24h" | "7d" | "30d" | "custom";
+type Preset = "1h" | "12h" | "24h" | "7d" | "30d" | "custom";
 
 function isoLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -42,6 +42,12 @@ function presetRange(preset: Preset): { start: string; end: string } {
   const end = now.toISOString();
   let start: Date;
   switch (preset) {
+    case "1h":
+      start = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+      break;
+    case "12h":
+      start = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+      break;
     case "24h":
       start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       break;
@@ -217,6 +223,8 @@ export default function History() {
   }, [data, sensor]);
 
   const presets: { key: Preset; label: string }[] = [
+    { key: "1h", label: "1 Hour" },
+    { key: "12h", label: "12 Hours" },
     { key: "24h", label: "24 Hours" },
     { key: "7d", label: "7 Days" },
     { key: "30d", label: "30 Days" },
