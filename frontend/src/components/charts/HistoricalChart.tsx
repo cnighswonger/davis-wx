@@ -31,7 +31,7 @@ export default function HistoricalChart({
     const mutedColor = getCSSVar("--color-text-muted") || "#5c6478";
     const borderColor = getCSSVar("--color-border") || "#2a2d3e";
     const accentColor = getCSSVar("--color-accent") || "#3b82f6";
-    const cardBg = getCSSVar("--color-bg-card") || "#1e2130";
+    const cardBg = getCSSVar("--color-bg-card-solid") || getCSSVar("--color-bg-card") || "#1e2130";
 
     const seriesData = data.map((pt) => [
       new Date(pt.timestamp).getTime(),

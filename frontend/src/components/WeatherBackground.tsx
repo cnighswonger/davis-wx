@@ -99,7 +99,9 @@ export default function WeatherBackground() {
     prevSceneRef.current = scene;
   }, [scene]);
 
-  // Override card/header/sidebar backgrounds with semi-transparent versions
+  // Override card/header/sidebar backgrounds with semi-transparent versions.
+  // Also set "--<prop>-solid" companions that remain opaque for SVG fills
+  // and chart backgrounds so only container backgrounds become transparent.
   useEffect(() => {
     const root = document.documentElement;
     if (enabled) {
@@ -107,11 +109,13 @@ export default function WeatherBackground() {
       const alpha = 1 - (transparency / 100) * 0.7;
       for (const { prop, key } of TRANSLUCENT_PROPS) {
         root.style.setProperty(prop, hexToRgba(theme.colors[key], alpha));
+        root.style.setProperty(`${prop}-solid`, theme.colors[key]);
       }
     } else {
-      // Restore opaque theme colors
+      // Restore opaque theme colors and remove solid companions
       for (const { prop, key } of TRANSLUCENT_PROPS) {
         root.style.setProperty(prop, theme.colors[key]);
+        root.style.removeProperty(`${prop}-solid`);
       }
     }
   }, [enabled, transparency, theme]);

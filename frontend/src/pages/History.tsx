@@ -158,7 +158,7 @@ export default function History() {
     const textColor = cs.getPropertyValue("--color-text").trim();
     const textMuted = cs.getPropertyValue("--color-text-muted").trim();
     const accent = cs.getPropertyValue("--color-accent").trim();
-    const bgCard = cs.getPropertyValue("--color-bg-card").trim();
+    const bgCard = cs.getPropertyValue("--color-bg-card-solid").trim() || cs.getPropertyValue("--color-bg-card").trim();
     const borderColor = cs.getPropertyValue("--color-border").trim();
 
     const unitKey = SENSOR_UNITS[sensor] ?? "";

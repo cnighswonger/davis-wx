@@ -171,7 +171,7 @@ export default function BarometerDial({ value, unit, trend }: BarometerDialProps
         />
         {/* Needle center */}
         <circle cx={cx} cy={cy} r="5" fill="var(--color-barometer-needle, #f59e0b)" />
-        <circle cx={cx} cy={cy} r="2.5" fill="var(--color-bg-card)" />
+        <circle cx={cx} cy={cy} r="2.5" fill="var(--color-bg-card-solid, var(--color-bg-card))" />
 
         {/* Digital readout at bottom of dial */}
         <text

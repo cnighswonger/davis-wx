@@ -119,7 +119,7 @@ export default function WindCompass({ direction, speed, gust, unit, cardinal }: 
         )}
 
         {/* Center hub */}
-        <circle cx={cx} cy={cy} r="28" fill="var(--color-bg-card)" stroke="var(--color-border)" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r="28" fill="var(--color-bg-card-solid, var(--color-bg-card))" stroke="var(--color-border)" strokeWidth="1" />
 
         {/* Speed in center */}
         <text

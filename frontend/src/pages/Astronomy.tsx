@@ -205,7 +205,7 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
         cy={cy}
         rx={shadowRx}
         ry={r}
-        fill="var(--color-bg-card)"
+        fill="var(--color-bg-card-solid, var(--color-bg-card))"
       />
 
       {/* If waning, the shadow is on the right; if waxing, on the left.
@@ -236,7 +236,7 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
               cx={cx}
               cy={cy}
               r={r}
-              fill="var(--color-bg-card)"
+              fill="var(--color-bg-card-solid, var(--color-bg-card))"
               clipPath={`url(#${clipId})`}
             />
             {/* Terminator: either add light or dark ellipse depending on phase */}
@@ -247,7 +247,7 @@ function MoonPhaseVis({ illumination, phase }: { illumination: number; phase: st
                 cy={cy}
                 rx={shadowRx}
                 ry={r}
-                fill="var(--color-bg-card)"
+                fill="var(--color-bg-card-solid, var(--color-bg-card))"
                 clipPath={`url(#${clipId})`}
                 style={{ transform: "none" }}
               />

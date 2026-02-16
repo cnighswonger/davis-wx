@@ -76,7 +76,7 @@ export default function TrendChart({
       tooltip: {
         xDateFormat: "%b %e, %l:%M %p",
         valueSuffix: ` ${unit}`,
-        backgroundColor: getCSSVar("--color-bg-card") || "#1e2130",
+        backgroundColor: getCSSVar("--color-bg-card-solid") || getCSSVar("--color-bg-card") || "#1e2130",
         borderColor: borderColor,
         style: { color: textColor, fontSize: "11px" },
       },
