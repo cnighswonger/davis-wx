@@ -11,11 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
 from .config import settings
-from .models.database import init_database
+from .models.database import init_database, SessionLocal
+from .models.station_config import StationConfigModel
 from .protocol.link_driver import LinkDriver
 from .services.poller import Poller
 from .api.router import api_router
 from .api import station as station_api
+from .api import setup as setup_api
 from .ws.handler import websocket_endpoint, set_driver as ws_set_driver
 
 # Configure logging for our app (uvicorn only configures its own loggers)
@@ -25,79 +27,122 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global references for cleanup
-_poller: Poller | None = None
-_poller_task: asyncio.Task | None = None
-_driver: LinkDriver | None = None
+# Shared mutable state — accessed by setup.py for reconnect
+_app_refs: dict = {
+    "driver": None,
+    "poller": None,
+    "poller_task": None,
+}
+
+
+def _try_serial_connect(port: str, baud: int, timeout: float):
+    """Attempt serial connection, station detection, and poller start.
+
+    Updates _app_refs on success. Raises on failure.
+    """
+    return port, baud, timeout  # placeholder — actual logic is async
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: start/stop serial polling and services."""
-    global _poller, _poller_task, _driver
 
     # Initialize database
     init_database()
     logger.info("Database initialized")
 
-    # Try to connect to serial port
-    logger.info(
-        "Connecting to serial port %s at %d baud (timeout=%.1fs)",
-        settings.serial_port, settings.baud_rate, settings.serial_timeout,
-    )
+    # Share refs with setup module for reconnect support
+    setup_api.set_app_refs(_app_refs)
+
+    # Check if setup has been completed
+    db = SessionLocal()
     try:
-        _driver = LinkDriver(
-            port=settings.serial_port,
-            baud_rate=settings.baud_rate,
-            timeout=settings.serial_timeout,
-        )
-        _driver.open()
-        logger.info("Serial port %s opened", settings.serial_port)
+        row = db.query(StationConfigModel).filter_by(key="setup_complete").first()
+        setup_done = row is not None and row.value == "true"
+    finally:
+        db.close()
 
-        # Detect station type via WRD read of model nibble
-        logger.info("Detecting station type...")
-        station_type = await _driver.async_detect_station_type()
-        logger.info(
-            "Station detected: %s (model code %d)",
-            station_type.name, station_type.value,
-        )
+    if setup_done:
+        # Normal startup — connect with DB config (falls back to .env defaults)
+        db = SessionLocal()
+        try:
+            from .api.config import get_effective_config
+            cfg = get_effective_config(db)
+            port = str(cfg.get("serial_port", settings.serial_port))
+            baud = int(cfg.get("baud_rate", settings.baud_rate))
+        finally:
+            db.close()
 
-        # Read calibration
-        logger.info("Reading calibration offsets...")
-        await _driver.async_read_calibration()
-
-        # Start poller
-        _poller = Poller(_driver, poll_interval=settings.poll_interval_sec)
-        _poller_task = asyncio.create_task(_poller.run())
-        logger.info("Poller started (%ds interval)", settings.poll_interval_sec)
-
-        # Set references for API endpoints and WebSocket handler
-        station_api.set_poller(_poller, _driver)
-        ws_set_driver(_driver)
-
-    except Exception as e:
-        logger.warning("Could not connect to serial port: %s", e, exc_info=True)
-        logger.info("Running in demo mode (no serial connection)")
+        await _async_connect(port, baud)
+    else:
+        # Try .env defaults — if it works, this is an existing install
+        logger.info("Setup not yet complete — trying .env defaults...")
+        try:
+            await _async_connect(settings.serial_port, settings.baud_rate)
+            # Connection worked → auto-mark setup complete (upgrade path)
+            db = SessionLocal()
+            try:
+                db.add(StationConfigModel(
+                    key="setup_complete", value="true",
+                ))
+                db.commit()
+                logger.info("Existing install detected — auto-marked setup complete")
+            finally:
+                db.close()
+        except Exception:
+            logger.info("Waiting for first-run setup wizard")
 
     yield
 
     # Shutdown: stop poller loop first, then close serial port
     logger.info("Shutting down...")
-    if _poller:
-        _poller.stop()
-    if _poller_task:
-        _poller_task.cancel()
+    poller = _app_refs.get("poller")
+    poller_task = _app_refs.get("poller_task")
+    driver = _app_refs.get("driver")
+
+    if poller:
+        poller.stop()
+    if poller_task:
+        poller_task.cancel()
         try:
-            await asyncio.wait_for(asyncio.shield(_poller_task), timeout=6.0)
+            await asyncio.wait_for(asyncio.shield(poller_task), timeout=6.0)
         except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
             pass
-    # Only close serial after poller is fully stopped
-    if _driver:
+    if driver:
         try:
-            _driver.close()
+            driver.close()
         except Exception:
             pass
     logger.info("Application shutdown complete")
+
+
+async def _async_connect(port: str, baud: int):
+    """Connect to serial port, detect station, start poller."""
+    logger.info(
+        "Connecting to serial port %s at %d baud (timeout=%.1fs)",
+        port, baud, settings.serial_timeout,
+    )
+    driver = LinkDriver(port=port, baud_rate=baud, timeout=settings.serial_timeout)
+    driver.open()
+    logger.info("Serial port %s opened", port)
+
+    logger.info("Detecting station type...")
+    station_type = await driver.async_detect_station_type()
+    logger.info("Station detected: %s (model code %d)", station_type.name, station_type.value)
+
+    logger.info("Reading calibration offsets...")
+    await driver.async_read_calibration()
+
+    poller = Poller(driver, poll_interval=settings.poll_interval_sec)
+    poller_task = asyncio.create_task(poller.run())
+    logger.info("Poller started (%ds interval)", settings.poll_interval_sec)
+
+    _app_refs["driver"] = driver
+    _app_refs["poller"] = poller
+    _app_refs["poller_task"] = poller_task
+
+    station_api.set_poller(poller, driver)
+    ws_set_driver(driver)
 
 
 def create_app() -> FastAPI:

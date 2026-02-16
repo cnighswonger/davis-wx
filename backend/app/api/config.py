@@ -28,6 +28,7 @@ _DEFAULTS: dict[str, object] = {
     "metar_enabled": settings.metar_enabled,
     "metar_station": settings.metar_station_id,
     "nws_enabled": settings.nws_enabled,
+    "setup_complete": False,
 }
 
 

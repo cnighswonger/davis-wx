@@ -179,3 +179,50 @@ export interface WSConnectionStatus {
 }
 
 export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSConnectionStatus;
+
+// --- Setup Wizard ---
+
+export interface SetupStatus {
+  setup_complete: boolean;
+}
+
+export interface SerialPortList {
+  ports: string[];
+}
+
+export interface ProbeResult {
+  success: boolean;
+  station_type: string | null;
+  station_code: number | null;
+  error: string | null;
+}
+
+export interface AutoDetectResult {
+  found: boolean;
+  port: string | null;
+  baud_rate: number | null;
+  station_type: string | null;
+  station_code: number | null;
+  attempts: Array<{ port: string; baud: number; error?: string }>;
+}
+
+export interface SetupConfig {
+  serial_port: string;
+  baud_rate: number;
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  temp_unit: string;
+  pressure_unit: string;
+  wind_unit: string;
+  rain_unit: string;
+  metar_enabled: boolean;
+  metar_station: string;
+  nws_enabled: boolean;
+}
+
+export interface ReconnectResult {
+  success: boolean;
+  station_type?: string;
+  error?: string;
+}

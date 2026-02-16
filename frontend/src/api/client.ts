@@ -83,4 +83,56 @@ export function syncStationTime(): Promise<{ status: string; synced_to?: string;
   return request("/api/station/sync-time", { method: "POST" });
 }
 
+// --- Setup ---
+
+import type {
+  SetupStatus,
+  SerialPortList,
+  ProbeResult,
+  AutoDetectResult,
+  SetupConfig,
+  ReconnectResult,
+} from "./types.ts";
+
+export function fetchSetupStatus(): Promise<SetupStatus> {
+  return request<SetupStatus>("/api/setup/status");
+}
+
+export function fetchSerialPorts(): Promise<SerialPortList> {
+  return request<SerialPortList>("/api/setup/serial-ports");
+}
+
+export function probeSerialPort(
+  port: string,
+  baudRate: number,
+): Promise<ProbeResult> {
+  return request<ProbeResult>("/api/setup/probe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ port, baud_rate: baudRate }),
+  });
+}
+
+export function autoDetectStation(): Promise<AutoDetectResult> {
+  return request<AutoDetectResult>("/api/setup/auto-detect", {
+    method: "POST",
+  });
+}
+
+export function completeSetup(
+  config: SetupConfig,
+): Promise<{ status: string; reconnect: ReconnectResult }> {
+  return request("/api/setup/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}
+
+export function reconnectStation(): Promise<ReconnectResult> {
+  return request<ReconnectResult>("/api/setup/reconnect", {
+    method: "POST",
+  });
+}
+
 export { ApiError };

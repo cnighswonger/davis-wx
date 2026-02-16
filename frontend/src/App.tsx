@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WeatherDataProvider, useWeatherData } from './context/WeatherDataContext';
@@ -7,6 +8,8 @@ import History from './pages/History';
 import Forecast from './pages/Forecast';
 import Astronomy from './pages/Astronomy';
 import Settings from './pages/Settings';
+import SetupWizard from './components/setup/SetupWizard';
+import { fetchSetupStatus } from './api/client';
 
 function AppContent() {
   const { connected, currentConditions } = useWeatherData();
@@ -28,6 +31,58 @@ function AppContent() {
 }
 
 function App() {
+  const [setupChecked, setSetupChecked] = useState(false);
+  const [setupComplete, setSetupComplete] = useState(false);
+
+  useEffect(() => {
+    fetchSetupStatus()
+      .then((s) => {
+        setSetupComplete(s.setup_complete);
+        setSetupChecked(true);
+      })
+      .catch(() => {
+        // Fail-open: if API unreachable, assume setup done to avoid lockout
+        setSetupComplete(true);
+        setSetupChecked(true);
+      });
+  }, []);
+
+  if (!setupChecked) {
+    return (
+      <ThemeProvider>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+            background: "var(--color-bg)",
+          }}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              border: "3px solid var(--color-border)",
+              borderTopColor: "var(--color-accent)",
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  if (!setupComplete) {
+    return (
+      <ThemeProvider>
+        <SetupWizard onComplete={() => setSetupComplete(true)} />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider>
       <BrowserRouter>

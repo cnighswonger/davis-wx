@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchConfig, updateConfig } from "../api/client.ts";
+import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation } from "../api/client.ts";
 import type { ConfigItem } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
 import { themes } from "../themes/index.ts";
@@ -143,18 +143,22 @@ export default function Settings() {
   const [configItems, setConfigItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
+  const [ports, setPorts] = useState<string[]>([]);
 
   const { themeName, setThemeName } = useTheme();
 
-  // Load config
+  // Load config + serial ports
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchConfig()
-      .then((items) => {
+    Promise.all([fetchConfig(), fetchSerialPorts().catch(() => ({ ports: [] }))])
+      .then(([items, portResult]) => {
         setConfigItems(items);
+        setPorts(portResult.ports);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -185,6 +189,37 @@ export default function Settings() {
       setSaving(false);
     }
   }, [configItems]);
+
+  const handleSaveAndReconnect = useCallback(async () => {
+    setSaving(true);
+    setReconnecting(true);
+    setError(null);
+    setSaveSuccess(false);
+    setReconnectMsg(null);
+    try {
+      const updated = await updateConfig(configItems);
+      setConfigItems(updated);
+      const result = await reconnectStation();
+      if (result.success) {
+        setReconnectMsg(
+          `Reconnected: ${result.station_type ?? "station"} detected`,
+        );
+      } else {
+        setError(result.error ?? "Reconnect failed");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+      setReconnecting(false);
+    }
+  }, [configItems]);
+
+  const refreshPorts = useCallback(() => {
+    fetchSerialPorts()
+      .then((result) => setPorts(result.ports))
+      .catch(() => {});
+  }, []);
 
   // Convenience getters
   const val = (key: string) => getConfigValue(configItems, key);
@@ -239,27 +274,64 @@ export default function Settings() {
         Settings
       </h2>
 
-      {/* Station section (read-only) */}
+      {/* Station section */}
       <div style={cardStyle}>
         <h3 style={sectionTitle}>Station</h3>
         <div style={gridTwoCol}>
           <div style={fieldGroup}>
-            <label style={labelStyle}>Serial Port</label>
-            <input
-              style={readOnlyInput}
+            <label style={labelStyle}>
+              Serial Port
+              <button
+                style={{
+                  fontSize: "11px",
+                  padding: "2px 8px",
+                  marginLeft: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-body)",
+                }}
+                onClick={refreshPorts}
+              >
+                Refresh
+              </button>
+            </label>
+            <select
+              style={selectStyle}
               value={String(val("serial_port"))}
-              readOnly
-              tabIndex={-1}
-            />
+              onChange={(e) => updateField("serial_port", e.target.value)}
+            >
+              {ports.length === 0 && (
+                <option value="">No ports detected</option>
+              )}
+              {ports.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+              {/* Keep current value visible even if not in detected list */}
+              {val("serial_port") &&
+                !ports.includes(String(val("serial_port"))) && (
+                  <option value={String(val("serial_port"))}>
+                    {String(val("serial_port"))}
+                  </option>
+                )}
+            </select>
           </div>
           <div style={fieldGroup}>
             <label style={labelStyle}>Baud Rate</label>
-            <input
-              style={readOnlyInput}
+            <select
+              style={selectStyle}
               value={String(val("baud_rate"))}
-              readOnly
-              tabIndex={-1}
-            />
+              onChange={(e) =>
+                updateField("baud_rate", parseInt(e.target.value))
+              }
+            >
+              <option value="2400">2400 (default)</option>
+              <option value="1200">1200</option>
+            </select>
           </div>
           <div style={fieldGroup}>
             <label style={labelStyle}>Poll Interval (seconds)</label>
@@ -443,8 +515,8 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Save button and status */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+      {/* Save buttons and status */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <button
           style={{
             ...btnPrimary,
@@ -452,9 +524,24 @@ export default function Settings() {
             cursor: saving ? "wait" : "pointer",
           }}
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || reconnecting}
         >
-          {saving ? "Saving..." : "Save Settings"}
+          {saving && !reconnecting ? "Saving..." : "Save Settings"}
+        </button>
+
+        <button
+          style={{
+            ...btnPrimary,
+            background: "var(--color-bg-secondary)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            opacity: reconnecting ? 0.6 : 1,
+            cursor: reconnecting ? "wait" : "pointer",
+          }}
+          onClick={handleSaveAndReconnect}
+          disabled={saving || reconnecting}
+        >
+          {reconnecting ? "Reconnecting..." : "Save & Reconnect"}
         </button>
 
         {saveSuccess && (
@@ -466,6 +553,18 @@ export default function Settings() {
             }}
           >
             Settings saved successfully.
+          </span>
+        )}
+
+        {reconnectMsg && (
+          <span
+            style={{
+              color: "var(--color-success)",
+              fontSize: "14px",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            {reconnectMsg}
           </span>
         )}
 
