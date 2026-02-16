@@ -134,6 +134,7 @@ export interface StationStatus {
   uptime_seconds: number;
   crc_errors: number;
   timeouts: number;
+  station_time: string | null;
 }
 
 // --- Configuration ---

@@ -79,4 +79,8 @@ export function updateConfig(items: ConfigItem[]): Promise<ConfigItem[]> {
   });
 }
 
+export function syncStationTime(): Promise<{ status: string; synced_to?: string; message?: string }> {
+  return request("/api/station/sync-time", { method: "POST" });
+}
+
 export { ApiError };

@@ -7,12 +7,14 @@ memory reads, archive sync, and calibration.
 import logging
 import struct
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from .serial_port import SerialPort
 from .commands import (
     build_loop_command,
     build_wrd_command,
+    build_wwr_command,
     build_rrd_command,
     build_srd_command,
     build_stop_command,
@@ -30,9 +32,19 @@ from .constants import (
 )
 from .loop_packet import parse_loop_packet
 from .station_types import SensorReading
-from .memory_map import BasicBank0, BasicBank1, MemAddr
+from .memory_map import BasicBank0, BasicBank1, GroWeatherBank1, MemAddr
 
 logger = logging.getLogger(__name__)
+
+
+def _bcd_decode(b: int) -> int:
+    """Decode a BCD-encoded byte: 0x23 -> 23."""
+    return (b >> 4) * 10 + (b & 0x0F)
+
+
+def _bcd_encode(val: int) -> int:
+    """Encode an integer (0-99) as BCD: 23 -> 0x23."""
+    return ((val // 10) << 4) | (val % 10)
 
 
 @dataclass
@@ -317,6 +329,154 @@ class LinkDriver:
 
         return data[:n_bytes]
 
+    def write_station_memory(
+        self, bank: int, address: int, n_nibbles: int, data: bytes
+    ) -> bool:
+        """Write station processor memory using WWR command.
+
+        Returns True on success (ACK received), False on failure.
+        """
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                cmd = build_wwr_command(n_nibbles, bank, address, data)
+                logger.debug(
+                    "WWR %d nibbles bank %d addr 0x%02X data=%s",
+                    n_nibbles, bank, address, data.hex(),
+                )
+                self.serial.send(cmd)
+
+                if self.serial.wait_for_ack():
+                    logger.debug("WWR ACK OK")
+                    return True
+
+                logger.warning(
+                    "WWR bank %d addr 0x%02X attempt %d: no ACK",
+                    bank, address, attempt + 1,
+                )
+            except Exception as e:
+                logger.warning("WWR attempt %d failed: %s", attempt + 1, e)
+
+        return False
+
+    def read_station_time(self) -> Optional[dict]:
+        """Read station time and date from processor memory.
+
+        Returns dict with keys: hour, minute, second, day, month, year.
+        Year is None for Monitor/Wizard/Perception (no year nibbles).
+        """
+        if self.station_model is None:
+            return None
+
+        is_gro = self.station_model in (
+            StationModel.GROWEATHER,
+            StationModel.ENERGY,
+            StationModel.HEALTH,
+        )
+
+        time_addr = GroWeatherBank1.TIME if is_gro else BasicBank1.TIME
+        date_addr = GroWeatherBank1.DATE if is_gro else BasicBank1.DATE
+        date_nibbles = 5 if is_gro else 3
+
+        # Read time (6 nibbles = 3 bytes: BCD hour, minute, second)
+        time_data = self.read_station_memory(
+            time_addr.bank, time_addr.address, time_addr.nibbles
+        )
+        if time_data is None or len(time_data) < 3:
+            return None
+
+        hour = _bcd_decode(time_data[0])
+        minute = _bcd_decode(time_data[1])
+        second = _bcd_decode(time_data[2])
+
+        # Read date
+        date_data = self.read_station_memory(
+            date_addr.bank, date_addr.address, date_nibbles
+        )
+        if date_data is None or len(date_data) < 2:
+            return None
+
+        day = _bcd_decode(date_data[0])
+        # Month is in the low nibble of byte 1
+        month = date_data[1] & 0x0F
+
+        year = None
+        if is_gro and len(date_data) >= 3:
+            # Year = binary value across upper nibble of byte 1 + byte 2
+            year = 1900 + ((date_data[2] & 0x0F) << 4) | (date_data[1] >> 4)
+
+        logger.info(
+            "Station clock: %02d:%02d:%02d %d/%d%s",
+            hour, minute, second, month, day,
+            f"/{year}" if year else "",
+        )
+
+        return {
+            "hour": hour, "minute": minute, "second": second,
+            "day": day, "month": month, "year": year,
+        }
+
+    def write_station_time(self, dt: datetime) -> bool:
+        """Write time and date to station processor memory.
+
+        Sends STOP before writing and START after.
+        """
+        if self.station_model is None:
+            return False
+
+        is_gro = self.station_model in (
+            StationModel.GROWEATHER,
+            StationModel.ENERGY,
+            StationModel.HEALTH,
+        )
+
+        time_addr = GroWeatherBank1.TIME if is_gro else BasicBank1.TIME
+        date_addr = GroWeatherBank1.DATE if is_gro else BasicBank1.DATE
+
+        # Encode time: 6 nibbles = 3 BCD bytes (hour, minute, second)
+        time_bytes = bytes([
+            _bcd_encode(dt.hour),
+            _bcd_encode(dt.minute),
+            _bcd_encode(dt.second),
+        ])
+
+        # Encode date
+        if is_gro:
+            # 5 nibbles: day(2 BCD) + month(1 binary) + year(2 binary)
+            yr = (dt.year - 1900) & 0xFF
+            date_bytes = bytes([
+                _bcd_encode(dt.day),
+                (yr & 0x0F) << 4 | (dt.month & 0x0F),
+                (yr >> 4) & 0x0F,
+            ])
+            date_nibbles = 5
+        else:
+            # 3 nibbles: day(2 BCD) + month(1 binary)
+            date_bytes = bytes([
+                _bcd_encode(dt.day),
+                dt.month & 0x0F,
+            ])
+            date_nibbles = 3
+
+        # STOP station polling for reliable writes
+        self.stop_polling()
+
+        try:
+            ok_time = self.write_station_memory(
+                time_addr.bank, time_addr.address, 6, time_bytes
+            )
+            ok_date = self.write_station_memory(
+                date_addr.bank, date_addr.address, date_nibbles, date_bytes
+            )
+        finally:
+            self.start_polling()
+
+        if ok_time and ok_date:
+            logger.info("Station clock synced to %s", dt.strftime("%H:%M:%S %m/%d/%Y"))
+        else:
+            logger.warning("Station clock sync partial failure: time=%s date=%s", ok_time, ok_date)
+
+        return ok_time and ok_date
+
     def stop_polling(self) -> bool:
         """Send STOP command to pause WeatherLink from polling station."""
         self.serial.send(build_stop_command())
@@ -344,3 +504,15 @@ class LinkDriver:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.read_calibration)
+
+    async def async_read_station_time(self) -> Optional[dict]:
+        """Async version of read_station_time."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_station_time)
+
+    async def async_write_station_time(self, dt: datetime) -> bool:
+        """Async version of write_station_time."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.write_station_time, dt)

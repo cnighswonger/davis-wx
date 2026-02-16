@@ -1,7 +1,9 @@
 /**
  * Compact panel showing station connection and health information.
  */
+import { useState } from "react";
 import { useWeatherData } from "../../context/WeatherDataContext.tsx";
+import { syncStationTime } from "../../api/client.ts";
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -28,6 +30,7 @@ function formatTime(iso: string | null): string {
 
 export default function StationStatus() {
   const { stationStatus, connected, wsConnected } = useWeatherData();
+  const [syncing, setSyncing] = useState(false);
 
   interface StatusRow {
     label: string;
@@ -121,6 +124,70 @@ export default function StationStatus() {
       >
         Station Status
       </div>
+
+      {/* Station Time row - full width with sync button */}
+      {stationStatus?.station_time && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "10px",
+            padding: "6px 8px",
+            background: "var(--color-bg, rgba(0,0,0,0.15))",
+            borderRadius: "8px",
+          }}
+        >
+          <div>
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-muted)",
+                marginRight: "8px",
+              }}
+            >
+              Station Clock
+            </span>
+            <span
+              style={{
+                fontSize: "12px",
+                fontFamily: "var(--font-gauge)",
+                fontWeight: "bold",
+                color: "var(--color-text)",
+              }}
+            >
+              {stationStatus.station_time}
+            </span>
+          </div>
+          <button
+            onClick={async () => {
+              setSyncing(true);
+              try {
+                await syncStationTime();
+              } catch {
+                /* ignore */
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+            style={{
+              fontSize: "10px",
+              fontFamily: "var(--font-body)",
+              padding: "2px 8px",
+              background: "var(--color-bg-card)",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "4px",
+              cursor: syncing ? "wait" : "pointer",
+              opacity: syncing ? 0.6 : 1,
+            }}
+          >
+            {syncing ? "Syncing..." : "Sync"}
+          </button>
+        </div>
+      )}
 
       <div
         style={{
