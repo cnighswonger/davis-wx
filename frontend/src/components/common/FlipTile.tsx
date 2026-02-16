@@ -1,31 +1,14 @@
 /**
  * Wrapper that gives any gauge tile a click-to-flip behaviour.
  * Front: the gauge (children). Back: a 1-hour sparkline chart.
+ *
+ * Note: the /api/history endpoint returns display-ready values
+ * (already converted from raw DB units), so no client-side
+ * transformation is needed here.
  */
 import { useState, useCallback, type ReactNode } from "react";
 import { fetchHistory } from "../../api/client.ts";
 import TrendChart from "../charts/TrendChart.tsx";
-
-// --- Raw DB value → display value transforms ---
-
-const DIVIDE_BY_10 = new Set([
-  "inside_temp",
-  "outside_temp",
-  "heat_index",
-  "dew_point",
-  "wind_chill",
-  "feels_like",
-  "theta_e",
-  "uv_index",
-]);
-
-const DIVIDE_BY_1000 = new Set(["barometer"]);
-
-function transformValue(sensor: string, raw: number): number {
-  if (DIVIDE_BY_10.has(sensor)) return raw / 10;
-  if (DIVIDE_BY_1000.has(sensor)) return raw / 1000;
-  return raw;
-}
 
 // --- Component ---
 
@@ -62,7 +45,7 @@ export default function FlipTile({
         .then((res) => {
           const pts = res.points.map((p) => ({
             x: new Date(p.timestamp).getTime(),
-            y: transformValue(sensor, p.value),
+            y: p.value,
           }));
           setChartData(pts);
         })

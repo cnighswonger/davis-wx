@@ -37,15 +37,28 @@ SENSOR_UNITS = {
     "outside_humidity": "%",
     "wind_speed": "mph",
     "wind_direction": "°",
-    "barometer": "thousandths inHg",
+    "barometer": "inHg",
     "rain_total": "clicks",
     "heat_index": "F",
     "dew_point": "F",
     "wind_chill": "F",
     "feels_like": "F",
-    "theta_e": "tenths K",
+    "theta_e": "K",
     "solar_radiation": "W/m²",
-    "uv_index": "tenths UV",
+    "uv_index": "",
+}
+
+# Raw DB values -> display units conversion divisors
+SENSOR_DIVISORS: dict[str, float] = {
+    "inside_temp": 10,
+    "outside_temp": 10,
+    "heat_index": 10,
+    "dew_point": 10,
+    "wind_chill": 10,
+    "feels_like": 10,
+    "theta_e": 10,
+    "uv_index": 10,
+    "barometer": 1000,
 }
 
 # Frontend uses display-friendly names; map them to DB column names
@@ -88,6 +101,7 @@ def get_history(
         start_dt = end_dt - timedelta(hours=24)
 
     column = SENSOR_COLUMNS[sensor]
+    divisor = SENSOR_DIVISORS.get(sensor, 1)
 
     if resolution == "raw":
         results = (
@@ -99,12 +113,12 @@ def get_history(
             .all()
         )
         data = [
-            {"timestamp": r[0].isoformat(), "value": r[1]}
+            {"timestamp": r[0].isoformat(), "value": round(r[1] / divisor, 2)}
             for r in results
         ]
     else:
         # For hourly/daily, return averages
-        data = _aggregate(db, column, start_dt, end_dt, resolution)
+        data = _aggregate(db, column, start_dt, end_dt, resolution, divisor)
 
     return {
         "sensor": sensor,
@@ -116,7 +130,7 @@ def get_history(
     }
 
 
-def _aggregate(db, column, start_dt, end_dt, resolution):
+def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1):
     """Aggregate readings by 5-minute, hourly, or daily buckets."""
     if resolution == "5m":
         # Group by epoch seconds rounded to 300s (5 min) boundaries
@@ -145,6 +159,6 @@ def _aggregate(db, column, start_dt, end_dt, resolution):
     )
 
     return [
-        {"timestamp": r[0], "value": round(r[1], 1) if r[1] is not None else None}
+        {"timestamp": r[0], "value": round(r[1] / divisor, 2) if r[1] is not None else None}
         for r in results
     ]
