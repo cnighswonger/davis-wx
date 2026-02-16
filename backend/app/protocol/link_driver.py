@@ -6,6 +6,7 @@ memory reads, archive sync, and calibration.
 
 import logging
 import struct
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -67,6 +68,7 @@ class LinkDriver:
         self.is_rev_e = False
         self._connected = False
         self._stop_requested = False
+        self._io_lock = threading.Lock()
 
     @property
     def connected(self) -> bool:
@@ -192,21 +194,22 @@ class LinkDriver:
         if self.station_model is None:
             raise RuntimeError("Station type not detected. Call detect_station_type() first.")
 
-        for attempt in range(MAX_RETRIES + 1):
-            if self._stop_requested:
-                logger.info("LOOP poll aborted (stop requested)")
-                return None
-            try:
-                reading = self._send_loop_once()
-                if reading is not None:
-                    return self.apply_calibration(reading)
-                else:
-                    logger.warning("LOOP attempt %d/%d: no response", attempt + 1, MAX_RETRIES + 1)
-            except Exception as e:
-                logger.warning("LOOP attempt %d/%d failed: %s", attempt + 1, MAX_RETRIES + 1, e)
+        with self._io_lock:
+            for attempt in range(MAX_RETRIES + 1):
+                if self._stop_requested:
+                    logger.info("LOOP poll aborted (stop requested)")
+                    return None
+                try:
+                    reading = self._send_loop_once()
+                    if reading is not None:
+                        return self.apply_calibration(reading)
+                    else:
+                        logger.warning("LOOP attempt %d/%d: no response", attempt + 1, MAX_RETRIES + 1)
+                except Exception as e:
+                    logger.warning("LOOP attempt %d/%d failed: %s", attempt + 1, MAX_RETRIES + 1, e)
 
-            if attempt < MAX_RETRIES:
-                self.serial.flush()
+                if attempt < MAX_RETRIES:
+                    self.serial.flush()
 
         logger.error("LOOP command failed after %d attempts", MAX_RETRIES + 1)
         return None
@@ -377,23 +380,26 @@ class LinkDriver:
         date_addr = GroWeatherBank1.DATE if is_gro else BasicBank1.DATE
         date_nibbles = 5 if is_gro else 3
 
-        # Read time (6 nibbles = 3 bytes: BCD hour, minute, second)
-        time_data = self.read_station_memory(
-            time_addr.bank, time_addr.address, time_addr.nibbles
-        )
-        if time_data is None or len(time_data) < 3:
-            return None
+        with self._io_lock:
+            # Read time (6 nibbles = 3 bytes: BCD hour, minute, second)
+            time_data = self.read_station_memory(
+                time_addr.bank, time_addr.address, time_addr.nibbles
+            )
+            if time_data is None or len(time_data) < 3:
+                logger.warning("Station time read failed (no data)")
+                return None
+
+            # Read date
+            date_data = self.read_station_memory(
+                date_addr.bank, date_addr.address, date_nibbles
+            )
+            if date_data is None or len(date_data) < 2:
+                logger.warning("Station date read failed (no data)")
+                return None
 
         hour = _bcd_decode(time_data[0])
         minute = _bcd_decode(time_data[1])
         second = _bcd_decode(time_data[2])
-
-        # Read date
-        date_data = self.read_station_memory(
-            date_addr.bank, date_addr.address, date_nibbles
-        )
-        if date_data is None or len(date_data) < 2:
-            return None
 
         day = _bcd_decode(date_data[0])
         # Month is in the low nibble of byte 1
@@ -457,18 +463,19 @@ class LinkDriver:
             ])
             date_nibbles = 3
 
-        # STOP station polling for reliable writes
-        self.stop_polling()
+        with self._io_lock:
+            # STOP station polling for reliable writes
+            self.stop_polling()
 
-        try:
-            ok_time = self.write_station_memory(
-                time_addr.bank, time_addr.address, 6, time_bytes
-            )
-            ok_date = self.write_station_memory(
-                date_addr.bank, date_addr.address, date_nibbles, date_bytes
-            )
-        finally:
-            self.start_polling()
+            try:
+                ok_time = self.write_station_memory(
+                    time_addr.bank, time_addr.address, 6, time_bytes
+                )
+                ok_date = self.write_station_memory(
+                    date_addr.bank, date_addr.address, date_nibbles, date_bytes
+                )
+            finally:
+                self.start_polling()
 
         if ok_time and ok_date:
             logger.info("Station clock synced to %s", dt.strftime("%H:%M:%S %m/%d/%Y"))

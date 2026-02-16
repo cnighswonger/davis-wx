@@ -126,68 +126,66 @@ export default function StationStatus() {
       </div>
 
       {/* Station Time row - full width with sync button */}
-      {stationStatus?.station_time && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "10px",
-            padding: "6px 8px",
-            background: "var(--color-bg, rgba(0,0,0,0.15))",
-            borderRadius: "8px",
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: "11px",
-                fontFamily: "var(--font-body)",
-                color: "var(--color-text-muted)",
-                marginRight: "8px",
-              }}
-            >
-              Station Clock
-            </span>
-            <span
-              style={{
-                fontSize: "12px",
-                fontFamily: "var(--font-gauge)",
-                fontWeight: "bold",
-                color: "var(--color-text)",
-              }}
-            >
-              {stationStatus.station_time}
-            </span>
-          </div>
-          <button
-            onClick={async () => {
-              setSyncing(true);
-              try {
-                await syncStationTime();
-              } catch {
-                /* ignore */
-              } finally {
-                setSyncing(false);
-              }
-            }}
-            disabled={syncing}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "10px",
+          padding: "6px 8px",
+          background: "var(--color-bg, rgba(0,0,0,0.15))",
+          borderRadius: "8px",
+        }}
+      >
+        <div>
+          <span
             style={{
-              fontSize: "10px",
+              fontSize: "11px",
               fontFamily: "var(--font-body)",
-              padding: "2px 8px",
-              background: "var(--color-bg-card)",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "4px",
-              cursor: syncing ? "wait" : "pointer",
-              opacity: syncing ? 0.6 : 1,
+              color: "var(--color-text-muted)",
+              marginRight: "8px",
             }}
           >
-            {syncing ? "Syncing..." : "Sync"}
-          </button>
+            Station Clock
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              fontFamily: "var(--font-gauge)",
+              fontWeight: "bold",
+              color: "var(--color-text)",
+            }}
+          >
+            {stationStatus?.station_time ?? "--"}
+          </span>
         </div>
-      )}
+        <button
+          onClick={async () => {
+            setSyncing(true);
+            try {
+              await syncStationTime();
+            } catch {
+              /* ignore */
+            } finally {
+              setSyncing(false);
+            }
+          }}
+          disabled={syncing || !stationStatus?.connected}
+          style={{
+            fontSize: "10px",
+            fontFamily: "var(--font-body)",
+            padding: "2px 8px",
+            background: "var(--color-bg-card)",
+            color: "var(--color-text-secondary)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "4px",
+            cursor: syncing ? "wait" : "pointer",
+            opacity: syncing || !stationStatus?.connected ? 0.6 : 1,
+          }}
+        >
+          {syncing ? "Syncing..." : "Sync"}
+        </button>
+      </div>
 
       <div
         style={{
