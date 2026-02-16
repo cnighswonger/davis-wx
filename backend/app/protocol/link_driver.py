@@ -120,7 +120,10 @@ class LinkDriver:
         Applies to Monitor/Wizard/Perception stations.
         Reference: techref.txt lines 847-1108.
         """
+        self.serial.flush()
+
         # Inside temp calibration: bank 1, address 0x52, 4 nibbles
+        logger.debug("Reading inside temp calibration...")
         data = self.read_station_memory(
             BasicBank1.INSIDE_TEMP_CAL.bank,
             BasicBank1.INSIDE_TEMP_CAL.address,
@@ -130,6 +133,7 @@ class LinkDriver:
             self.calibration.inside_temp = struct.unpack("<h", data[:2])[0]
 
         # Outside temp calibration
+        logger.debug("Reading outside temp calibration...")
         data = self.read_station_memory(
             BasicBank1.OUTSIDE_TEMP_CAL.bank,
             BasicBank1.OUTSIDE_TEMP_CAL.address,
@@ -139,6 +143,7 @@ class LinkDriver:
             self.calibration.outside_temp = struct.unpack("<h", data[:2])[0]
 
         # Barometer calibration
+        logger.debug("Reading barometer calibration...")
         data = self.read_station_memory(
             BasicBank1.BAR_CAL.bank,
             BasicBank1.BAR_CAL.address,
@@ -148,6 +153,7 @@ class LinkDriver:
             self.calibration.barometer = struct.unpack("<H", data[:2])[0]
 
         # Outside humidity calibration
+        logger.debug("Reading outside humidity calibration...")
         data = self.read_station_memory(
             BasicBank1.OUTSIDE_HUMIDITY_CAL.bank,
             BasicBank1.OUTSIDE_HUMIDITY_CAL.address,
@@ -157,6 +163,7 @@ class LinkDriver:
             self.calibration.outside_hum = struct.unpack("<h", data[:2])[0]
 
         # Rain calibration (clicks per inch)
+        logger.debug("Reading rain calibration...")
         data = self.read_station_memory(
             BasicBank1.RAIN_CAL.bank,
             BasicBank1.RAIN_CAL.address,
