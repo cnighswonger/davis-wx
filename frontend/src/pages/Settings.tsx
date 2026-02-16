@@ -158,6 +158,8 @@ export default function Settings() {
     setEnabled: setBgEnabled,
     intensity: bgIntensity,
     setIntensity: setBgIntensity,
+    transparency: bgTransparency,
+    setTransparency: setBgTransparency,
     customImages: bgCustomImages,
     refreshCustomImages: refreshBgImages,
   } = useWeatherBackground();
@@ -808,6 +810,20 @@ export default function Settings() {
                   max={100}
                   value={bgIntensity}
                   onChange={(e) => setBgIntensity(parseInt(e.target.value))}
+                  style={{ width: "100%", cursor: "pointer" }}
+                />
+              </div>
+
+              <div style={fieldGroup}>
+                <label style={labelStyle} title="How transparent tiles, cards, header, and sidebar are. Higher values let more of the background show through.">
+                  Tile Transparency: {bgTransparency}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={bgTransparency}
+                  onChange={(e) => setBgTransparency(parseInt(e.target.value))}
                   style={{ width: "100%", cursor: "pointer" }}
                 />
               </div>

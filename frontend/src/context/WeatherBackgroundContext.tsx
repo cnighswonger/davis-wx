@@ -19,6 +19,8 @@ interface WeatherBackgroundContextValue {
   setEnabled: (v: boolean) => void;
   intensity: number;
   setIntensity: (v: number) => void;
+  transparency: number;
+  setTransparency: (v: number) => void;
   customImages: Record<string, string>;
   refreshCustomImages: () => void;
 }
@@ -28,6 +30,7 @@ const WeatherBackgroundContext =
 
 const STORAGE_ENABLED = "davis-wx-weather-bg";
 const STORAGE_INTENSITY = "davis-wx-weather-bg-intensity";
+const STORAGE_TRANSPARENCY = "davis-wx-weather-bg-transparency";
 
 function loadEnabled(): boolean {
   try {
@@ -51,6 +54,19 @@ function loadIntensity(): number {
   return 30;
 }
 
+function loadTransparency(): number {
+  try {
+    const v = localStorage.getItem(STORAGE_TRANSPARENCY);
+    if (v !== null) {
+      const n = parseInt(v, 10);
+      if (!isNaN(n) && n >= 0 && n <= 100) return n;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 15;
+}
+
 export function WeatherBackgroundProvider({
   children,
 }: {
@@ -58,6 +74,7 @@ export function WeatherBackgroundProvider({
 }) {
   const [enabled, setEnabledState] = useState(loadEnabled);
   const [intensity, setIntensityState] = useState(loadIntensity);
+  const [transparency, setTransparencyState] = useState(loadTransparency);
   const [customImages, setCustomImages] = useState<Record<string, string>>({});
 
   const setEnabled = useCallback((v: boolean) => {
@@ -74,6 +91,16 @@ export function WeatherBackgroundProvider({
     setIntensityState(clamped);
     try {
       localStorage.setItem(STORAGE_INTENSITY, String(clamped));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const setTransparency = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(100, v));
+    setTransparencyState(clamped);
+    try {
+      localStorage.setItem(STORAGE_TRANSPARENCY, String(clamped));
     } catch {
       /* ignore */
     }
@@ -107,6 +134,8 @@ export function WeatherBackgroundProvider({
         setEnabled,
         intensity,
         setIntensity,
+        transparency,
+        setTransparency,
         customImages,
         refreshCustomImages,
       }}

@@ -89,7 +89,7 @@ const TRANSLUCENT_PROPS = [
 // --- Component ---
 
 export default function WeatherBackground() {
-  const { enabled, intensity, customImages } = useWeatherBackground();
+  const { enabled, intensity, transparency, customImages } = useWeatherBackground();
   const scene = useWeatherScene();
   const { theme } = useTheme();
   const prevSceneRef = useRef<WeatherScene>(scene);
@@ -103,9 +103,8 @@ export default function WeatherBackground() {
   useEffect(() => {
     const root = document.documentElement;
     if (enabled) {
-      // Scale card opacity: at intensity 0 → fully opaque; at 100 → most transparent
-      // Card alpha ranges from 0.95 (subtle) to 0.6 (vivid)
-      const alpha = 0.95 - (intensity / 100) * 0.35;
+      // Transparency 0 → fully opaque (alpha=1); 100 → mostly transparent (alpha=0.3)
+      const alpha = 1 - (transparency / 100) * 0.7;
       for (const { prop, key } of TRANSLUCENT_PROPS) {
         root.style.setProperty(prop, hexToRgba(theme.colors[key], alpha));
       }
@@ -115,7 +114,7 @@ export default function WeatherBackground() {
         root.style.setProperty(prop, theme.colors[key]);
       }
     }
-  }, [enabled, intensity, theme]);
+  }, [enabled, transparency, theme]);
 
   if (!enabled) return null;
 
