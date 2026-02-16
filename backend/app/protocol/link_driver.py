@@ -33,12 +33,12 @@ from .constants import (
 )
 from .loop_packet import parse_loop_packet
 from .station_types import SensorReading
-from .memory_map import BasicBank0, BasicBank1, GroWeatherBank1, MemAddr
+from .memory_map import BasicBank0, BasicBank1, GroWeatherBank1, GroWeatherLinkBank1, LinkBank1, MemAddr
 
 logger = logging.getLogger(__name__)
 
 
-def _bcd_decode(b: int) -> int:
+def bcd_decode(b: int) -> int:
     """Decode a BCD-encoded byte: 0x23 -> 23."""
     return (b >> 4) * 10 + (b & 0x0F)
 
@@ -314,23 +314,90 @@ class LinkDriver:
         return None
 
     def read_archive(self, address: int, n_bytes: int) -> Optional[bytes]:
-        """Read archive/SRAM memory using SRD command."""
-        cmd = build_srd_command(address, n_bytes)
-        self.serial.send(cmd)
+        """Read archive/SRAM memory using SRD command with retries."""
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                self.serial.flush()
+                cmd = build_srd_command(address, n_bytes)
+                self.serial.send(cmd)
 
-        if not self.serial.wait_for_ack():
+                if not self.serial.wait_for_ack():
+                    logger.warning("SRD addr 0x%04X attempt %d: no ACK", address, attempt + 1)
+                    continue
+
+                # SRD always returns data + 2-byte CRC
+                data = self.serial.receive(n_bytes + 2)
+                if len(data) < n_bytes + 2:
+                    logger.warning("SRD addr 0x%04X attempt %d: short read", address, attempt + 1)
+                    continue
+
+                if not crc_validate(data):
+                    logger.warning("SRD addr 0x%04X attempt %d: CRC failed", address, attempt + 1)
+                    continue
+
+                return data[:n_bytes]
+
+            except Exception as e:
+                logger.warning("SRD attempt %d failed: %s", attempt + 1, e)
+
+        return None
+
+    def read_archive_pointers(self) -> Optional[tuple]:
+        """Read NewPtr and OldPtr from link processor memory.
+
+        Returns (new_ptr, old_ptr) as SRAM addresses, or None on failure.
+        """
+        if self.station_model is None:
             return None
 
-        # SRD always returns data + 2-byte CRC
-        data = self.serial.receive(n_bytes + 2)
-        if len(data) < n_bytes + 2:
+        is_gro = self.station_model in (
+            StationModel.GROWEATHER, StationModel.ENERGY, StationModel.HEALTH,
+        )
+
+        if is_gro:
+            new_addr = GroWeatherLinkBank1.NEW_ARCHIVE_PTR
+            old_addr = GroWeatherLinkBank1.OLD_ARCHIVE_PTR
+        else:
+            new_addr = LinkBank1.NEW_ARCHIVE_PTR
+            old_addr = LinkBank1.OLD_ARCHIVE_PTR
+
+        new_data = self.read_link_memory(new_addr.bank, new_addr.address, new_addr.nibbles)
+        if new_data is None or len(new_data) < 2:
             return None
 
-        if not crc_validate(data):
-            logger.warning("SRD CRC validation failed")
+        old_data = self.read_link_memory(old_addr.bank, old_addr.address, old_addr.nibbles)
+        if old_data is None or len(old_data) < 2:
             return None
 
-        return data[:n_bytes]
+        new_ptr = struct.unpack("<H", new_data[:2])[0]
+        old_ptr = struct.unpack("<H", old_data[:2])[0]
+        return (new_ptr, old_ptr)
+
+    def read_archive_period(self) -> Optional[int]:
+        """Read the archive interval in minutes from link memory."""
+        addr = LinkBank1.ARCHIVE_PERIOD
+        data = self.read_link_memory(addr.bank, addr.address, addr.nibbles)
+        if data is None or len(data) < 1:
+            return None
+        return data[0]
+
+    async def async_read_archive(self, address: int, n_bytes: int) -> Optional[bytes]:
+        """Async version of read_archive."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_archive, address, n_bytes)
+
+    async def async_read_archive_pointers(self) -> Optional[tuple]:
+        """Async version of read_archive_pointers."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_archive_pointers)
+
+    async def async_read_archive_period(self) -> Optional[int]:
+        """Async version of read_archive_period."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_archive_period)
 
     def write_station_memory(
         self, bank: int, address: int, n_nibbles: int, data: bytes
@@ -397,11 +464,11 @@ class LinkDriver:
                 logger.warning("Station date read failed (no data)")
                 return None
 
-        hour = _bcd_decode(time_data[0])
-        minute = _bcd_decode(time_data[1])
-        second = _bcd_decode(time_data[2])
+        hour = bcd_decode(time_data[0])
+        minute = bcd_decode(time_data[1])
+        second = bcd_decode(time_data[2])
 
-        day = _bcd_decode(date_data[0])
+        day = bcd_decode(date_data[0])
         # Month is in the low nibble of byte 1
         month = date_data[1] & 0x0F
 

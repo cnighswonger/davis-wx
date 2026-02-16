@@ -102,6 +102,18 @@ class LinkBank1:
 
 
 # ============================================================
+# Link processor memory (Bank 1) - GroWeather/Energy/Health
+# ============================================================
+class GroWeatherLinkBank1:
+    """Link processor memory addresses for GroWeather/Energy/Health (RRD command).
+
+    Archive pointers are at different offsets than basic stations.
+    """
+    OLD_ARCHIVE_PTR = MemAddr(1, 0x06, 4)
+    NEW_ARCHIVE_PTR = MemAddr(1, 0x0A, 4)
+
+
+# ============================================================
 # GroWeather - Bank 0
 # ============================================================
 class GroWeatherBank0:

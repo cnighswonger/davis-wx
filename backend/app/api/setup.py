@@ -245,6 +245,14 @@ async def _reconnect(port: str, baud_rate: int) -> dict:
         logger.info("Station detected: %s", station_type.name)
         await new_driver.async_read_calibration()
 
+        # Backfill archive records
+        from ..services.archive_sync import async_sync_archive
+        try:
+            n_synced = await async_sync_archive(new_driver)
+            logger.info("Archive sync on reconnect: %d new records", n_synced)
+        except Exception as e:
+            logger.warning("Archive sync on reconnect failed: %s", e)
+
         new_poller = Poller(new_driver, poll_interval=settings.poll_interval_sec)
         new_task = asyncio.create_task(new_poller.run())
         logger.info("Poller restarted (%ds interval)", settings.poll_interval_sec)

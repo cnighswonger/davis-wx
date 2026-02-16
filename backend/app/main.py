@@ -133,6 +133,14 @@ async def _async_connect(port: str, baud: int):
     logger.info("Reading calibration offsets...")
     await driver.async_read_calibration()
 
+    # Backfill any archive records missed during downtime
+    from .services.archive_sync import async_sync_archive
+    try:
+        n_synced = await async_sync_archive(driver)
+        logger.info("Archive sync: %d new records", n_synced)
+    except Exception as e:
+        logger.warning("Archive sync failed (continuing): %s", e)
+
     poller = Poller(driver, poll_interval=settings.poll_interval_sec)
     poller_task = asyncio.create_task(poller.run())
     logger.info("Poller started (%ds interval)", settings.poll_interval_sec)
