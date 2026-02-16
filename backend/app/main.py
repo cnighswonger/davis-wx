@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from .config import settings
 from .models.database import init_database
@@ -125,7 +126,20 @@ def create_app() -> FastAPI:
     # Serve frontend static files if built
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+        # Mount hashed assets at /assets for correct MIME types
+        assets_dir = frontend_dist / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+        # SPA catch-all: serve the file if it exists, otherwise index.html
+        index_html = frontend_dist / "index.html"
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            file_path = frontend_dist / full_path
+            if file_path.is_file():
+                return FileResponse(str(file_path))
+            return FileResponse(str(index_html))
 
     return app
 
