@@ -97,8 +97,8 @@ class LinkBank1:
     INSIDE_HUMIDITY = MemAddr(1, 0x2E, 2)
     OUTSIDE_HUMIDITY = MemAddr(1, 0x30, 2)
     RAIN = MemAddr(1, 0x32, 4)
-    SAMPLE_PERIOD = MemAddr(0, 0x3A, 2)
-    ARCHIVE_PERIOD = MemAddr(0, 0x3C, 2)
+    SAMPLE_PERIOD = MemAddr(0, 0x13A, 2)
+    ARCHIVE_PERIOD = MemAddr(0, 0x13C, 2)
 
 
 # ============================================================
@@ -111,6 +111,7 @@ class GroWeatherLinkBank1:
     """
     OLD_ARCHIVE_PTR = MemAddr(1, 0x06, 4)
     NEW_ARCHIVE_PTR = MemAddr(1, 0x0A, 4)
+    ARCHIVE_PERIOD = MemAddr(0, 0x152, 2)
 
 
 # ============================================================

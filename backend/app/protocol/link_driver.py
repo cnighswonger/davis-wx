@@ -375,7 +375,13 @@ class LinkDriver:
 
     def read_archive_period(self) -> Optional[int]:
         """Read the archive interval in minutes from link memory."""
-        addr = LinkBank1.ARCHIVE_PERIOD
+        if self.station_model is None:
+            return None
+
+        is_gro = self.station_model in (
+            StationModel.GROWEATHER, StationModel.ENERGY, StationModel.HEALTH,
+        )
+        addr = GroWeatherLinkBank1.ARCHIVE_PERIOD if is_gro else LinkBank1.ARCHIVE_PERIOD
         data = self.read_link_memory(addr.bank, addr.address, addr.nibbles)
         if data is None or len(data) < 1:
             return None
