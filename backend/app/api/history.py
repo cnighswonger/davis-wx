@@ -113,7 +113,7 @@ def get_history(
             .all()
         )
         data = [
-            {"timestamp": r[0].isoformat(), "value": round(r[1] / divisor, 2)}
+            {"timestamp": r[0].isoformat() + "Z", "value": round(r[1] / divisor, 2)}
             for r in results
         ]
     else:
@@ -123,8 +123,8 @@ def get_history(
     return {
         "sensor": sensor,
         "unit": SENSOR_UNITS.get(sensor, ""),
-        "start": start_dt.isoformat(),
-        "end": end_dt.isoformat(),
+        "start": start_dt.isoformat() + ("" if start_dt.tzinfo else "Z"),
+        "end": end_dt.isoformat() + ("" if end_dt.tzinfo else "Z"),
         "resolution": resolution,
         "points": data,
     }
@@ -159,6 +159,6 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1):
     )
 
     return [
-        {"timestamp": r[0], "value": round(r[1] / divisor, 2) if r[1] is not None else None}
+        {"timestamp": r[0] + "Z", "value": round(r[1] / divisor, 2) if r[1] is not None else None}
         for r in results
     ]
