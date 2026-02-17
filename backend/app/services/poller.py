@@ -94,6 +94,20 @@ class Poller:
 
     async def _process_reading(self, reading: SensorReading) -> None:
         """Compute derived values, store to DB, broadcast to WS clients."""
+        # Compute rain_rate from delta for stations that don't provide it
+        if reading.rain_rate is None and reading.rain_total is not None:
+            if (self._last_rain_total is not None
+                    and self._last_poll is not None):
+                clicks_delta = reading.rain_total - self._last_rain_total
+                if clicks_delta < 0:
+                    clicks_delta = 0  # counter wrapped or reset
+                elapsed = (datetime.now(timezone.utc) - self._last_poll).total_seconds()
+                if elapsed > 0:
+                    # Each click = 0.01 in; rain_rate stored as tenths of in/hr
+                    rate_in_per_hr = (clicks_delta * 0.01) / (elapsed / 3600)
+                    reading.rain_rate = round(rate_in_per_hr * 10)
+            self._last_rain_total = reading.rain_total
+
         # Compute derived values
         hi = None
         dp = None
@@ -244,7 +258,7 @@ class Poller:
                 "yearly": None,
                 "rate": (
                     {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
-                    if reading.rain_rate else None
+                    if reading.rain_rate is not None else None
                 ),
             },
             "derived": {
@@ -259,7 +273,7 @@ class Poller:
                 if reading.solar_radiation is not None else None
             ),
             "uv_index": (
-                {"value": reading.uv_index / 10.0 if reading.uv_index else None, "unit": ""}
+                {"value": reading.uv_index / 10.0 if reading.uv_index is not None else None, "unit": ""}
                 if reading.uv_index is not None else None
             ),
         }

@@ -78,7 +78,7 @@ def get_current(db: Session = Depends(get_db)):
             "yearly": None,
             "rate": (
                 {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
-                if reading.rain_rate else None
+                if reading.rain_rate is not None else None
             ),
         },
         "derived": {
@@ -86,14 +86,14 @@ def get_current(db: Session = Depends(get_db)):
             "dew_point": {"value": _temp_f(reading.dew_point), "unit": "F"},
             "wind_chill": {"value": _temp_f(reading.wind_chill), "unit": "F"},
             "feels_like": {"value": _temp_f(reading.feels_like), "unit": "F"},
-            "theta_e": {"value": reading.theta_e / 10.0 if reading.theta_e else None, "unit": "K"},
+            "theta_e": {"value": reading.theta_e / 10.0 if reading.theta_e is not None else None, "unit": "K"},
         },
         "solar_radiation": (
             {"value": reading.solar_radiation, "unit": "W/m²"}
             if reading.solar_radiation is not None else None
         ),
         "uv_index": (
-            {"value": reading.uv_index / 10.0 if reading.uv_index else None, "unit": ""}
+            {"value": reading.uv_index / 10.0 if reading.uv_index is not None else None, "unit": ""}
             if reading.uv_index is not None else None
         ),
     }

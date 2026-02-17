@@ -27,6 +27,9 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Local screenshots
+pics/
+
 # Testing
 .pytest_cache/
 .coverage
