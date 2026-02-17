@@ -19,6 +19,8 @@ interface FlipTileProps {
   label: string;
   /** Display unit for chart tooltip (e.g. "°F"). */
   unit: string;
+  /** When true, click does not flip (used during dashboard edit mode). */
+  disabled?: boolean;
   children: ReactNode;
 }
 
@@ -26,6 +28,7 @@ export default function FlipTile({
   sensor,
   label,
   unit,
+  disabled,
   children,
 }: FlipTileProps) {
   const [flipped, setFlipped] = useState(false);
@@ -33,6 +36,7 @@ export default function FlipTile({
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(() => {
+    if (disabled) return;
     const nextFlipped = !flipped;
     setFlipped(nextFlipped);
 
@@ -52,7 +56,7 @@ export default function FlipTile({
         .catch(() => setChartData([]))
         .finally(() => setLoading(false));
     }
-  }, [flipped, sensor]);
+  }, [flipped, disabled, sensor]);
 
   return (
     <div

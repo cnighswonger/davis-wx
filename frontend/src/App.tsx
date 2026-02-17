@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WeatherBackgroundProvider } from './context/WeatherBackgroundContext';
 import { WeatherDataProvider, useWeatherData } from './context/WeatherDataContext';
+import { DashboardLayoutProvider } from './dashboard/DashboardLayoutContext';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
@@ -89,7 +90,9 @@ function App() {
       <WeatherBackgroundProvider>
         <BrowserRouter>
           <WeatherDataProvider>
-            <AppContent />
+            <DashboardLayoutProvider>
+              <AppContent />
+            </DashboardLayoutProvider>
           </WeatherDataProvider>
         </BrowserRouter>
       </WeatherBackgroundProvider>
