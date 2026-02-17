@@ -10,6 +10,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Optional
 
+from sqlalchemy import func
+
 from ..protocol.link_driver import LinkDriver
 from ..protocol.station_types import SensorReading
 from ..protocol.constants import StationModel, STATION_NAMES
@@ -213,6 +215,9 @@ class Poller:
             )
             db.add(model)
             db.commit()
+
+            # Query daily extremes while session is open
+            extremes = self._get_daily_extremes(db)
         finally:
             db.close()
 
@@ -220,7 +225,7 @@ class Poller:
         if self._broadcast_callback:
             await self._broadcast_callback({
                 "type": "sensor_update",
-                "data": self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend),
+                "data": self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend, extremes),
             })
 
     async def _get_pressure_trend(self) -> Optional[str]:
@@ -249,6 +254,47 @@ class Poller:
             db.close()
 
     @staticmethod
+    def _get_daily_extremes(db) -> Optional[dict]:
+        """Query today's high/low extremes from sensor_readings."""
+        now = datetime.now(timezone.utc)
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        S = SensorReadingModel
+        row = (
+            db.query(
+                func.max(S.outside_temp), func.min(S.outside_temp),
+                func.max(S.inside_temp), func.min(S.inside_temp),
+                func.max(S.wind_speed),
+                func.max(S.barometer), func.min(S.barometer),
+                func.max(S.outside_humidity), func.min(S.outside_humidity),
+                func.max(S.rain_rate),
+            )
+            .filter(S.timestamp >= midnight)
+            .first()
+        )
+
+        if row is None or row[0] is None:
+            return None
+
+        def _val(raw, divisor=1, unit=""):
+            if raw is None:
+                return None
+            return {"value": round(raw / divisor, 2) if divisor != 1 else raw, "unit": unit}
+
+        return {
+            "outside_temp_hi": _val(row[0], 10, "F"),
+            "outside_temp_lo": _val(row[1], 10, "F"),
+            "inside_temp_hi": _val(row[2], 10, "F"),
+            "inside_temp_lo": _val(row[3], 10, "F"),
+            "wind_speed_hi": _val(row[4], 1, "mph"),
+            "barometer_hi": _val(row[5], 1000, "inHg"),
+            "barometer_lo": _val(row[6], 1000, "inHg"),
+            "humidity_hi": _val(row[7], 1, "%"),
+            "humidity_lo": _val(row[8], 1, "%"),
+            "rain_rate_hi": _val(row[9], 10, "in/hr"),
+        }
+
+    @staticmethod
     def _cardinal(degrees: Optional[int]) -> Optional[str]:
         if degrees is None:
             return None
@@ -264,6 +310,7 @@ class Poller:
         fl: Optional[int],
         theta: Optional[int],
         trend: Optional[str],
+        extremes: Optional[dict] = None,
     ) -> dict:
         """Convert a reading to a JSON-serializable dict for WebSocket.
 
@@ -329,4 +376,5 @@ class Poller:
                 {"value": reading.uv_index / 10.0 if reading.uv_index is not None else None, "unit": ""}
                 if reading.uv_index is not None else None
             ),
+            "daily_extremes": extremes,
         }

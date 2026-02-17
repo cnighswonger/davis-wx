@@ -7,6 +7,8 @@ interface BarometerDialProps {
   unit: string;                // 'inHg' or 'hPa'
   trend?: 'rising' | 'falling' | 'steady' | null;
   trendRate?: number | null;   // Rate of change
+  high?: number | null;        // Today's high
+  low?: number | null;         // Today's low
 }
 
 const RANGES = {
@@ -14,7 +16,7 @@ const RANGES = {
   hPa: { min: 965, max: 1050, step: 10, decimals: 0 },
 };
 
-export default function BarometerDial({ value, unit, trend }: BarometerDialProps) {
+export default function BarometerDial({ value, unit, trend, high, low }: BarometerDialProps) {
   const range = RANGES[unit as keyof typeof RANGES] || RANGES.inHg;
   const { min, max, step, decimals } = range;
 
@@ -207,6 +209,19 @@ export default function BarometerDial({ value, unit, trend }: BarometerDialProps
           </text>
         )}
       </svg>
+
+      {(high != null || low != null) && (
+        <div style={{
+          fontSize: '12px',
+          fontFamily: 'var(--font-gauge)',
+          color: 'var(--color-text-secondary)',
+          marginTop: '-4px',
+        }}>
+          H {high != null ? high.toFixed(decimals) : '--'}
+          {' / '}
+          L {low != null ? low.toFixed(decimals) : '--'}
+        </div>
+      )}
     </div>
   );
 }

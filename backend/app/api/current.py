@@ -1,8 +1,9 @@
 """GET /api/current - Latest sensor reading with derived values."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
@@ -30,6 +31,48 @@ def _temp_f(tenths: int | None) -> float | None:
 
 def _bar_inhg(thousandths: int | None) -> float | None:
     return thousandths / 1000.0 if thousandths is not None else None
+
+
+def _get_daily_extremes(db: Session) -> dict | None:
+    """Query today's high/low extremes from sensor_readings."""
+    # Use local midnight as the start of "today"
+    now = datetime.now(timezone.utc)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    S = SensorReadingModel
+    row = (
+        db.query(
+            func.max(S.outside_temp), func.min(S.outside_temp),
+            func.max(S.inside_temp), func.min(S.inside_temp),
+            func.max(S.wind_speed),
+            func.max(S.barometer), func.min(S.barometer),
+            func.max(S.outside_humidity), func.min(S.outside_humidity),
+            func.max(S.rain_rate),
+        )
+        .filter(S.timestamp >= midnight)
+        .first()
+    )
+
+    if row is None or row[0] is None:
+        return None
+
+    def _val(raw, divisor=1, unit=""):
+        if raw is None:
+            return None
+        return {"value": round(raw / divisor, 2) if divisor != 1 else raw, "unit": unit}
+
+    return {
+        "outside_temp_hi": _val(row[0], 10, "F"),
+        "outside_temp_lo": _val(row[1], 10, "F"),
+        "inside_temp_hi": _val(row[2], 10, "F"),
+        "inside_temp_lo": _val(row[3], 10, "F"),
+        "wind_speed_hi": _val(row[4], 1, "mph"),
+        "barometer_hi": _val(row[5], 1000, "inHg"),
+        "barometer_lo": _val(row[6], 1000, "inHg"),
+        "humidity_hi": _val(row[7], 1, "%"),
+        "humidity_lo": _val(row[8], 1, "%"),
+        "rain_rate_hi": _val(row[9], 10, "in/hr"),
+    }
 
 
 @router.get("/current")
@@ -99,4 +142,5 @@ def get_current(db: Session = Depends(get_db)):
             {"value": reading.uv_index / 10.0 if reading.uv_index is not None else None, "unit": ""}
             if reading.uv_index is not None else None
         ),
+        "daily_extremes": _get_daily_extremes(db),
     }

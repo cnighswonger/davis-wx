@@ -7,6 +7,7 @@ interface RainGaugeProps {
   daily: number | null;      // daily accumulation
   yearly: number | null;     // yearly total
   unit: string;              // 'in' or 'mm'
+  peakRate?: number | null;  // Today's peak rain rate
 }
 
 function rateColor(rate: number): string {
@@ -17,7 +18,7 @@ function rateColor(rate: number): string {
   return '#7c3aed';
 }
 
-export default function RainGauge({ rate, daily, yearly, unit }: RainGaugeProps) {
+export default function RainGauge({ rate, daily, yearly, unit, peakRate }: RainGaugeProps) {
   const decimals = unit === 'mm' ? 1 : 2;
   const rateStr = rate !== null ? rate.toFixed(decimals) : '--';
   const dailyStr = daily !== null ? daily.toFixed(decimals) : '--';
@@ -98,6 +99,17 @@ export default function RainGauge({ rate, daily, yearly, unit }: RainGaugeProps)
          rate < 0.3 ? 'Moderate rain' :
          rate < 1.0 ? 'Heavy rain' : 'Very heavy rain'}
       </div>
+
+      {peakRate != null && peakRate > 0 && (
+        <div style={{
+          fontSize: '11px',
+          fontFamily: 'var(--font-body)',
+          color: 'var(--color-text-secondary)',
+          marginBottom: '4px',
+        }}>
+          Peak: {peakRate.toFixed(decimals)} {unit}/hr
+        </div>
+      )}
 
       {/* Divider */}
       <div style={{

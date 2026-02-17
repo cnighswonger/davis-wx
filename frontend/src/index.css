@@ -99,6 +99,10 @@ a:hover {
     display: inline-flex !important;
   }
 
+  .header-hilo {
+    display: none !important;
+  }
+
   .sidebar {
     transform: translateX(-100%);
   }

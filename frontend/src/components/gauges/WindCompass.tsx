@@ -7,6 +7,7 @@ interface WindCompassProps {
   direction: number | null;  // 0-359 degrees
   speed: number | null;      // mph (or display unit)
   gust?: number | null;
+  peak?: number | null;      // Today's peak wind speed
   unit: string;              // 'mph', 'kph', 'knots'
   cardinal?: string | null;  // e.g. 'NNE'
 }
@@ -14,7 +15,7 @@ interface WindCompassProps {
 const CARDINALS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
-export default function WindCompass({ direction, speed, gust, unit, cardinal }: WindCompassProps) {
+export default function WindCompass({ direction, speed, gust, peak, unit, cardinal }: WindCompassProps) {
   const cx = 130;
   const cy = 130;
   const outerR = 110;
@@ -162,6 +163,11 @@ export default function WindCompass({ direction, speed, gust, unit, cardinal }: 
         {gust != null && (
           <span style={{ color: 'var(--color-warning)' }}>
             G {gust.toFixed(0)} {unit}
+          </span>
+        )}
+        {peak != null && (
+          <span>
+            Peak {peak.toFixed(0)} {unit}
           </span>
         )}
       </div>

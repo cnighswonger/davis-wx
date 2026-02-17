@@ -1,4 +1,5 @@
 import { useTheme } from '../../context/ThemeContext';
+import { useWeatherData } from '../../context/WeatherDataContext';
 import { themes } from '../../themes';
 
 interface HeaderProps {
@@ -9,6 +10,10 @@ interface HeaderProps {
 
 export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderProps) {
   const { themeName, setThemeName } = useTheme();
+  const { currentConditions } = useWeatherData();
+  const extremes = currentConditions?.daily_extremes;
+  const hi = extremes?.outside_temp_hi?.value;
+  const lo = extremes?.outside_temp_lo?.value;
 
   return (
     <header
@@ -62,6 +67,24 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div
+          className="header-hilo"
+          style={{
+            fontSize: '13px',
+            fontFamily: 'var(--font-gauge)',
+            color: 'var(--color-text-secondary)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span style={{ color: 'var(--color-temp-hot, #ef4444)' }}>
+            H {hi != null ? `${hi.toFixed(1)}°` : '--'}
+          </span>
+          {' / '}
+          <span style={{ color: 'var(--color-temp-cold, #3b82f6)' }}>
+            L {lo != null ? `${lo.toFixed(1)}°` : '--'}
+          </span>
+        </div>
+
         <div
           style={{
             display: 'flex',

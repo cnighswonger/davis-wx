@@ -50,6 +50,19 @@ export interface DerivedData {
   theta_e: ValueWithUnit | null;
 }
 
+export interface DailyExtremes {
+  outside_temp_hi: ValueWithUnit | null;
+  outside_temp_lo: ValueWithUnit | null;
+  inside_temp_hi: ValueWithUnit | null;
+  inside_temp_lo: ValueWithUnit | null;
+  wind_speed_hi: ValueWithUnit | null;
+  barometer_hi: ValueWithUnit | null;
+  barometer_lo: ValueWithUnit | null;
+  humidity_hi: ValueWithUnit | null;
+  humidity_lo: ValueWithUnit | null;
+  rain_rate_hi: ValueWithUnit | null;
+}
+
 export interface CurrentConditions {
   timestamp: string;
   station_type: string;
@@ -61,6 +74,7 @@ export interface CurrentConditions {
   derived: DerivedData;
   solar_radiation: ValueWithUnit | null;
   uv_index: ValueWithUnit | null;
+  daily_extremes: DailyExtremes | null;
 }
 
 // --- Forecast ---

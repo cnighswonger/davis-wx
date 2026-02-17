@@ -6,6 +6,8 @@
 interface HumidityGaugeProps {
   value: number | null;  // 0-100%
   label?: string;        // 'Inside' or 'Outside'
+  high?: number | null;  // Today's high
+  low?: number | null;   // Today's low
 }
 
 function humidityColor(pct: number): string {
@@ -24,7 +26,7 @@ function humidityColor(pct: number): string {
   }
 }
 
-export default function HumidityGauge({ value, label }: HumidityGaugeProps) {
+export default function HumidityGauge({ value, label, high, low }: HumidityGaugeProps) {
   const cx = 120;
   const cy = 115;
   const r = 90;
@@ -145,6 +147,19 @@ export default function HumidityGauge({ value, label }: HumidityGaugeProps) {
           {value !== null ? `${value}%` : '--%'}
         </text>
       </svg>
+
+      {(high != null || low != null) && (
+        <div style={{
+          fontSize: '12px',
+          fontFamily: 'var(--font-gauge)',
+          color: 'var(--color-text-secondary)',
+          marginTop: '-4px',
+        }}>
+          H {high != null ? `${high}%` : '--%'}
+          {' / '}
+          L {low != null ? `${low}%` : '--%'}
+        </div>
+      )}
     </div>
   );
 }
