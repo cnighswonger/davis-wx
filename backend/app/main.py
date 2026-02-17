@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -62,6 +63,9 @@ async def lifespan(app: FastAPI):
     try:
         row = db.query(StationConfigModel).filter_by(key="setup_complete").first()
         setup_done = row is not None and row.value == "true"
+        row_count = db.query(StationConfigModel).count()
+        logger.info("Config DB: %d rows, setup_complete=%s",
+                     row_count, row.value if row else "NOT FOUND")
     finally:
         db.close()
 
@@ -92,15 +96,23 @@ async def lifespan(app: FastAPI):
             try:
                 db = SessionLocal()
                 try:
-                    db.merge(StationConfigModel(
-                        key="setup_complete", value="true",
-                    ))
+                    existing = db.query(StationConfigModel).filter_by(
+                        key="setup_complete"
+                    ).first()
+                    if existing:
+                        existing.value = "true"
+                        existing.updated_at = datetime.now(timezone.utc)
+                    else:
+                        db.add(StationConfigModel(
+                            key="setup_complete", value="true",
+                            updated_at=datetime.now(timezone.utc),
+                        ))
                     db.commit()
                     logger.info("Existing install detected — auto-marked setup complete")
                 finally:
                     db.close()
             except Exception as e:
-                logger.error("Failed to mark setup complete: %s", e)
+                logger.error("Failed to mark setup complete: %s", e, exc_info=True)
         else:
             logger.info("Waiting for first-run setup wizard")
 
