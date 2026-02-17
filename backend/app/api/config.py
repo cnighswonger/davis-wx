@@ -76,14 +76,17 @@ def get_config(db: Session = Depends(get_db)):
 def update_config(updates: list[ConfigUpdate], db: Session = Depends(get_db)):
     """Update one or more configuration values."""
     for update in updates:
+        # Python's str(True) produces "True" — normalize bools to lowercase
+        # so downstream checks like `value == "true"` work consistently.
+        val = str(update.value).lower() if isinstance(update.value, bool) else str(update.value)
         existing = db.query(StationConfigModel).filter_by(key=update.key).first()
         if existing:
-            existing.value = str(update.value)
+            existing.value = val
             existing.updated_at = datetime.now(timezone.utc)
         else:
             new_item = StationConfigModel(
                 key=update.key,
-                value=str(update.value),
+                value=val,
                 updated_at=datetime.now(timezone.utc),
             )
             db.add(new_item)
