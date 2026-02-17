@@ -46,6 +46,46 @@ def _try_serial_connect(port: str, baud: int, timeout: float):
     return port, baud, timeout  # placeholder — actual logic is async
 
 
+async def _bg_connect(port: str, baud: int):
+    """Connect to serial port in the background so uvicorn starts immediately."""
+    try:
+        await _async_connect(port, baud)
+    except Exception as e:
+        logger.error("Background serial connect failed: %s", e)
+
+
+async def _bg_connect_and_mark_setup(port: str, baud: int):
+    """Try connecting with defaults; if it works, auto-mark setup complete."""
+    try:
+        await _async_connect(port, baud)
+    except Exception as e:
+        logger.info("Could not connect with .env defaults (%s)", e)
+        logger.info("Waiting for first-run setup wizard")
+        return
+
+    # Connection worked → auto-mark setup complete (upgrade path)
+    try:
+        db = SessionLocal()
+        try:
+            existing = db.query(StationConfigModel).filter_by(
+                key="setup_complete"
+            ).first()
+            if existing:
+                existing.value = "true"
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                db.add(StationConfigModel(
+                    key="setup_complete", value="true",
+                    updated_at=datetime.now(timezone.utc),
+                ))
+            db.commit()
+            logger.info("Existing install detected — auto-marked setup complete")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Failed to mark setup complete: %s", e, exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: start/stop serial polling and services."""
@@ -80,41 +120,13 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-        await _async_connect(port, baud)
+        asyncio.create_task(_bg_connect(port, baud))
     else:
-        # Try .env defaults — if it works, this is an existing install
+        # Try .env defaults in background — if it works, auto-mark setup complete
         logger.info("Setup not yet complete — trying .env defaults...")
-        connected = False
-        try:
-            await _async_connect(settings.serial_port, settings.baud_rate)
-            connected = True
-        except Exception as e:
-            logger.info("Could not connect with .env defaults (%s)", e)
-
-        if connected:
-            # Connection worked → auto-mark setup complete (upgrade path)
-            try:
-                db = SessionLocal()
-                try:
-                    existing = db.query(StationConfigModel).filter_by(
-                        key="setup_complete"
-                    ).first()
-                    if existing:
-                        existing.value = "true"
-                        existing.updated_at = datetime.now(timezone.utc)
-                    else:
-                        db.add(StationConfigModel(
-                            key="setup_complete", value="true",
-                            updated_at=datetime.now(timezone.utc),
-                        ))
-                    db.commit()
-                    logger.info("Existing install detected — auto-marked setup complete")
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.error("Failed to mark setup complete: %s", e, exc_info=True)
-        else:
-            logger.info("Waiting for first-run setup wizard")
+        asyncio.create_task(_bg_connect_and_mark_setup(
+            settings.serial_port, settings.baud_rate,
+        ))
 
     yield
 
