@@ -30,7 +30,9 @@ import { useWeatherData } from "../context/WeatherDataContext.tsx";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+  // Cap at 3 columns: each column is at least 1/3 of available width (minus gaps),
+  // but never narrower than 280px so it collapses to 2 or 1 on small screens.
+  gridTemplateColumns: "repeat(auto-fill, minmax(max(280px, calc((100% - 32px) / 3)), 1fr))",
   gap: "16px",
 };
 
