@@ -325,6 +325,24 @@ export default function History() {
               ))}
             </select>
           </div>
+
+          {/* CSV export */}
+          <div>
+            <label style={labelStyle}>&nbsp;</label>
+            <a
+              href={`/api/export?sensors=${encodeURIComponent(sensor)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&resolution=${encodeURIComponent(resolution)}`}
+              download
+              style={{
+                ...presetBtnBase,
+                background: "var(--color-bg-secondary)",
+                color: "var(--color-text-secondary)",
+                textDecoration: "none",
+                display: "inline-block",
+              }}
+            >
+              Download CSV
+            </a>
+          </div>
         </div>
 
         {/* Custom date inputs */}
