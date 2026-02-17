@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 # Resolve .env from the project root (one level above backend/)
@@ -27,6 +28,14 @@ class Settings(BaseSettings):
 
     # Database
     db_path: str = "davis_wx.db"
+
+    @model_validator(mode="after")
+    def _resolve_db_path(self) -> "Settings":
+        """Make db_path absolute, relative to the project root."""
+        p = Path(self.db_path)
+        if not p.is_absolute():
+            self.db_path = str(_PROJECT_ROOT / p)
+        return self
 
     @property
     def database_url(self) -> str:

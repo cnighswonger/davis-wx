@@ -50,6 +50,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan: start/stop serial polling and services."""
 
     # Initialize database
+    logger.info("Database: %s", settings.db_path)
     init_database()
     logger.info("Database initialized")
 
