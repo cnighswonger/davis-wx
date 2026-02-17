@@ -305,7 +305,10 @@ class LoggerDaemon:
     async def _h_read_station_time(self, _msg: dict) -> Any:
         if not self.driver or not self.driver.connected:
             raise RuntimeError("Not connected")
-        return await self.driver.async_read_station_time()
+        result = await self.driver.async_read_station_time()
+        if result is None:
+            logger.warning("read_station_time returned None")
+        return result
 
     async def _h_sync_station_time(self, _msg: dict) -> dict[str, Any]:
         if not self.driver or not self.driver.connected:

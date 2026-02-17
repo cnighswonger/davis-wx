@@ -4,6 +4,7 @@
 All hardware operations are proxied to the logger daemon via IPC.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -50,7 +51,7 @@ async def get_station():
     try:
         client = get_ipc_client()
         result = await client.send_command({"cmd": "status"})
-    except (ConnectionRefusedError, OSError):
+    except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
         return _DEGRADED_RESPONSE
 
     if not result.get("ok"):
@@ -62,7 +63,10 @@ async def get_station():
     station_time = None
     if data.get("connected"):
         try:
-            time_result = await client.send_command({"cmd": "read_station_time"})
+            # Longer timeout — serial lock may be held by archive sync
+            time_result = await client.send_command(
+                {"cmd": "read_station_time"}, timeout=20.0,
+            )
             if time_result.get("ok") and time_result["data"] is not None:
                 t = time_result["data"]
                 station_time = _format_station_time(t)
@@ -79,6 +83,11 @@ async def get_station():
                     if sync_result.get("ok") and sync_result["data"].get("success"):
                         station_time = datetime.now().strftime("%H:%M:%S %m/%d")
                         logger.info("Auto-sync complete")
+            else:
+                logger.warning(
+                    "Station time IPC returned ok=%s data=%s",
+                    time_result.get("ok"), time_result.get("data"),
+                )
         except Exception as exc:
             logger.warning("Failed to read station time via IPC: %s", exc)
 
