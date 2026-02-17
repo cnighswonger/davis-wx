@@ -42,3 +42,13 @@ def init_database() -> None:
     with engine.connect() as conn:
         conn.execute(text("PRAGMA journal_mode=WAL"))
         conn.commit()
+
+    # Migrate: add rain_yearly column if missing
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT rain_yearly FROM sensor_readings LIMIT 1"))
+        except Exception:
+            conn.execute(text(
+                "ALTER TABLE sensor_readings ADD COLUMN rain_yearly INTEGER"
+            ))
+            conn.commit()

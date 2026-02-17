@@ -731,6 +731,25 @@ class LinkDriver:
             logger.info("Daily rain cleared")
         return ok
 
+    def read_rain_yearly(self) -> Optional[int]:
+        """Read the yearly rain accumulator from station processor memory.
+
+        Returns raw click count (each click = 0.01 in), or None on failure.
+        """
+        if self.station_model is None:
+            return None
+
+        is_gro = self.station_model in (
+            StationModel.GROWEATHER, StationModel.ENERGY, StationModel.HEALTH,
+        )
+        addr = GroWeatherBank1.RAIN_YEARLY if is_gro else BasicBank1.RAIN_YEARLY
+
+        data = self.read_station_memory(addr.bank, addr.address, addr.nibbles)
+        if data is None or len(data) < 2:
+            return None
+
+        return struct.unpack_from("<H", data)[0]
+
     def clear_rain_yearly(self) -> bool:
         """Clear the yearly rain accumulator by writing 0x0000."""
         with self._io_lock:
@@ -812,6 +831,12 @@ class LinkDriver:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.write_calibration, offsets)
+
+    async def async_read_rain_yearly(self) -> Optional[int]:
+        """Async version of read_rain_yearly."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.read_rain_yearly)
 
     async def async_clear_rain_daily(self) -> bool:
         """Async version of clear_rain_daily."""

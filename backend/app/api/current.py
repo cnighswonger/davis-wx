@@ -75,7 +75,10 @@ def get_current(db: Session = Depends(get_db)):
                 {"value": round(reading.rain_total * 0.01, 2), "unit": "in"}
                 if reading.rain_total is not None else None
             ),
-            "yearly": None,
+            "yearly": (
+                {"value": round(reading.rain_yearly * 0.01, 2), "unit": "in"}
+                if reading.rain_yearly is not None else None
+            ),
             "rate": (
                 {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
                 if reading.rain_rate is not None else None

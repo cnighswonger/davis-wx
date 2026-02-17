@@ -147,6 +147,15 @@ class Poller:
             reading.rain_rate = round(self._rain_rate_in_per_hr * 10)
             self._last_rain_total = reading.rain_total
 
+        # Read yearly rain from station processor memory (separate WRD command)
+        if self.driver.station_model is not None:
+            try:
+                yearly = await self.driver.async_read_rain_yearly()
+                if yearly is not None:
+                    reading.rain_yearly = yearly
+            except Exception:
+                pass  # non-critical — leave as None
+
         # Compute derived values
         hi = None
         dp = None
@@ -192,6 +201,7 @@ class Poller:
                 barometer=reading.barometer,
                 rain_total=reading.rain_total,
                 rain_rate=reading.rain_rate,
+                rain_yearly=reading.rain_yearly,
                 solar_radiation=reading.solar_radiation,
                 uv_index=reading.uv_index,
                 heat_index=hi,
@@ -295,7 +305,10 @@ class Poller:
                     {"value": round(reading.rain_total * 0.01, 2), "unit": "in"}
                     if reading.rain_total is not None else None
                 ),
-                "yearly": None,
+                "yearly": (
+                    {"value": round(reading.rain_yearly * 0.01, 2), "unit": "in"}
+                    if reading.rain_yearly is not None else None
+                ),
                 "rate": (
                     {"value": round(reading.rain_rate / 10.0, 2), "unit": "in/hr"}
                     if reading.rain_rate is not None else None

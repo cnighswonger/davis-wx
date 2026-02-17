@@ -27,6 +27,7 @@ class SensorReadingModel(Base):
     barometer: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rain_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rain_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rain_yearly: Mapped[int | None] = mapped_column(Integer, nullable=True)
     solar_radiation: Mapped[int | None] = mapped_column(Integer, nullable=True)
     uv_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

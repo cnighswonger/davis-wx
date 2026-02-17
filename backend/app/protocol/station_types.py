@@ -130,6 +130,7 @@ class SensorReading:
     barometer: Optional[int] = None
     rain_total: Optional[int] = None
     rain_rate: Optional[int] = None
+    rain_yearly: Optional[int] = None
     solar_radiation: Optional[int] = None
     uv_index: Optional[int] = None
     uv_dose: Optional[int] = None

@@ -68,7 +68,7 @@ SENSOR_ALIASES = {
     "humidity_inside": "inside_humidity",
     "humidity_outside": "outside_humidity",
     "rain_daily": "rain_total",
-    "rain_yearly": "rain_total",
+    "rain_yearly": "rain_yearly",
     "rain_rate": "rain_total",
 }
 
