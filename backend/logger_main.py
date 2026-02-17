@@ -12,8 +12,10 @@ Stop:   Ctrl-C or SIGTERM
 import asyncio
 import json
 import logging
+import os
 import signal
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -83,6 +85,11 @@ class LoggerDaemon:
 
     async def shutdown(self) -> None:
         logger.info("Shutting down logger daemon...")
+        # Hard deadline: if cleanup hangs (executor threads, IPC), force exit
+        threading.Timer(10.0, lambda: (
+            logger.warning("Shutdown deadline exceeded — forcing exit"),
+            os._exit(0),
+        )).start()
         await self._teardown_driver()
         if self.ipc_server:
             await self.ipc_server.stop()

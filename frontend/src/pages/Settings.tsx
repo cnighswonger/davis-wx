@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive } from "../api/client.ts";
-import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration } from "../api/types.ts";
+import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
 import { useWeatherBackground } from "../context/WeatherBackgroundContext.tsx";
 import { themes } from "../themes/index.ts";
@@ -167,6 +167,20 @@ export default function Settings() {
   } = useWeatherBackground();
   const [scenesExpanded, setScenesExpanded] = useState(false);
 
+  // --- Alert thresholds ---
+  const [alertThresholds, setAlertThresholds] = useState<AlertThreshold[]>([]);
+  const [alertSaving, setAlertSaving] = useState(false);
+  const [alertSuccess, setAlertSuccess] = useState(false);
+  const [showAddAlert, setShowAddAlert] = useState(false);
+  const [newAlert, setNewAlert] = useState<Partial<AlertThreshold>>({
+    sensor: "outside_temp",
+    operator: "<=",
+    value: 32,
+    label: "",
+    cooldown_min: 15,
+    enabled: true,
+  });
+
   const handleBgUpload = useCallback(async (scene: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -219,6 +233,11 @@ export default function Settings() {
         setConfigItems(items);
         setPorts(portResult.ports);
         setLoading(false);
+        // Load alert thresholds from config
+        const atItem = items.find((i: ConfigItem) => i.key === "alert_thresholds");
+        if (atItem && typeof atItem.value === "string") {
+          try { setAlertThresholds(JSON.parse(atItem.value)); } catch { /* ignore */ }
+        }
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
@@ -979,6 +998,195 @@ export default function Settings() {
             />
             Enable NWS forecast data
           </label>
+        </div>
+      </div>
+
+      {/* ==================== Alerts ==================== */}
+      <div style={cardStyle}>
+        <h3 style={sectionTitle}>Alerts</h3>
+
+        {alertThresholds.length > 0 && (
+          <div style={{ marginBottom: "12px" }}>
+            {alertThresholds.map((t, idx) => (
+              <div
+                key={t.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "8px 0",
+                  borderBottom: idx < alertThresholds.length - 1 ? "1px solid var(--color-border)" : "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={t.enabled}
+                  onChange={() => {
+                    const updated = [...alertThresholds];
+                    updated[idx] = { ...t, enabled: !t.enabled };
+                    setAlertThresholds(updated);
+                    setAlertSuccess(false);
+                  }}
+                />
+                <span style={{ flex: 1, fontSize: "14px", fontFamily: "var(--font-body)", color: t.enabled ? "var(--color-text)" : "var(--color-text-muted)" }}>
+                  <strong>{t.label}</strong> — {t.sensor} {t.operator} {t.value}
+                </span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                  {t.cooldown_min}m cooldown
+                </span>
+                <button
+                  onClick={() => {
+                    setAlertThresholds(alertThresholds.filter((_, i) => i !== idx));
+                    setAlertSuccess(false);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-danger)",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    padding: "4px 8px",
+                  }}
+                  title="Delete"
+                >
+                  &#x2715;
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {alertThresholds.length === 0 && !showAddAlert && (
+          <p style={{ fontSize: "14px", color: "var(--color-text-muted)", marginBottom: "12px", fontFamily: "var(--font-body)" }}>
+            No alerts configured. Add one to get notified when conditions exceed a threshold.
+          </p>
+        )}
+
+        {showAddAlert && (
+          <div style={{ ...cardStyle, background: "var(--color-bg-secondary)", marginBottom: "12px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-end" }}>
+              <div>
+                <label style={labelStyle}>Label</label>
+                <input
+                  style={{ ...inputStyle, width: "180px" }}
+                  placeholder="e.g. Freeze Warning"
+                  value={newAlert.label ?? ""}
+                  onChange={(e) => setNewAlert({ ...newAlert, label: e.target.value })}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Sensor</label>
+                <select
+                  style={{ ...inputStyle, width: "160px" }}
+                  value={newAlert.sensor ?? "outside_temp"}
+                  onChange={(e) => setNewAlert({ ...newAlert, sensor: e.target.value })}
+                >
+                  <option value="outside_temp">Outside Temp</option>
+                  <option value="inside_temp">Inside Temp</option>
+                  <option value="wind_speed">Wind Speed</option>
+                  <option value="barometer">Barometer</option>
+                  <option value="outside_humidity">Humidity</option>
+                  <option value="rain_rate">Rain Rate</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Condition</label>
+                <select
+                  style={{ ...inputStyle, width: "70px" }}
+                  value={newAlert.operator ?? "<="}
+                  onChange={(e) => setNewAlert({ ...newAlert, operator: e.target.value as AlertThreshold["operator"] })}
+                >
+                  <option value=">=">&#8805;</option>
+                  <option value="<=">&#8804;</option>
+                  <option value=">">&gt;</option>
+                  <option value="<">&lt;</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Value</label>
+                <input
+                  type="number"
+                  style={{ ...inputStyle, width: "90px" }}
+                  value={newAlert.value ?? 0}
+                  onChange={(e) => setNewAlert({ ...newAlert, value: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Cooldown (min)</label>
+                <input
+                  type="number"
+                  style={{ ...inputStyle, width: "80px" }}
+                  value={newAlert.cooldown_min ?? 15}
+                  onChange={(e) => setNewAlert({ ...newAlert, cooldown_min: parseInt(e.target.value) || 15 })}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              <button
+                style={btnPrimary}
+                onClick={() => {
+                  if (!newAlert.label?.trim()) return;
+                  const id = `alert-${Date.now()}`;
+                  setAlertThresholds([...alertThresholds, {
+                    id,
+                    sensor: newAlert.sensor ?? "outside_temp",
+                    operator: (newAlert.operator ?? "<=") as AlertThreshold["operator"],
+                    value: newAlert.value ?? 0,
+                    label: newAlert.label?.trim() ?? "",
+                    enabled: true,
+                    cooldown_min: newAlert.cooldown_min ?? 15,
+                  }]);
+                  setShowAddAlert(false);
+                  setNewAlert({ sensor: "outside_temp", operator: "<=", value: 32, label: "", cooldown_min: 15, enabled: true });
+                  setAlertSuccess(false);
+                }}
+              >
+                Add
+              </button>
+              <button
+                style={{ ...btnPrimary, background: "var(--color-bg-secondary)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+                onClick={() => setShowAddAlert(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+          {!showAddAlert && (
+            <button style={btnPrimary} onClick={() => setShowAddAlert(true)}>
+              Add Alert
+            </button>
+          )}
+          <button
+            style={{
+              ...btnPrimary,
+              opacity: alertSaving ? 0.6 : 1,
+            }}
+            onClick={async () => {
+              setAlertSaving(true);
+              setAlertSuccess(false);
+              try {
+                await updateConfig([{ key: "alert_thresholds", value: JSON.stringify(alertThresholds) }]);
+                setAlertSuccess(true);
+              } catch {
+                setError("Failed to save alerts");
+              } finally {
+                setAlertSaving(false);
+              }
+            }}
+            disabled={alertSaving}
+          >
+            {alertSaving ? "Saving..." : "Save Alerts"}
+          </button>
+
+          {alertSuccess && (
+            <span style={{ color: "var(--color-success)", fontSize: "14px", fontFamily: "var(--font-body)" }}>
+              Alerts saved.
+            </span>
+          )}
         </div>
       </div>
 

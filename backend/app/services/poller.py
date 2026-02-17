@@ -23,8 +23,10 @@ from ..services.calculations import (
     equivalent_potential_temperature,
 )
 from ..services.pressure_trend import analyze_pressure_trend
+from ..services.alerts import AlertChecker
 from ..models.database import SessionLocal
 from ..models.sensor_reading import SensorReadingModel
+from ..models.station_config import StationConfigModel
 
 CARDINAL_DIRECTIONS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -51,6 +53,7 @@ class Poller:
         self._broadcast_callback: (
             Callable[[dict[str, Any]], Coroutine[Any, Any, Any]] | None
         ) = None
+        self._alert_checker = AlertChecker()
 
     @property
     def stats(self) -> dict:
@@ -61,10 +64,27 @@ class Poller:
             "uptime_seconds": int(time.time() - self._start_time),
         }
 
+    def reload_alert_thresholds(self) -> None:
+        """Load alert thresholds from the database."""
+        import json
+        db = SessionLocal()
+        try:
+            row = db.query(StationConfigModel).filter_by(key="alert_thresholds").first()
+            if row:
+                thresholds = json.loads(row.value)
+                self._alert_checker.load_thresholds(thresholds)
+            else:
+                self._alert_checker.load_thresholds([])
+        except Exception as e:
+            logger.error("Failed to load alert thresholds: %s", e)
+        finally:
+            db.close()
+
     async def run(self) -> None:
         """Main polling loop. Runs until cancelled."""
         self._running = True
         self._start_time = time.time()
+        self.reload_alert_thresholds()
         logger.info("Poller starting with %ds interval", self.poll_interval)
 
         while self._running:
@@ -150,7 +170,7 @@ class Poller:
             self._last_rain_total = reading.rain_total
 
         # Read yearly rain from station processor memory (separate WRD command)
-        if self.driver.station_model is not None:
+        if self.driver.station_model is not None and self._running:
             try:
                 yearly = await self.driver.async_read_rain_yearly()
                 if yearly is not None:
@@ -223,10 +243,25 @@ class Poller:
 
         # Broadcast to subscribers (IPC clients / WebSocket relay)
         if self._broadcast_callback:
+            data_dict = self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend, extremes)
             await self._broadcast_callback({
                 "type": "sensor_update",
-                "data": self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend, extremes),
+                "data": data_dict,
             })
+
+            # Reload thresholds each cycle so config changes take effect
+            self.reload_alert_thresholds()
+            triggered, cleared = self._alert_checker.check(data_dict)
+            for alert in triggered:
+                await self._broadcast_callback({
+                    "type": "alert_triggered",
+                    "data": alert,
+                })
+            for alert in cleared:
+                await self._broadcast_callback({
+                    "type": "alert_cleared",
+                    "data": alert,
+                })
 
     async def _get_pressure_trend(self) -> Optional[str]:
         """Query last 3 hours of barometer readings for trend analysis."""

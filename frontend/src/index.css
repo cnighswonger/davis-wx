@@ -86,6 +86,12 @@ a:hover {
   outline-offset: 2px;
 }
 
+/* Alert toast slide-in animation */
+@keyframes alert-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
 /* Responsive: mobile sidebar behavior */
 @media (max-width: 768px) {
   .app-shell {

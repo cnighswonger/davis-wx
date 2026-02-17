@@ -3,7 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WeatherBackgroundProvider } from './context/WeatherBackgroundContext';
 import { WeatherDataProvider, useWeatherData } from './context/WeatherDataContext';
+import { AlertProvider } from './context/AlertContext';
 import { DashboardLayoutProvider } from './dashboard/DashboardLayoutContext';
+import AlertToast from './components/AlertToast';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
@@ -21,6 +23,7 @@ function AppContent() {
 
   return (
     <AppShell connected={connected} lastUpdate={lastUpdate}>
+      <AlertToast />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/history" element={<History />} />
@@ -90,9 +93,11 @@ function App() {
       <WeatherBackgroundProvider>
         <BrowserRouter>
           <WeatherDataProvider>
-            <DashboardLayoutProvider>
-              <AppContent />
-            </DashboardLayoutProvider>
+            <AlertProvider>
+              <DashboardLayoutProvider>
+                <AppContent />
+              </DashboardLayoutProvider>
+            </AlertProvider>
           </WeatherDataProvider>
         </BrowserRouter>
       </WeatherBackgroundProvider>

@@ -214,8 +214,12 @@ class LinkDriver:
                     if reading is not None:
                         return self.apply_calibration(reading)
                     else:
+                        if self._stop_requested:
+                            return None
                         logger.warning("LOOP attempt %d/%d: no response", attempt + 1, MAX_RETRIES + 1)
                 except Exception as e:
+                    if self._stop_requested:
+                        return None
                     logger.warning("LOOP attempt %d/%d failed: %s", attempt + 1, MAX_RETRIES + 1, e)
 
                 if attempt < MAX_RETRIES:
@@ -253,6 +257,8 @@ class LinkDriver:
         """
         with self._io_lock:
             for attempt in range(MAX_RETRIES + 1):
+                if self._stop_requested:
+                    return None
                 try:
                     cmd = build_wrd_command(n_nibbles, bank, address)
                     logger.debug(
@@ -262,6 +268,8 @@ class LinkDriver:
                     self.serial.send(cmd)
 
                     if not self.serial.wait_for_ack():
+                        if self._stop_requested:
+                            return None
                         logger.warning(
                             "WRD bank %d addr 0x%02X attempt %d: no ACK",
                             bank, address, attempt + 1,
@@ -294,6 +302,8 @@ class LinkDriver:
                     return data[:n_bytes]
 
                 except Exception as e:
+                    if self._stop_requested:
+                        return None
                     logger.warning("WRD attempt %d failed: %s", attempt + 1, e)
 
             return None
@@ -304,11 +314,15 @@ class LinkDriver:
         """Read link processor memory using RRD command."""
         with self._io_lock:
             for attempt in range(MAX_RETRIES + 1):
+                if self._stop_requested:
+                    return None
                 try:
                     cmd = build_rrd_command(bank, address, n_nibbles)
                     self.serial.send(cmd)
 
                     if not self.serial.wait_for_ack():
+                        if self._stop_requested:
+                            return None
                         continue
 
                     n_bytes = (n_nibbles + 1) // 2
@@ -316,6 +330,8 @@ class LinkDriver:
                     data = self.serial.receive(read_size)
 
                     if len(data) < n_bytes:
+                        if self._stop_requested:
+                            return None
                         logger.warning(
                             "RRD bank %d addr 0x%03X attempt %d: short read (%d/%d bytes)",
                             bank, address, attempt + 1, len(data), n_bytes,
@@ -336,6 +352,8 @@ class LinkDriver:
                     return data[:n_bytes]
 
                 except Exception as e:
+                    if self._stop_requested:
+                        return None
                     logger.warning("RRD attempt %d failed: %s", attempt + 1, e)
 
             return None
@@ -344,28 +362,38 @@ class LinkDriver:
         """Read archive/SRAM memory using SRD command with retries."""
         with self._io_lock:
             for attempt in range(MAX_RETRIES + 1):
+                if self._stop_requested:
+                    return None
                 try:
                     self.serial.flush()
                     cmd = build_srd_command(address, n_bytes)
                     self.serial.send(cmd)
 
                     if not self.serial.wait_for_ack():
+                        if self._stop_requested:
+                            return None
                         logger.warning("SRD addr 0x%04X attempt %d: no ACK", address, attempt + 1)
                         continue
 
                     # SRD always returns data + 2-byte CRC
                     data = self.serial.receive(n_bytes + 2)
                     if len(data) < n_bytes + 2:
+                        if self._stop_requested:
+                            return None
                         logger.warning("SRD addr 0x%04X attempt %d: short read", address, attempt + 1)
                         continue
 
                     if not crc_validate(data):
+                        if self._stop_requested:
+                            return None
                         logger.warning("SRD addr 0x%04X attempt %d: CRC failed", address, attempt + 1)
                         continue
 
                     return data[:n_bytes]
 
                 except Exception as e:
+                    if self._stop_requested:
+                        return None
                     logger.warning("SRD attempt %d failed: %s", attempt + 1, e)
 
             return None
@@ -442,6 +470,8 @@ class LinkDriver:
         """
         with self._io_lock:
             for attempt in range(MAX_RETRIES + 1):
+                if self._stop_requested:
+                    return False
                 try:
                     cmd = build_wwr_command(n_nibbles, bank, address, data)
                     logger.debug(
@@ -454,11 +484,15 @@ class LinkDriver:
                         logger.debug("WWR ACK OK")
                         return True
 
+                    if self._stop_requested:
+                        return False
                     logger.warning(
                         "WWR bank %d addr 0x%02X attempt %d: no ACK",
                         bank, address, attempt + 1,
                     )
                 except Exception as e:
+                    if self._stop_requested:
+                        return False
                     logger.warning("WWR attempt %d failed: %s", attempt + 1, e)
 
             return False

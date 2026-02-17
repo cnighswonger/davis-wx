@@ -175,6 +175,27 @@ export interface HistoryResponse {
   points: HistoryPoint[];
 }
 
+// --- Alerts ---
+
+export interface AlertThreshold {
+  id: string;
+  sensor: string;
+  operator: ">=" | "<=" | ">" | "<";
+  value: number;
+  label: string;
+  enabled: boolean;
+  cooldown_min: number;
+}
+
+export interface AlertEvent {
+  id: string;
+  label: string;
+  sensor: string;
+  value: number;
+  threshold: number;
+  operator: string;
+}
+
 // --- WebSocket Messages ---
 
 export interface WSSensorUpdate {
@@ -187,12 +208,22 @@ export interface WSForecastUpdate {
   data: ForecastResponse;
 }
 
+export interface WSAlertTriggered {
+  type: "alert_triggered";
+  data: AlertEvent;
+}
+
+export interface WSAlertCleared {
+  type: "alert_cleared";
+  data: { id: string; label: string };
+}
+
 export interface WSConnectionStatus {
   type: "connection_status";
   connected: boolean;
 }
 
-export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSConnectionStatus;
+export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
 
 // --- Setup Wizard ---
 

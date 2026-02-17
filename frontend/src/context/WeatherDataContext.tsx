@@ -8,7 +8,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   useCallback,
 } from "react";
@@ -41,6 +40,8 @@ interface WeatherDataContextValue {
   wsConnected: boolean;
   /** Manually refresh forecast data. */
   refreshForecast: () => void;
+  /** WebSocket manager for alert subscriptions (null until connected). */
+  ws: WebSocketManager | null;
 }
 
 const WeatherDataContext = createContext<WeatherDataContextValue | null>(null);
@@ -62,7 +63,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
   const [connected, setConnected] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
 
-  const wsRef = useRef<WebSocketManager | null>(null);
+  const [ws, setWs] = useState<WebSocketManager | null>(null);
 
   // Refresh forecast data from REST endpoint.
   const refreshForecast = useCallback(() => {
@@ -108,37 +109,37 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     const forecastTimer = setInterval(refreshForecast, FORECAST_REFRESH_INTERVAL);
 
     // --- WebSocket setup ---
-    const ws = new WebSocketManager();
-    wsRef.current = ws;
+    const manager = new WebSocketManager();
+    setWs(manager);
 
     // Track WS connection state by polling the manager (the manager
     // itself does not emit events for its own connection state, so we use
     // a short poll that is cheap and avoids adding an event to the manager
     // just for this).
     const wsStateTimer = setInterval(() => {
-      setWsConnected(ws.isConnected);
+      setWsConnected(manager.isConnected);
     }, 1000);
 
-    ws.onMessage("sensor_update", (data) => {
+    manager.onMessage("sensor_update", (data) => {
       setCurrentConditions(data as CurrentConditions);
     });
 
-    ws.onMessage("forecast_update", (data) => {
+    manager.onMessage("forecast_update", (data) => {
       setForecast(data as ForecastResponse);
     });
 
-    ws.onMessage("connection_status", (data) => {
+    manager.onMessage("connection_status", (data) => {
       setConnected(data as boolean);
     });
 
-    ws.connect();
+    manager.connect();
 
     return () => {
       clearInterval(slowTimer);
       clearInterval(forecastTimer);
       clearInterval(wsStateTimer);
-      ws.disconnect();
-      wsRef.current = null;
+      manager.disconnect();
+      setWs(null);
     };
   }, [refreshSlowData, refreshForecast]);
 
@@ -150,6 +151,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     connected,
     wsConnected,
     refreshForecast,
+    ws,
   };
 
   return (

@@ -29,6 +29,7 @@ _DEFAULTS: dict[str, object] = {
     "metar_station": settings.metar_station_id,
     "nws_enabled": settings.nws_enabled,
     "setup_complete": False,
+    "alert_thresholds": "[]",
 }
 
 

@@ -56,7 +56,10 @@ class IPCServer:
 
         if self._server:
             self._server.close()
-            await self._server.wait_closed()
+            try:
+                await asyncio.wait_for(self._server.wait_closed(), timeout=3.0)
+            except asyncio.TimeoutError:
+                logger.warning("IPC server wait_closed timed out")
             logger.info("IPC server stopped")
 
     async def broadcast_to_subscribers(self, message: dict[str, Any]) -> None:
