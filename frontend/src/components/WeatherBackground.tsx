@@ -105,6 +105,8 @@ export default function WeatherBackground() {
   useEffect(() => {
     const root = document.documentElement;
     if (enabled) {
+      // Signal to ThemeContext to skip these properties on theme changes
+      root.dataset.weatherBg = "active";
       // Transparency 0 → fully opaque (alpha=1); 100 → mostly transparent (alpha=0.3)
       const alpha = 1 - (transparency / 100) * 0.7;
       for (const { prop, key } of TRANSLUCENT_PROPS) {
@@ -112,6 +114,7 @@ export default function WeatherBackground() {
         root.style.setProperty(`${prop}-solid`, theme.colors[key]);
       }
     } else {
+      delete root.dataset.weatherBg;
       // Restore opaque theme colors and remove solid companions
       for (const { prop, key } of TRANSLUCENT_PROPS) {
         root.style.setProperty(prop, theme.colors[key]);

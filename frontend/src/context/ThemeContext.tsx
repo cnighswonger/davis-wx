@@ -11,11 +11,19 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = 'davis-wx-theme';
 
+// Color keys managed by WeatherBackground when active — skip to avoid
+// overwriting the rgba overrides that make tiles transparent.
+const WEATHER_BG_KEYS = new Set([
+  'bgCard', 'bgCardHover', 'bgSecondary', 'headerBg', 'sidebarBg',
+]);
+
 function applyThemeToDOM(theme: Theme) {
   const root = document.documentElement;
+  const skipWeatherBg = root.dataset.weatherBg === 'active';
 
   // Apply color CSS custom properties
   for (const [key, value] of Object.entries(theme.colors)) {
+    if (skipWeatherBg && WEATHER_BG_KEYS.has(key)) continue;
     const cssVar = `--color-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
     root.style.setProperty(cssVar, value);
   }
