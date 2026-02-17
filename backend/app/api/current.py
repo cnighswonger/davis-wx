@@ -35,9 +35,9 @@ def _bar_inhg(thousandths: int | None) -> float | None:
 
 def _get_daily_extremes(db: Session) -> dict | None:
     """Query today's high/low extremes from sensor_readings."""
-    # Use local midnight as the start of "today"
-    now = datetime.now(timezone.utc)
-    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Use system-local midnight so the day boundary matches the user's timezone
+    now = datetime.now().astimezone()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
     S = SensorReadingModel
     row = (
