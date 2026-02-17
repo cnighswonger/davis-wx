@@ -28,7 +28,7 @@ interface DashboardLayoutContextValue {
   reorderTiles: (fromIndex: number, toIndex: number) => void;
   addTile: (tileId: string, colSpan?: 1 | 2) => void;
   removeTile: (tileId: string) => void;
-  setTileColSpan: (tileId: string, colSpan: 1 | 2) => void;
+  setTileColSpan: (tileId: string, colSpan: 1 | 2 | 3) => void;
   resetToDefault: () => void;
 }
 
@@ -126,7 +126,7 @@ export function DashboardLayoutProvider({
   }, []);
 
   const setTileColSpan = useCallback(
-    (tileId: string, colSpan: 1 | 2) => {
+    (tileId: string, colSpan: 1 | 2 | 3) => {
       setLayoutState((prev) => {
         const next = {
           ...prev,

@@ -269,12 +269,10 @@ export default function DashboardGrid() {
                   id={placement.tileId}
                   colSpan={colSpan}
                   onRemove={() => removeTile(placement.tileId)}
-                  onToggleSpan={() =>
-                    setTileColSpan(
-                      placement.tileId,
-                      colSpan > 1 ? 1 : 2,
-                    )
-                  }
+                  onToggleSpan={() => {
+                    const next = colSpan === 1 ? 2 : colSpan === 2 ? 3 : 1;
+                    setTileColSpan(placement.tileId, next as 1 | 2 | 3);
+                  }}
                 >
                   {wrapped}
                 </SortableTile>

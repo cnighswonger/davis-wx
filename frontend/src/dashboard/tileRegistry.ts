@@ -9,7 +9,7 @@ export interface TileDefinition {
   id: string;
   label: string;
   category: "temperature" | "atmosphere" | "wind" | "rain" | "solar" | "status";
-  minColSpan: 1 | 2;
+  minColSpan: 1 | 2 | 3;
   requiresSolar?: boolean;
   hasFlipTile: boolean;
   sensor?: string;
@@ -19,7 +19,7 @@ export interface TileDefinition {
 
 export interface TilePlacement {
   tileId: string;
-  colSpan?: 1 | 2;
+  colSpan?: 1 | 2 | 3;
 }
 
 export interface DashboardLayout {
@@ -143,6 +143,6 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
     { tileId: "rain" },
     { tileId: "solar-uv" },
     { tileId: "current-conditions" },
-    { tileId: "station-status", colSpan: 2 },
+    { tileId: "station-status", colSpan: 3 },
   ],
 };

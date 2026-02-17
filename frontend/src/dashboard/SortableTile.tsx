@@ -10,7 +10,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 interface SortableTileProps {
   id: string;
-  colSpan: 1 | 2;
+  colSpan: 1 | 2 | 3;
   onRemove: () => void;
   onToggleSpan: () => void;
   children: ReactNode;
@@ -138,9 +138,9 @@ export default function SortableTile({
           e.stopPropagation();
           onToggleSpan();
         }}
-        aria-label={colSpan > 1 ? "Shrink tile" : "Expand tile"}
+        aria-label={`Change tile width (currently ${colSpan}col)`}
       >
-        {colSpan > 1 ? "\u25C0 1col" : "2col \u25B6"}
+        {colSpan === 1 ? "2col \u25B6" : colSpan === 2 ? "3col \u25B6" : "\u25C0 1col"}
       </button>
 
       {children}
