@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # UI
     theme: str = "dark"
 
+    # IPC (logger <-> web app)
+    ipc_port: int = 6514
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

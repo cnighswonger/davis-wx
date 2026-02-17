@@ -1,14 +1,14 @@
 """Async polling loop for Davis WeatherLink LOOP command.
 
 Periodically polls the station, parses data, computes derived values,
-stores to database, and broadcasts to WebSocket clients.
+stores to database, and broadcasts via a configurable callback.
 """
 
 import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Callable, Coroutine, Optional
 
 from ..protocol.link_driver import LinkDriver
 from ..protocol.station_types import SensorReading
@@ -23,7 +23,6 @@ from ..services.calculations import (
 from ..services.pressure_trend import analyze_pressure_trend
 from ..models.database import SessionLocal
 from ..models.sensor_reading import SensorReadingModel
-from ..ws.handler import ws_manager
 
 CARDINAL_DIRECTIONS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -47,6 +46,9 @@ class Poller:
         self._crc_errors = 0
         self._timeouts = 0
         self._start_time = time.time()
+        self._broadcast_callback: (
+            Callable[[dict[str, Any]], Coroutine[Any, Any, Any]] | None
+        ) = None
 
     @property
     def stats(self) -> dict:
@@ -89,6 +91,16 @@ class Poller:
                 await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
                 break
+
+    def set_broadcast_callback(
+        self,
+        callback: Callable[[dict[str, Any]], Coroutine[Any, Any, Any]],
+    ) -> None:
+        """Set the async callback invoked after each reading.
+
+        In the logger daemon this is IPCServer.broadcast_to_subscribers.
+        """
+        self._broadcast_callback = callback
 
     def stop(self) -> None:
         self._running = False
@@ -194,11 +206,12 @@ class Poller:
         finally:
             db.close()
 
-        # Broadcast to WebSocket clients
-        await ws_manager.broadcast({
-            "type": "sensor_update",
-            "data": self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend),
-        })
+        # Broadcast to subscribers (IPC clients / WebSocket relay)
+        if self._broadcast_callback:
+            await self._broadcast_callback({
+                "type": "sensor_update",
+                "data": self._reading_to_dict(reading, hi, dp, wc, fl, theta, trend),
+            })
 
     async def _get_pressure_trend(self) -> Optional[str]:
         """Query last 3 hours of barometer readings for trend analysis."""

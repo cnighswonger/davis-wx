@@ -1,6 +1,6 @@
 """Database engine and session factory for SQLAlchemy."""
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
 
 from ..config import settings
@@ -37,3 +37,8 @@ def init_database() -> None:
     from . import station_config  # noqa: F401
     from . import archive_record  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Enable WAL mode so the logger and web app can access the DB concurrently
+    with engine.connect() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.commit()

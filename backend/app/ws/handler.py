@@ -1,47 +1,78 @@
-"""WebSocket endpoint for live sensor data."""
+"""WebSocket endpoint for live sensor data.
 
+Relays sensor_update messages from the logger daemon (via IPC subscription)
+to all connected browser WebSocket clients.
+"""
+
+import asyncio
 import json
 import logging
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from ..config import settings
+from ..ipc.client import IPCClient
+
 logger = logging.getLogger(__name__)
-
-# Set by main.py so we can send initial connection_status
-_driver = None
-
-
-def set_driver(driver) -> None:
-    global _driver
-    _driver = driver
 
 
 class ConnectionManager:
-    """Manages active WebSocket connections."""
+    """Manages browser WebSocket connections and the IPC relay to the logger."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_connections: list[WebSocket] = []
+        self._relay_task: asyncio.Task | None = None
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info("WebSocket client connected. Total: %d", len(self.active_connections))
 
+        # Start the IPC relay if this is the first browser client
+        if len(self.active_connections) == 1:
+            self._start_relay()
+
     def disconnect(self, websocket: WebSocket) -> None:
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         logger.info("WebSocket client disconnected. Total: %d", len(self.active_connections))
 
-    async def broadcast(self, message: dict[str, Any]) -> None:
-        """Send a message to all connected clients."""
-        disconnected = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                disconnected.append(connection)
+        # Stop relay when no more browser clients
+        if not self.active_connections and self._relay_task:
+            self._relay_task.cancel()
+            self._relay_task = None
 
+    def _start_relay(self) -> None:
+        if self._relay_task and not self._relay_task.done():
+            return
+        self._relay_task = asyncio.create_task(self._relay_loop())
+
+    async def _relay_loop(self) -> None:
+        """Subscribe to the logger daemon IPC and relay messages to browsers."""
+        while self.active_connections:
+            try:
+                client = IPCClient(settings.ipc_port)
+                async for msg in client.subscribe():
+                    if not self.active_connections:
+                        break
+                    await self._broadcast(msg)
+            except asyncio.CancelledError:
+                break
+            except (ConnectionRefusedError, OSError):
+                # Logger not running — wait and retry
+                await asyncio.sleep(2.0)
+            except Exception as exc:
+                logger.error("IPC relay error: %s", exc)
+                await asyncio.sleep(2.0)
+
+    async def _broadcast(self, message: dict[str, Any]) -> None:
+        disconnected: list[WebSocket] = []
+        for conn in self.active_connections:
+            try:
+                await conn.send_json(message)
+            except Exception:
+                disconnected.append(conn)
         for conn in disconnected:
             if conn in self.active_connections:
                 self.active_connections.remove(conn)
@@ -55,20 +86,28 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     """Handle WebSocket connections for live data streaming."""
     await ws_manager.connect(websocket)
     try:
-        # Send initial connection status so the client knows right away
-        is_connected = _driver.connected if _driver else False
+        # Send initial connection status from logger
+        try:
+            client = IPCClient(settings.ipc_port)
+            result = await client.send_command({"cmd": "status"}, timeout=3.0)
+            connected = (
+                result.get("ok", False)
+                and result.get("data", {}).get("connected", False)
+            )
+            await client.close()
+        except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
+            connected = False
+
         await websocket.send_json({
             "type": "connection_status",
-            "connected": is_connected,
+            "connected": connected,
         })
 
         while True:
-            # Keep connection alive; handle any client messages
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
-                msg_type = msg.get("type")
-                if msg_type == "ping":
+                if msg.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
             except json.JSONDecodeError:
                 pass

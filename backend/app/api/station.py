@@ -1,5 +1,7 @@
 """GET /api/station - Station type, connection status, diagnostics.
    POST /api/station/sync-time - Sync station clock to computer time.
+
+All hardware operations are proxied to the logger daemon via IPC.
 """
 
 import logging
@@ -7,21 +9,10 @@ from datetime import datetime
 
 from fastapi import APIRouter
 
-from ..protocol.constants import STATION_NAMES, StationModel
+from ..ipc.dependencies import get_ipc_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# These will be set by main.py during startup
-_poller = None
-_driver = None
-
-
-def set_poller(poller, driver):
-    global _poller, _driver
-    _poller = poller
-    _driver = driver
-
 
 AUTO_SYNC_THRESHOLD_SECONDS = 5
 
@@ -43,31 +34,40 @@ def _station_time_to_datetime(t: dict) -> datetime:
     return datetime(year, t["month"], t["day"], t["hour"], t["minute"], t["second"])
 
 
+_DEGRADED_RESPONSE = {
+    "type_code": -1,
+    "type_name": "Not connected",
+    "connected": False,
+    "link_revision": "unknown",
+    "poll_interval": 0,
+    "station_time": None,
+}
+
+
 @router.get("/station")
 async def get_station():
     """Return station information and diagnostics."""
-    if _driver is None:
-        return {
-            "type_code": -1,
-            "type_name": "Not connected",
-            "connected": False,
-            "link_revision": "unknown",
-            "poll_interval": 0,
-            "station_time": None,
-        }
+    try:
+        client = get_ipc_client()
+        result = await client.send_command({"cmd": "status"})
+    except (ConnectionRefusedError, OSError):
+        return _DEGRADED_RESPONSE
 
-    model = _driver.station_model
-    stats = _poller.stats if _poller else {}
+    if not result.get("ok"):
+        return _DEGRADED_RESPONSE
+
+    data = result["data"]
 
     # Read station clock and auto-sync if drifted
     station_time = None
-    if _driver.connected:
+    if data.get("connected"):
         try:
-            t = await _driver.async_read_station_time()
-            station_time = _format_station_time(t)
+            time_result = await client.send_command({"cmd": "read_station_time"})
+            if time_result.get("ok") and time_result["data"] is not None:
+                t = time_result["data"]
+                station_time = _format_station_time(t)
 
-            # Auto-sync if drift exceeds threshold
-            if t is not None:
+                # Auto-sync if drift exceeds threshold
                 station_dt = _station_time_to_datetime(t)
                 drift = abs((datetime.now() - station_dt).total_seconds())
                 if drift > AUTO_SYNC_THRESHOLD_SECONDS:
@@ -75,26 +75,23 @@ async def get_station():
                         "Station clock drift %.1fs exceeds %ds threshold, auto-syncing",
                         drift, AUTO_SYNC_THRESHOLD_SECONDS,
                     )
-                    now = datetime.now()
-                    ok = await _driver.async_write_station_time(now)
-                    if ok:
-                        station_time = now.strftime("%H:%M:%S %m/%d")
+                    sync_result = await client.send_command({"cmd": "sync_station_time"})
+                    if sync_result.get("ok") and sync_result["data"].get("success"):
+                        station_time = datetime.now().strftime("%H:%M:%S %m/%d")
                         logger.info("Auto-sync complete")
-                    else:
-                        logger.warning("Auto-sync write failed")
-        except Exception as e:
-            logger.warning("Failed to read station time: %s", e)
+        except Exception as exc:
+            logger.warning("Failed to read station time via IPC: %s", exc)
 
     return {
-        "type_code": model.value if model else -1,
-        "type_name": STATION_NAMES.get(model, "Unknown") if model else "Unknown",
-        "connected": _driver.connected,
-        "link_revision": "E" if _driver.is_rev_e else "D",
-        "poll_interval": _poller.poll_interval if _poller else 0,
-        "last_poll": stats.get("last_poll"),
-        "uptime_seconds": stats.get("uptime_seconds", 0),
-        "crc_errors": stats.get("crc_errors", 0),
-        "timeouts": stats.get("timeouts", 0),
+        "type_code": data.get("type_code", -1),
+        "type_name": data.get("type_name", "Unknown"),
+        "connected": data.get("connected", False),
+        "link_revision": data.get("link_revision", "unknown"),
+        "poll_interval": data.get("poll_interval", 0),
+        "last_poll": data.get("last_poll"),
+        "uptime_seconds": data.get("uptime_seconds", 0),
+        "crc_errors": data.get("crc_errors", 0),
+        "timeouts": data.get("timeouts", 0),
         "station_time": station_time,
     }
 
@@ -102,16 +99,11 @@ async def get_station():
 @router.post("/station/sync-time")
 async def sync_station_time():
     """Sync station clock to computer time."""
-    if _driver is None or not _driver.connected:
-        return {"status": "error", "message": "Station not connected"}
-
-    now = datetime.now()
     try:
-        ok = await _driver.async_write_station_time(now)
-    except Exception as e:
-        logger.error("Station time sync failed: %s", e)
-        return {"status": "error", "message": str(e)}
-
-    if ok:
-        return {"status": "ok", "synced_to": now.strftime("%H:%M:%S %m/%d/%Y")}
-    return {"status": "error", "message": "Write failed (no ACK)"}
+        client = get_ipc_client()
+        result = await client.send_command({"cmd": "sync_station_time"})
+        if result.get("ok"):
+            return {"status": "ok", **result["data"]}
+        return {"status": "error", "message": result.get("error", "Unknown error")}
+    except (ConnectionRefusedError, OSError):
+        return {"status": "error", "message": "Logger daemon not running"}

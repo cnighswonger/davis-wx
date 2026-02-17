@@ -6,9 +6,11 @@ POST /api/setup/probe        - Test a specific port+baud for a WeatherLink stati
 POST /api/setup/auto-detect  - Scan all ports for a WeatherLink station
 POST /api/setup/complete     - Save config and trigger reconnect
 POST /api/setup/reconnect    - Reconnect with current DB config
+
+Hardware operations (probe, detect, connect) are proxied to the logger
+daemon via IPC.
 """
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -16,25 +18,13 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..models.database import get_db
 from ..models.station_config import StationConfigModel
 from ..protocol.serial_port import list_serial_ports
-from ..protocol.link_driver import LinkDriver
-from ..protocol.constants import STATION_NAMES, StationModel
-from ..services.poller import Poller
-from .config import get_effective_config
+from ..ipc.dependencies import get_ipc_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# Populated by main.py via set_app_refs()
-_app_refs: dict = {}
-
-
-def set_app_refs(refs: dict):
-    """Called by main.py to share mutable references to driver/poller/task."""
-    _app_refs.update(refs)
 
 
 # --------------- Request/Response models ---------------
@@ -96,72 +86,47 @@ async def probe_serial_port(req: ProbeRequest):
     if req.baud_rate not in (1200, 2400):
         return ProbeResult(success=False, error="Baud rate must be 1200 or 2400")
 
-    # If the main driver already has this port open, return its info
-    driver = _app_refs.get("driver")
-    if driver is not None and driver.connected and driver.serial.port == req.port:
-        return ProbeResult(
-            success=True,
-            station_type=STATION_NAMES.get(driver.station_model, "Unknown"),
-            station_code=driver.station_model.value if driver.station_model else None,
-        )
-
-    # Create a temporary driver to probe
     try:
-        tmp = LinkDriver(port=req.port, baud_rate=req.baud_rate, timeout=3.0)
-        tmp.open()
-        try:
-            station = await tmp.async_detect_station_type()
+        client = get_ipc_client()
+        result = await client.send_command({
+            "cmd": "probe",
+            "port": req.port,
+            "baud": req.baud_rate,
+        })
+        if result.get("ok"):
+            data = result["data"]
             return ProbeResult(
-                success=True,
-                station_type=STATION_NAMES.get(station, "Unknown"),
-                station_code=station.value,
+                success=data["success"],
+                station_type=data.get("station_type"),
+                station_code=data.get("station_code"),
             )
-        finally:
-            tmp.close()
-    except Exception as e:
-        return ProbeResult(success=False, error=str(e))
+        return ProbeResult(success=False, error=result.get("error", "Unknown error"))
+    except (ConnectionRefusedError, OSError) as exc:
+        return ProbeResult(success=False, error="Logger daemon not running")
 
 
 @router.post("/setup/auto-detect")
 async def auto_detect_station():
-    """Scan all available ports with 2400 and 1200 baud for a WeatherLink station."""
-    ports = list_serial_ports()
-    attempts: list[dict] = []
-
-    # Check if main driver is already connected
-    driver = _app_refs.get("driver")
-    if driver is not None and driver.connected and driver.station_model is not None:
+    """Scan all available ports for a WeatherLink station."""
+    try:
+        client = get_ipc_client()
+        result = await client.send_command({"cmd": "auto_detect"}, timeout=30.0)
+        if result.get("ok"):
+            data = result["data"]
+            return AutoDetectResult(
+                found=data.get("found", False),
+                port=data.get("port"),
+                baud_rate=data.get("baud_rate"),
+                station_type=data.get("station_type"),
+                station_code=data.get("station_code"),
+                attempts=data.get("attempts", []),
+            )
+        return AutoDetectResult(found=False, attempts=[])
+    except (ConnectionRefusedError, OSError):
         return AutoDetectResult(
-            found=True,
-            port=driver.serial.port,
-            baud_rate=driver.serial.baud_rate,
-            station_type=STATION_NAMES.get(driver.station_model, "Unknown"),
-            station_code=driver.station_model.value,
-            attempts=[],
+            found=False,
+            attempts=[{"error": "Logger daemon not running"}],
         )
-
-    for port in ports:
-        for baud in (2400, 1200):
-            try:
-                tmp = LinkDriver(port=port, baud_rate=baud, timeout=3.0)
-                tmp.open()
-                try:
-                    station = await tmp.async_detect_station_type()
-                    attempts.append({"port": port, "baud": baud, "result": "found"})
-                    return AutoDetectResult(
-                        found=True,
-                        port=port,
-                        baud_rate=baud,
-                        station_type=STATION_NAMES.get(station, "Unknown"),
-                        station_code=station.value,
-                        attempts=attempts,
-                    )
-                finally:
-                    tmp.close()
-            except Exception as e:
-                attempts.append({"port": port, "baud": baud, "error": str(e)})
-
-    return AutoDetectResult(found=False, attempts=attempts)
 
 
 @router.post("/setup/complete")
@@ -170,13 +135,14 @@ async def complete_setup(config: SetupConfig, db: Session = Depends(get_db)):
     # Save config to DB
     config_dict = config.model_dump()
     for key, value in config_dict.items():
+        val = str(value).lower() if isinstance(value, bool) else str(value)
         existing = db.query(StationConfigModel).filter_by(key=key).first()
         if existing:
-            existing.value = str(value)
+            existing.value = val
             existing.updated_at = datetime.now(timezone.utc)
         else:
             db.add(StationConfigModel(
-                key=key, value=str(value),
+                key=key, value=val,
                 updated_at=datetime.now(timezone.utc),
             ))
 
@@ -194,94 +160,31 @@ async def complete_setup(config: SetupConfig, db: Session = Depends(get_db)):
     db.commit()
     logger.info("Setup complete — config saved to database")
 
-    # Reconnect with new settings
-    result = await _reconnect(config.serial_port, config.baud_rate)
-    return {"status": "ok", "reconnect": result}
+    # Tell the logger daemon to connect with the new settings
+    try:
+        client = get_ipc_client()
+        result = await client.send_command({
+            "cmd": "connect",
+            "port": config.serial_port,
+            "baud": config.baud_rate,
+        })
+        reconnect = result.get("data", {}) if result.get("ok") else {
+            "success": False, "error": result.get("error", "Unknown error"),
+        }
+    except (ConnectionRefusedError, OSError):
+        reconnect = {"success": False, "error": "Logger daemon not running"}
+
+    return {"status": "ok", "reconnect": reconnect}
 
 
 @router.post("/setup/reconnect")
-async def reconnect_endpoint(db: Session = Depends(get_db)):
+async def reconnect_endpoint():
     """Reconnect using current DB config."""
-    cfg = get_effective_config(db)
-    result = await _reconnect(str(cfg["serial_port"]), int(cfg["baud_rate"]))
-    return result
-
-
-# --------------- Internal reconnect logic ---------------
-
-async def _reconnect(port: str, baud_rate: int) -> dict:
-    """Teardown existing driver/poller, reinitialize with new settings."""
-    # Import these here to set the module globals
-    from . import station as station_api
-    from ..ws.handler import set_driver as ws_set_driver
-
-    # 1. Stop poller
-    poller = _app_refs.get("poller")
-    poller_task = _app_refs.get("poller_task")
-    if poller:
-        poller.stop()
-    if poller_task:
-        poller_task.cancel()
-        try:
-            await asyncio.wait_for(asyncio.shield(poller_task), timeout=6.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
-            pass
-
-    # 2. Close existing driver
-    driver = _app_refs.get("driver")
-    if driver:
-        try:
-            driver.close()
-        except Exception:
-            pass
-
-    # 3. Create new driver
     try:
-        new_driver = LinkDriver(port=port, baud_rate=baud_rate, timeout=settings.serial_timeout)
-        new_driver.open()
-        logger.info("Reconnected to %s at %d baud", port, baud_rate)
-
-        station_type = await new_driver.async_detect_station_type()
-        logger.info("Station detected: %s", station_type.name)
-        await new_driver.async_read_calibration()
-
-        new_poller = Poller(new_driver, poll_interval=settings.poll_interval_sec)
-        new_task = asyncio.create_task(new_poller.run())
-        logger.info("Poller restarted (%ds interval)", settings.poll_interval_sec)
-
-        # Update global refs
-        _app_refs["driver"] = new_driver
-        _app_refs["poller"] = new_poller
-        _app_refs["poller_task"] = new_task
-
-        station_api.set_poller(new_poller, new_driver)
-        from . import weatherlink as weatherlink_api
-        weatherlink_api.set_driver(new_driver)
-        ws_set_driver(new_driver)
-
-        # Backfill archive records in background (coordinates with
-        # poller via _io_lock so they don't corrupt each other)
-        async def _bg_archive_sync():
-            from ..services.archive_sync import async_sync_archive
-            try:
-                n_synced = await async_sync_archive(new_driver)
-                logger.info("Archive sync on reconnect: %d new records", n_synced)
-            except Exception as e:
-                logger.warning("Archive sync on reconnect failed: %s", e)
-
-        asyncio.create_task(_bg_archive_sync())
-
-        return {
-            "success": True,
-            "station_type": STATION_NAMES.get(station_type, "Unknown"),
-        }
-    except Exception as e:
-        logger.error("Reconnect failed: %s", e)
-        _app_refs["driver"] = None
-        _app_refs["poller"] = None
-        _app_refs["poller_task"] = None
-        station_api.set_poller(None, None)
-        from . import weatherlink as weatherlink_api
-        weatherlink_api.set_driver(None)
-        ws_set_driver(None)
-        return {"success": False, "error": str(e)}
+        client = get_ipc_client()
+        result = await client.send_command({"cmd": "reconnect"})
+        if result.get("ok"):
+            return result["data"]
+        return {"success": False, "error": result.get("error", "Unknown error")}
+    except (ConnectionRefusedError, OSError):
+        return {"success": False, "error": "Logger daemon not running"}
