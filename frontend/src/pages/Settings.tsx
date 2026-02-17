@@ -6,6 +6,7 @@ import { useWeatherBackground } from "../context/WeatherBackgroundContext.tsx";
 import { themes } from "../themes/index.ts";
 import { ALL_SCENES, SCENE_LABELS, SCENE_GRADIENTS } from "../components/WeatherBackground.tsx";
 import { API_BASE } from "../utils/constants.ts";
+import { getTimezone, setTimezone as storeTimezone, resolveTimezone, getTimezoneOptions } from "../utils/timezone.ts";
 
 // --- Shared styles ---
 
@@ -153,6 +154,7 @@ export default function Settings() {
   const [ports, setPorts] = useState<string[]>([]);
 
   const { themeName, setThemeName } = useTheme();
+  const [timezone, setTimezoneState] = useState(getTimezone);
   const {
     enabled: bgEnabled,
     setEnabled: setBgEnabled,
@@ -787,6 +789,24 @@ export default function Settings() {
               <option key={key} value={key}>
                 {t.label}
               </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={fieldGroup}>
+          <label style={labelStyle}>Timezone</label>
+          <select
+            style={selectStyle}
+            value={timezone}
+            onChange={(e) => {
+              const tz = e.target.value;
+              setTimezoneState(tz);
+              storeTimezone(tz);
+            }}
+          >
+            <option value="auto">Auto ({resolveTimezone()})</option>
+            {getTimezoneOptions().map((tz) => (
+              <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
             ))}
           </select>
         </div>

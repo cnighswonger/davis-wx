@@ -6,6 +6,7 @@ import {
   SENSOR_DISPLAY_NAMES,
   UNIT_LABELS,
 } from "../utils/constants.ts";
+import { getHighchartsTimeConfig, resolveTimezone } from "../utils/timezone.ts";
 
 // --- Sensor unit mapping (sensor key -> unit string) ---
 
@@ -152,6 +153,7 @@ export default function History() {
   );
 
   // Build Highcharts options
+  const tz = resolveTimezone();
   const chartOptions: Highcharts.Options = useMemo(() => {
     const root = document.documentElement;
     const cs = getComputedStyle(root);
@@ -170,6 +172,7 @@ export default function History() {
     ]);
 
     return {
+      time: getHighchartsTimeConfig(),
       chart: {
         type: "areaspline",
         height: 400,
@@ -220,7 +223,7 @@ export default function History() {
         },
       ],
     };
-  }, [data, sensor]);
+  }, [data, sensor, tz]);
 
   const presets: { key: Preset; label: string }[] = [
     { key: "1h", label: "1 Hour" },

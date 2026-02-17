@@ -5,6 +5,7 @@
 import { useMemo } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
+import { getHighchartsTimeConfig, resolveTimezone } from "../../utils/timezone.ts";
 
 interface TrendChartProps {
   title: string;
@@ -27,6 +28,7 @@ export default function TrendChart({
   color,
   height = 120,
 }: TrendChartProps) {
+  const tz = resolveTimezone();
   const options: Highcharts.Options = useMemo(() => {
     const textColor = getCSSVar("--color-text-secondary") || "#9ca3b4";
     const mutedColor = getCSSVar("--color-text-muted") || "#5c6478";
@@ -34,6 +36,7 @@ export default function TrendChart({
     const lineColor = color || getCSSVar("--color-accent") || "#3b82f6";
 
     return {
+      time: getHighchartsTimeConfig(),
       chart: {
         type: "spline",
         height,
@@ -98,7 +101,7 @@ export default function TrendChart({
         },
       ],
     };
-  }, [title, data, unit, color, height]);
+  }, [title, data, unit, color, height, tz]);
 
   return (
     <div

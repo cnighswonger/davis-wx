@@ -5,6 +5,7 @@
 import { useMemo } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
+import { getHighchartsTimeConfig, resolveTimezone } from "../../utils/timezone.ts";
 
 interface HistoricalChartProps {
   title: string;
@@ -25,6 +26,7 @@ export default function HistoricalChart({
   data,
   unit,
 }: HistoricalChartProps) {
+  const tz = resolveTimezone();
   const options: Highcharts.Options = useMemo(() => {
     const textColor = getCSSVar("--color-text") || "#e8e9ed";
     const secondaryColor = getCSSVar("--color-text-secondary") || "#9ca3b4";
@@ -39,6 +41,7 @@ export default function HistoricalChart({
     ]);
 
     return {
+      time: getHighchartsTimeConfig(),
       chart: {
         type: "areaspline",
         height: 400,
@@ -123,7 +126,7 @@ export default function HistoricalChart({
         },
       ],
     };
-  }, [title, sensor, data, unit]);
+  }, [title, sensor, data, unit, tz]);
 
   return (
     <div
