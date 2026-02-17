@@ -42,7 +42,8 @@ class Poller:
         self._running = False
         self._last_poll: Optional[datetime] = None
         self._last_rain_total: Optional[int] = None
-        self._last_rain_poll: Optional[datetime] = None
+        self._last_rain_tip_time: Optional[datetime] = None
+        self._rain_rate_in_per_hr: float = 0.0
         self._crc_errors = 0
         self._timeouts = 0
         self._start_time = time.time()
@@ -95,20 +96,44 @@ class Poller:
 
     async def _process_reading(self, reading: SensorReading) -> None:
         """Compute derived values, store to DB, broadcast to WS clients."""
-        # Compute rain_rate from delta for stations that don't provide it
+        # Compute rain_rate from bucket tips for stations that don't provide it.
+        # Uses time-between-tips with decay: rate holds steady until the next
+        # expected tip is overdue, then decays toward 0.  After 15 min with no
+        # tip, rate drops to 0 (rain stopped).
         if reading.rain_rate is None and reading.rain_total is not None:
-            if (self._last_rain_total is not None
-                    and self._last_rain_poll is not None):
+            now = datetime.now(timezone.utc)
+
+            if self._last_rain_total is not None:
                 clicks_delta = reading.rain_total - self._last_rain_total
                 if clicks_delta < 0:
                     clicks_delta = 0  # counter wrapped or reset
-                elapsed = (datetime.now(timezone.utc) - self._last_rain_poll).total_seconds()
-                if elapsed > 0:
-                    # Each click = 0.01 in; rain_rate stored as tenths of in/hr
-                    rate_in_per_hr = (clicks_delta * 0.01) / (elapsed / 3600)
-                    reading.rain_rate = round(rate_in_per_hr * 10)
+
+                if clicks_delta > 0 and self._last_rain_tip_time is not None:
+                    # Bucket tipped — rate from time since last tip
+                    elapsed_hr = (now - self._last_rain_tip_time).total_seconds() / 3600
+                    if elapsed_hr > 0:
+                        self._rain_rate_in_per_hr = (clicks_delta * 0.01) / elapsed_hr
+                    self._last_rain_tip_time = now
+                elif clicks_delta > 0:
+                    # First tip since startup — record time, no rate yet
+                    self._last_rain_tip_time = now
+                elif self._last_rain_tip_time is not None:
+                    # No new tips — decay: can't be raining faster than
+                    # 0.01 / time_waiting or a tip would have occurred
+                    elapsed_s = (now - self._last_rain_tip_time).total_seconds()
+                    if elapsed_s > 900:  # 15 min timeout
+                        self._rain_rate_in_per_hr = 0.0
+                    else:
+                        elapsed_hr = elapsed_s / 3600
+                        if elapsed_hr > 0:
+                            self._rain_rate_in_per_hr = min(
+                                self._rain_rate_in_per_hr,
+                                0.01 / elapsed_hr,
+                            )
+
+            # Convert to native unit (tenths of in/hr)
+            reading.rain_rate = round(self._rain_rate_in_per_hr * 10)
             self._last_rain_total = reading.rain_total
-            self._last_rain_poll = datetime.now(timezone.utc)
 
         # Compute derived values
         hi = None
