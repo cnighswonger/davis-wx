@@ -42,6 +42,7 @@ class Poller:
         self._running = False
         self._last_poll: Optional[datetime] = None
         self._last_rain_total: Optional[int] = None
+        self._last_rain_poll: Optional[datetime] = None
         self._crc_errors = 0
         self._timeouts = 0
         self._start_time = time.time()
@@ -97,16 +98,17 @@ class Poller:
         # Compute rain_rate from delta for stations that don't provide it
         if reading.rain_rate is None and reading.rain_total is not None:
             if (self._last_rain_total is not None
-                    and self._last_poll is not None):
+                    and self._last_rain_poll is not None):
                 clicks_delta = reading.rain_total - self._last_rain_total
                 if clicks_delta < 0:
                     clicks_delta = 0  # counter wrapped or reset
-                elapsed = (datetime.now(timezone.utc) - self._last_poll).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - self._last_rain_poll).total_seconds()
                 if elapsed > 0:
                     # Each click = 0.01 in; rain_rate stored as tenths of in/hr
                     rate_in_per_hr = (clicks_delta * 0.01) / (elapsed / 3600)
                     reading.rain_rate = round(rate_in_per_hr * 10)
             self._last_rain_total = reading.rain_total
+            self._last_rain_poll = datetime.now(timezone.utc)
 
         # Compute derived values
         hi = None
