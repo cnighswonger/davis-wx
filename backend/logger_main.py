@@ -15,7 +15,6 @@ import logging
 import os
 import signal
 import sys
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -85,15 +84,13 @@ class LoggerDaemon:
 
     async def shutdown(self) -> None:
         logger.info("Shutting down logger daemon...")
-        # Hard deadline: if cleanup hangs (executor threads, IPC), force exit
-        threading.Timer(10.0, lambda: (
-            logger.warning("Shutdown deadline exceeded — forcing exit"),
-            os._exit(0),
-        )).start()
         await self._teardown_driver()
         if self.ipc_server:
             await self.ipc_server.stop()
         logger.info("Logger daemon stopped")
+        # Exit directly — asyncio.run() cleanup hangs on executor threads
+        logging.shutdown()
+        os._exit(0)
 
     # ---- serial lifecycle ----
 
@@ -106,6 +103,13 @@ class LoggerDaemon:
         station = await self.driver.async_detect_station_type()
         logger.info("Station: %s", STATION_NAMES.get(station, "Unknown"))
         await self.driver.async_read_calibration()
+
+        # Sync station clock to system time
+        now = datetime.now()
+        if await self.driver.async_write_station_time(now):
+            logger.info("Station clock synced to %s", now.strftime("%H:%M:%S"))
+        else:
+            logger.warning("Failed to sync station clock")
 
         # Archive sync in background (shares _io_lock with poller)
         asyncio.create_task(self._bg_archive_sync())
