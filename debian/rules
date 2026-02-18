@@ -1,0 +1,37 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Build frontend
+	cd frontend && npm ci && npm run build
+	# Create Python venv and install backend
+	python3 -m venv debian/venv
+	debian/venv/bin/pip install --upgrade pip
+	debian/venv/bin/pip install backend/
+
+override_dh_auto_install:
+	# App files
+	install -d debian/davis-wx/opt/davis-wx/backend
+	cp -r backend/app debian/davis-wx/opt/davis-wx/backend/
+	cp backend/logger_main.py debian/davis-wx/opt/davis-wx/backend/
+	cp backend/pyproject.toml debian/davis-wx/opt/davis-wx/backend/
+	cp -r debian/venv debian/davis-wx/opt/davis-wx/backend/.venv
+	# Frontend
+	install -d debian/davis-wx/opt/davis-wx/frontend
+	cp -r frontend/dist debian/davis-wx/opt/davis-wx/frontend/
+	# Config
+	install -d debian/davis-wx/etc/davis-wx
+	install -m 644 debian/davis-wx.conf debian/davis-wx/etc/davis-wx/davis-wx.conf
+	# Systemd units
+	install -d debian/davis-wx/lib/systemd/system
+	install -m 644 debian/davis-wx-logger.service debian/davis-wx/lib/systemd/system/
+	install -m 644 debian/davis-wx-web.service debian/davis-wx/lib/systemd/system/
+	# Data dir
+	install -d debian/davis-wx/var/lib/davis-wx
+
+override_dh_auto_test:
+	# Skip tests during package build
+
+override_dh_auto_clean:
+	rm -rf debian/venv frontend/dist frontend/node_modules

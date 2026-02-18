@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Create davis system user if it doesn't exist
+        if ! id -u davis >/dev/null 2>&1; then
+            adduser --system --group --home /var/lib/davis-wx \
+                    --no-create-home --shell /usr/sbin/nologin davis
+        fi
+
+        # Add to dialout for serial port access
+        usermod -aG dialout davis 2>/dev/null || true
+
+        # Fix ownership
+        chown -R davis:davis /var/lib/davis-wx
+        chown -R davis:davis /opt/davis-wx
+
+        # Fix venv shebang paths (they point to the build machine's python)
+        VENV=/opt/davis-wx/backend/.venv
+        REAL_PY=$(readlink -f "$VENV/bin/python3" 2>/dev/null || echo "")
+        if [ -z "$REAL_PY" ] || [ ! -x "$REAL_PY" ]; then
+            # Recreate venv symlinks to system Python
+            python3 -m venv --upgrade "$VENV" 2>/dev/null || true
+        fi
+
+        # Enable and start services
+        systemctl daemon-reload
+        systemctl enable davis-wx-logger.service davis-wx-web.service
+        systemctl start davis-wx-logger.service davis-wx-web.service || true
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

@@ -1,18 +1,17 @@
 [Unit]
-Description=Davis Weather Station Application
-After=network.target
+Description=Davis Weather Station Web UI
+After=network.target davis-wx-logger.service
+Wants=davis-wx-logger.service
 
 [Service]
 Type=simple
 User=davis
 Group=davis
 WorkingDirectory=/opt/davis-wx/backend
+EnvironmentFile=/etc/davis-wx/davis-wx.conf
 ExecStart=/opt/davis-wx/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-Restart=always
+Restart=on-failure
 RestartSec=5
-Environment=DAVIS_SERIAL_PORT=/dev/ttyUSB0
-Environment=DAVIS_BAUD_RATE=19200
-Environment=DAVIS_DB_PATH=/var/lib/davis-wx/weather.db
 
 [Install]
 WantedBy=multi-user.target

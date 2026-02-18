@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    purge)
+        # Remove data and config on purge (not on regular remove)
+        rm -rf /var/lib/davis-wx
+        rm -rf /etc/davis-wx
+        # Remove system user
+        deluser --quiet davis 2>/dev/null || true
+        ;;
+    remove)
+        # Keep data and config on regular remove
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

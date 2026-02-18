@@ -5,9 +5,10 @@ from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
-# Resolve .env from the project root (one level above backend/)
+# Resolve config: prefer system config (installed), fall back to repo .env (dev)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-_ENV_FILE = _PROJECT_ROOT / ".env"
+_SYSTEM_CONF = Path("/etc/davis-wx/davis-wx.conf")
+_ENV_FILE = _SYSTEM_CONF if _SYSTEM_CONF.exists() else _PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -31,10 +32,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _resolve_db_path(self) -> "Settings":
-        """Make db_path absolute, relative to the project root."""
+        """Make db_path absolute — relative to /var/lib/davis-wx if installed, else project root."""
         p = Path(self.db_path)
         if not p.is_absolute():
-            self.db_path = str(_PROJECT_ROOT / p)
+            if _ENV_FILE == _SYSTEM_CONF:
+                self.db_path = str(Path("/var/lib/davis-wx") / p)
+            else:
+                self.db_path = str(_PROJECT_ROOT / p)
         return self
 
     @property
@@ -59,6 +63,9 @@ class Settings(BaseSettings):
 
     # IPC (logger <-> web app)
     ipc_port: int = 6514
+
+    # Frontend (empty = auto-detect relative to source tree)
+    frontend_dir: str = ""
 
     # Server
     host: str = "0.0.0.0"

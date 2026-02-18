@@ -1,0 +1,16 @@
+[Unit]
+Description=Davis Weather Station Logger
+After=local-fs.target
+
+[Service]
+Type=simple
+User=davis
+Group=davis
+WorkingDirectory=/opt/davis-wx/backend
+EnvironmentFile=/etc/davis-wx/davis-wx.conf
+ExecStart=/opt/davis-wx/backend/.venv/bin/python logger_main.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

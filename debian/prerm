@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|upgrade)
+        systemctl stop davis-wx-web.service davis-wx-logger.service || true
+        systemctl disable davis-wx-web.service davis-wx-logger.service || true
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

@@ -1,0 +1,13 @@
+Source: davis-wx
+Section: misc
+Priority: optional
+Maintainer: Davis WX <davis-wx@localhost>
+Build-Depends: debhelper-compat (= 13), python3, python3-venv, nodejs, npm
+Standards-Version: 4.6.0
+
+Package: davis-wx
+Architecture: all
+Depends: python3 (>= 3.10), python3-venv, ${misc:Depends}
+Description: Davis Weather Station monitoring and display
+ Web-based dashboard for Davis Vantage Pro2/Vue weather stations.
+ Includes a serial logger daemon and FastAPI web application.

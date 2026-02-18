@@ -91,7 +91,10 @@ def create_app() -> FastAPI:
     app.mount("/backgrounds", StaticFiles(directory=str(bg_dir)), name="backgrounds")
 
     # Serve frontend static files if built
-    frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
+    if settings.frontend_dir:
+        frontend_dist = Path(settings.frontend_dir)
+    else:
+        frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
         # Mount hashed assets at /assets for correct MIME types
         assets_dir = frontend_dist / "assets"
