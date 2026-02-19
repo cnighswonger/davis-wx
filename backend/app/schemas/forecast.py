@@ -16,6 +16,9 @@ class NWSPeriod(BaseModel):
     wind: str | None = None
     precipitation_pct: int | None = None
     text: str
+    icon_url: str | None = None
+    short_forecast: str | None = None
+    is_daytime: bool | None = None
 
 
 class NWSForecast(BaseModel):

@@ -92,6 +92,9 @@ export interface NWSPeriod {
   wind: string;
   precipitation_pct: number;
   text: string;
+  icon_url: string | null;
+  short_forecast: string | null;
+  is_daytime: boolean | null;
 }
 
 export interface NWSForecast {
