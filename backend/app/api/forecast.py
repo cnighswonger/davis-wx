@@ -85,6 +85,9 @@ async def get_forecast(db: Session = Depends(get_db)):
                             "wind": p.wind,
                             "precipitation_pct": p.precipitation_pct or 0,
                             "text": p.text,
+                            "icon_url": p.icon_url,
+                            "short_forecast": p.short_forecast,
+                            "is_daytime": p.is_daytime,
                         }
                         for p in nws.periods
                     ],

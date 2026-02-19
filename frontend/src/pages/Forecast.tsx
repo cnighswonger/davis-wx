@@ -125,16 +125,44 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
         gap: "8px",
       }}
     >
-      <h4
-        style={{
-          margin: 0,
-          fontSize: "15px",
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
-        }}
-      >
-        {period.name}
-      </h4>
+      {/* Header row: icon + name + short forecast */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        {period.icon_url && (
+          <img
+            src={period.icon_url}
+            alt={period.short_forecast || period.name}
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "6px",
+              flexShrink: 0,
+            }}
+          />
+        )}
+        <div>
+          <h4
+            style={{
+              margin: 0,
+              fontSize: "15px",
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-text)",
+            }}
+          >
+            {period.name}
+          </h4>
+          {period.short_forecast && (
+            <span
+              style={{
+                fontSize: "12px",
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              {period.short_forecast}
+            </span>
+          )}
+        </div>
+      </div>
 
       <div
         style={{

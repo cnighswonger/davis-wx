@@ -36,6 +36,9 @@ class ForecastPeriod:
     wind: str  # e.g., "SW 10 to 15 mph"
     precipitation_pct: Optional[int]  # 0-100 or None
     text: str  # Detailed forecast text
+    icon_url: Optional[str] = None  # NWS icon URL
+    short_forecast: Optional[str] = None  # e.g., "Partly Sunny"
+    is_daytime: Optional[bool] = None
 
 
 @dataclass
@@ -172,6 +175,9 @@ async def _fetch_grid_forecast(
             wind=wind_text,
             precipitation_pct=precip_pct,
             text=p.get("detailedForecast", ""),
+            icon_url=p.get("icon"),
+            short_forecast=p.get("shortForecast"),
+            is_daytime=p.get("isDaytime"),
         ))
 
     return periods
