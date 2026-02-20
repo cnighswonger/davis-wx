@@ -42,7 +42,7 @@ Setup creates a `.env` file from `.env.example`. Edit it to match your environme
 # macOS:   /dev/tty.usbserial-XXXX
 # Windows: COM3  (check Device Manager -> Ports)
 DAVIS_SERIAL_PORT=/dev/ttyUSB0
-DAVIS_BAUD_RATE=19200
+DAVIS_BAUD_RATE=2400
 
 # Location (required for astronomy and NWS forecasts)
 DAVIS_LATITUDE=40.7128
@@ -144,7 +144,7 @@ frontend/src/
 
 ## Hardware Setup
 
-Connect the Davis WeatherLink datalogger to your computer via a USB-to-serial adapter (or native RS-232 port). The protocol runs at **19200 baud, 8N1**.
+Connect the Davis WeatherLink datalogger to your computer via a USB-to-serial adapter (or native RS-232 port). The protocol runs at **2400 baud, 8N1** (1200 baud also supported).
 
 The application auto-detects the station model on startup by reading the model nibble from the WeatherLink's memory.
 
@@ -181,7 +181,7 @@ sudo systemctl enable --now davis-wx
 | Layer | Technology |
 |-------|------------|
 | Backend | Python 3.10+, FastAPI, uvicorn |
-| Serial | pyserial (19200 baud, 8N1) |
+| Serial | pyserial (2400 baud, 8N1) |
 | Database | SQLAlchemy + SQLite |
 | Migrations | Alembic |
 | Astronomy | astral |
