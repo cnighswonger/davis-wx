@@ -7,6 +7,7 @@ class LocalForecast(BaseModel):
     source: str = "zambretti"
     text: str
     confidence: float
+    trend: str | None = None
     updated: str
 
 
