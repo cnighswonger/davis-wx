@@ -123,7 +123,7 @@ const inputStyle: React.CSSProperties = {
 export default function History() {
   const isMobile = useIsMobile();
   const sensorKeys = Object.keys(SENSOR_DISPLAY_NAMES);
-  const [sensor, setSensor] = useState(sensorKeys[1] ?? "temperature_outside");
+  const [sensor, setSensor] = useState(sensorKeys[0] ?? "temperature_inside");
   const [preset, setPreset] = useState<Preset>("24h");
   const [resolution, setResolution] = useState("5m");
 
