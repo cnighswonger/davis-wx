@@ -194,25 +194,13 @@ def get_history(
 
 def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1,
                bounds=None, spike_threshold=None):
-    """Aggregate readings by 5-minute, hourly, or daily buckets."""
-    if resolution == "5m":
-        # Group by epoch seconds rounded to 300s (5 min) boundaries
-        bucket = func.cast(
-            func.strftime("%s", SensorReadingModel.timestamp), Integer
-        ) / 300
-        time_label = func.strftime(
-            "%Y-%m-%dT%H:%M:00", SensorReadingModel.timestamp
-        )
-        group_key = bucket
-    elif resolution == "hourly":
-        group_key = func.strftime("%Y-%m-%dT%H:00:00", SensorReadingModel.timestamp)
-        time_label = group_key
-    else:  # daily
-        group_key = func.strftime("%Y-%m-%dT00:00:00", SensorReadingModel.timestamp)
-        time_label = group_key
+    """Aggregate readings by 5-minute, hourly, or daily buckets.
 
-    # Build a clean value expression that nulls out bad readings.
-    # AVG() naturally ignores NULLs, so spikes/out-of-range won't skew averages.
+    SQLite forbids window functions (LAG/LEAD) inside GROUP BY queries,
+    so when spike detection is needed we use a subquery: first compute
+    clean values with window functions, then aggregate the result.
+    """
+    # --- Build clean-value expression (bounds + spike detection) ---
     conditions: list[tuple] = []
     if bounds:
         conditions.append((~column.between(bounds[0], bounds[1]), None))
@@ -226,18 +214,53 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1,
             ),
             None,
         ))
-    clean_col = case(*conditions, else_=column) if conditions else column
 
-    query = (
-        db.query(time_label, func.avg(clean_col))
-        .filter(SensorReadingModel.timestamp >= start_dt)
-        .filter(SensorReadingModel.timestamp <= end_dt)
-        .filter(column.isnot(None))
-        .group_by(group_key)
-        .order_by(group_key)
-    )
+    need_subquery = spike_threshold is not None
 
-    results = query.all()
+    if need_subquery:
+        # Subquery: compute clean values with window functions (no GROUP BY)
+        clean_col = case(*conditions, else_=column) if conditions else column
+        subq = (
+            db.query(
+                SensorReadingModel.timestamp.label("ts"),
+                clean_col.label("val"),
+            )
+            .filter(SensorReadingModel.timestamp >= start_dt)
+            .filter(SensorReadingModel.timestamp <= end_dt)
+            .filter(column.isnot(None))
+        ).subquery()
+
+        ts_col = subq.c.ts
+        val_col = subq.c.val
+    else:
+        # No window functions needed — query the table directly
+        ts_col = SensorReadingModel.timestamp
+        val_col = case(*conditions, else_=column) if conditions else column
+
+    # --- Time bucket grouping ---
+    if resolution == "5m":
+        bucket = func.cast(func.strftime("%s", ts_col), Integer) / 300
+        time_label = func.strftime("%Y-%m-%dT%H:%M:00", ts_col)
+        group_key = bucket
+    elif resolution == "hourly":
+        group_key = func.strftime("%Y-%m-%dT%H:00:00", ts_col)
+        time_label = group_key
+    else:  # daily
+        group_key = func.strftime("%Y-%m-%dT00:00:00", ts_col)
+        time_label = group_key
+
+    query = db.query(time_label, func.avg(val_col))
+
+    if not need_subquery:
+        # Apply filters directly (subquery already has them baked in)
+        query = (
+            query
+            .filter(SensorReadingModel.timestamp >= start_dt)
+            .filter(SensorReadingModel.timestamp <= end_dt)
+            .filter(column.isnot(None))
+        )
+
+    results = query.group_by(group_key).order_by(group_key).all()
 
     return [
         {"timestamp": r[0] + "Z", "value": round(r[1] / divisor, 2) if r[1] is not None else None}
