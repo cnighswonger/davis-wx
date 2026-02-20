@@ -123,7 +123,6 @@ class LinkDriver:
         self.serial.flush()
 
         # Inside temp calibration: bank 1, address 0x52, 4 nibbles
-        logger.debug("Reading inside temp calibration...")
         data = self.read_station_memory(
             BasicBank1.INSIDE_TEMP_CAL.bank,
             BasicBank1.INSIDE_TEMP_CAL.address,
@@ -131,9 +130,10 @@ class LinkDriver:
         )
         if data and len(data) >= 2:
             self.calibration.inside_temp = struct.unpack("<h", data[:2])[0]
+        else:
+            logger.warning("Failed to read inside temp calibration (data=%s)", data)
 
         # Outside temp calibration
-        logger.debug("Reading outside temp calibration...")
         data = self.read_station_memory(
             BasicBank1.OUTSIDE_TEMP_CAL.bank,
             BasicBank1.OUTSIDE_TEMP_CAL.address,
@@ -141,9 +141,10 @@ class LinkDriver:
         )
         if data and len(data) >= 2:
             self.calibration.outside_temp = struct.unpack("<h", data[:2])[0]
+        else:
+            logger.warning("Failed to read outside temp calibration (data=%s)", data)
 
         # Barometer calibration
-        logger.debug("Reading barometer calibration...")
         data = self.read_station_memory(
             BasicBank1.BAR_CAL.bank,
             BasicBank1.BAR_CAL.address,
@@ -151,9 +152,12 @@ class LinkDriver:
         )
         if data and len(data) >= 2:
             self.calibration.barometer = struct.unpack("<h", data[:2])[0]
+            logger.info("Barometer calibration raw bytes: %s -> %d",
+                        data[:2].hex(), self.calibration.barometer)
+        else:
+            logger.warning("Failed to read barometer calibration (data=%s)", data)
 
         # Outside humidity calibration
-        logger.debug("Reading outside humidity calibration...")
         data = self.read_station_memory(
             BasicBank1.OUTSIDE_HUMIDITY_CAL.bank,
             BasicBank1.OUTSIDE_HUMIDITY_CAL.address,
@@ -161,9 +165,10 @@ class LinkDriver:
         )
         if data and len(data) >= 2:
             self.calibration.outside_hum = struct.unpack("<h", data[:2])[0]
+        else:
+            logger.warning("Failed to read outside humidity calibration (data=%s)", data)
 
         # Rain calibration (clicks per inch)
-        logger.debug("Reading rain calibration...")
         data = self.read_station_memory(
             BasicBank1.RAIN_CAL.bank,
             BasicBank1.RAIN_CAL.address,
@@ -173,6 +178,8 @@ class LinkDriver:
             cal = struct.unpack("<H", data[:2])[0]
             if cal > 0:
                 self.calibration.rain_cal = cal
+        else:
+            logger.warning("Failed to read rain calibration (data=%s)", data)
 
         logger.info("Calibration offsets: %s", self.calibration)
         return self.calibration
