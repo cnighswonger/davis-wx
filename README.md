@@ -196,4 +196,6 @@ The `reference/` directory contains the original Davis Instruments SDK materials
 
 ## License
 
-This project is intended for personal/educational use with Davis Instruments hardware you own.
+Copyright (C) 2026 Chris Nighswonger
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 3. See [LICENSE](LICENSE) for the full text.
