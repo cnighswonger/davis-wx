@@ -50,6 +50,10 @@ fi
 
 echo ""
 echo "Installation complete!"
-echo "You can open Davis Weather Station from the desktop shortcut"
-echo "or visit http://localhost:8000 in your browser."
+echo ""
+echo "A shortcut has been placed on your Desktop."
+echo "Right-click it and select 'Allow Launching' to enable it."
+echo ""
+echo "You can also find it in the application menu or browse"
+echo "directly to http://localhost:8000"
 echo ""
