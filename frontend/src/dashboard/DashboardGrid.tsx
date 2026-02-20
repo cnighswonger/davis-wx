@@ -26,6 +26,7 @@ import TileRenderer from "./TileRenderer.tsx";
 import SortableTile from "./SortableTile.tsx";
 import TileCatalogModal from "./TileCatalogModal.tsx";
 import FlipTile from "../components/common/FlipTile.tsx";
+import TrendModal from "../components/common/TrendModal.tsx";
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
 
@@ -167,14 +168,24 @@ export default function DashboardGrid() {
             const colSpan = isMobile ? 1 : (placement.colSpan ?? def.minColSpan);
 
             const content = <TileRenderer tileId={placement.tileId} />;
-            const wrapped = (!isMobile && def.hasFlipTile) ? (
-              <FlipTile
-                sensor={def.sensor!}
-                label={def.chartLabel!}
-                unit={def.chartUnit!}
-              >
-                {content}
-              </FlipTile>
+            const wrapped = def.hasFlipTile ? (
+              isMobile ? (
+                <TrendModal
+                  sensor={def.sensor!}
+                  label={def.chartLabel!}
+                  unit={def.chartUnit!}
+                >
+                  {content}
+                </TrendModal>
+              ) : (
+                <FlipTile
+                  sensor={def.sensor!}
+                  label={def.chartLabel!}
+                  unit={def.chartUnit!}
+                >
+                  {content}
+                </FlipTile>
+              )
             ) : (
               content
             );
