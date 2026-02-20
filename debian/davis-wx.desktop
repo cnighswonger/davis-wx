@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Davis Weather Station
+Comment=Open the Davis Weather Station dashboard
+Exec=xdg-open http://localhost:8000
+Icon=davis-wx
+Terminal=false
+Type=Application
+Categories=Utility;Monitor;
+Keywords=weather;davis;station;

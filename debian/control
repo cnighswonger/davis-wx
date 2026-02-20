@@ -7,7 +7,10 @@ Standards-Version: 4.6.0
 
 Package: davis-wx
 Architecture: all
-Depends: python3 (>= 3.10), python3-venv, ${misc:Depends}
+Depends: python3 (>= 3.10), python3-venv, adduser, xdg-utils, ${misc:Depends}
 Description: Davis Weather Station monitoring and display
  Web-based dashboard for Davis Vantage Pro2/Vue weather stations.
  Includes a serial logger daemon and FastAPI web application.
+ .
+ After installation, open "Davis Weather Station" from the application
+ menu or browse to http://localhost:8000.

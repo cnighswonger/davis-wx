@@ -27,6 +27,11 @@ override_dh_auto_install:
 	install -d debian/davis-wx/lib/systemd/system
 	install -m 644 debian/davis-wx-logger.service debian/davis-wx/lib/systemd/system/
 	install -m 644 debian/davis-wx-web.service debian/davis-wx/lib/systemd/system/
+	# Desktop shortcut and icon
+	install -d debian/davis-wx/usr/share/applications
+	install -m 644 debian/davis-wx.desktop debian/davis-wx/usr/share/applications/
+	install -d debian/davis-wx/usr/share/icons/hicolor/scalable/apps
+	install -m 644 debian/davis-wx.svg debian/davis-wx/usr/share/icons/hicolor/scalable/apps/davis-wx.svg
 	# Data dir
 	install -d debian/davis-wx/var/lib/davis-wx
 
