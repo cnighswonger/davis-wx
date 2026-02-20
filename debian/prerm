@@ -5,6 +5,9 @@ case "$1" in
     remove|upgrade)
         systemctl stop davis-wx-web.service davis-wx-logger.service || true
         systemctl disable davis-wx-web.service davis-wx-logger.service || true
+        # Remove runtime artifacts so dpkg can cleanly remove directories
+        find /opt/davis-wx -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+        rm -rf /opt/davis-wx/backend/.venv
         ;;
 esac
 
