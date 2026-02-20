@@ -9,6 +9,7 @@ POST /api/weatherlink/force-archive      - Force immediate archive write
 All operations are proxied to the logger daemon via IPC.
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter
@@ -50,7 +51,8 @@ async def get_weatherlink_config():
     """Read current hardware settings from the WeatherLink."""
     try:
         client = get_ipc_client()
-        result = await client.send_command({"cmd": "read_config"})
+        # Longer timeout — serial reads compete with poller for lock
+        result = await client.send_command({"cmd": "read_config"}, timeout=20.0)
         if result.get("ok"):
             data = result["data"]
             return WeatherLinkConfigResponse(
@@ -59,7 +61,7 @@ async def get_weatherlink_config():
                 calibration=CalibrationConfig(**data["calibration"]),
             )
         return {"error": result.get("error", "Not connected")}
-    except (ConnectionRefusedError, OSError):
+    except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
         return {"error": "Logger daemon not running"}
 
 
@@ -76,12 +78,15 @@ async def update_weatherlink_config(config: WeatherLinkConfigUpdate):
         if config.calibration is not None:
             cmd["calibration"] = config.calibration.model_dump()
 
-        result = await client.send_command(cmd)
+        # Longer timeout — write does serial I/O with poller stopped
+        result = await client.send_command(cmd, timeout=30.0)
         if not result.get("ok"):
             return {"error": result.get("error", "Failed")}
 
         # Re-read current state to return
-        read_result = await client.send_command({"cmd": "read_config"})
+        read_result = await client.send_command(
+            {"cmd": "read_config"}, timeout=20.0,
+        )
         if read_result.get("ok"):
             data = read_result["data"]
             return {
@@ -93,7 +98,7 @@ async def update_weatherlink_config(config: WeatherLinkConfigUpdate):
                 ),
             }
         return {"results": result["data"]["results"]}
-    except (ConnectionRefusedError, OSError):
+    except (ConnectionRefusedError, OSError, asyncio.TimeoutError):
         return {"error": "Logger daemon not running"}
 
 
