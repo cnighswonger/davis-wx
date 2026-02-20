@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEB="$SCRIPT_DIR/davis-wx_0.1.0_all.deb"
+DEB="$SCRIPT_DIR/davis-wx_0.1.0~alpha1_all.deb"
 
 if [ ! -f "$DEB" ]; then
     echo "Error: $DEB not found."
@@ -26,12 +26,12 @@ echo "================================"
 echo ""
 
 # Copy to /tmp to avoid _apt sandbox permission issues
-cp "$DEB" /tmp/davis-wx_0.1.0_all.deb
+cp "$DEB" /tmp/davis-wx_0.1.0~alpha1_all.deb
 
 echo "Installing Davis Weather Station..."
-apt install -y /tmp/davis-wx_0.1.0_all.deb
+apt install -y /tmp/davis-wx_0.1.0~alpha1_all.deb
 
-rm -f /tmp/davis-wx_0.1.0_all.deb
+rm -f /tmp/davis-wx_0.1.0~alpha1_all.deb
 
 # Place desktop shortcut for the user who ran sudo
 REAL_USER="${SUDO_USER:-$USER}"

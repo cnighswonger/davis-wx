@@ -1,6 +1,6 @@
 [project]
 name = "davis-wx-station"
-version = "0.1.0"
+version = "0.1.0a1"
 description = "Davis Weather Station cross-platform application"
 requires-python = ">=3.10"
 dependencies = [

@@ -67,7 +67,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Davis Weather Station",
-        version="0.1.0",
+        version="0.1.0a1",
         lifespan=lifespan,
     )
 
