@@ -140,11 +140,13 @@ export default function DashboardGrid() {
     return (
       <div>
         <h2
+          className="dashboard-heading"
           style={{
             margin: "0 0 16px 0",
             fontSize: "24px",
             fontFamily: "var(--font-heading)",
             color: "var(--color-text)",
+            whiteSpace: "nowrap",
           }}
         >
           Current Conditions
