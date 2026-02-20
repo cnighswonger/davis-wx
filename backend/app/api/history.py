@@ -3,7 +3,7 @@
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Query, Depends
-from sqlalchemy import case, func, Integer
+from sqlalchemy import and_, case, func, Integer
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
@@ -95,6 +95,23 @@ SENSOR_BOUNDS: dict[str, tuple[int, int]] = {
     "uv_index": (0, 160),             # 0 to 16        (raw × 10)
 }
 
+# Maximum reasonable change between consecutive samples (~10 s apart).
+# A reading that differs from BOTH its neighbors by more than this
+# threshold is treated as a single-sample spike and nulled out.
+# Sensors omitted here (wind, rain, solar) can legitimately spike.
+SENSOR_SPIKE_THRESHOLDS: dict[str, int] = {
+    "inside_temp": 50,       # 5 °F   (raw × 10)
+    "outside_temp": 50,      # 5 °F
+    "heat_index": 50,        # 5 °F
+    "dew_point": 50,         # 5 °F
+    "wind_chill": 50,        # 5 °F
+    "feels_like": 50,        # 5 °F
+    "theta_e": 50,           # 5 K    (raw × 10)
+    "inside_humidity": 15,   # 15 %
+    "outside_humidity": 15,  # 15 %
+    "barometer": 100,        # 0.1 inHg (raw × 1000)
+}
+
 
 @router.get("/history")
 def get_history(
@@ -126,13 +143,25 @@ def get_history(
     column = SENSOR_COLUMNS[sensor]
     divisor = SENSOR_DIVISORS.get(sensor, 1)
     bounds = SENSOR_BOUNDS.get(sensor)
+    spike_threshold = SENSOR_SPIKE_THRESHOLDS.get(sensor)
 
     if resolution == "raw":
-        # Use CASE to null-out readings outside physical bounds (chart gaps)
-        value_expr = (
-            case((column.between(bounds[0], bounds[1]), column), else_=None)
-            if bounds else column
-        )
+        # Build CASE conditions: bounds check, then spike detection
+        conditions: list[tuple] = []
+        if bounds:
+            conditions.append((~column.between(bounds[0], bounds[1]), None))
+        if spike_threshold:
+            lag_col = func.lag(column, 1).over(order_by=SensorReadingModel.timestamp)
+            lead_col = func.lead(column, 1).over(order_by=SensorReadingModel.timestamp)
+            conditions.append((
+                and_(
+                    func.abs(column - lag_col) > spike_threshold,
+                    func.abs(column - lead_col) > spike_threshold,
+                ),
+                None,
+            ))
+        value_expr = case(*conditions, else_=column) if conditions else column
+
         results = (
             db.query(SensorReadingModel.timestamp, value_expr)
             .filter(SensorReadingModel.timestamp >= start_dt)
@@ -150,7 +179,8 @@ def get_history(
         ]
     else:
         # For hourly/daily, return averages (bad values excluded)
-        data = _aggregate(db, column, start_dt, end_dt, resolution, divisor, bounds)
+        data = _aggregate(db, column, start_dt, end_dt, resolution, divisor,
+                          bounds, spike_threshold)
 
     return {
         "sensor": sensor,
@@ -162,7 +192,8 @@ def get_history(
     }
 
 
-def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1, bounds=None):
+def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1,
+               bounds=None, spike_threshold=None):
     """Aggregate readings by 5-minute, hourly, or daily buckets."""
     if resolution == "5m":
         # Group by epoch seconds rounded to 300s (5 min) boundaries
@@ -180,17 +211,33 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1, bounds=None)
         group_key = func.strftime("%Y-%m-%dT00:00:00", SensorReadingModel.timestamp)
         time_label = group_key
 
+    # Build a clean value expression that nulls out bad readings.
+    # AVG() naturally ignores NULLs, so spikes/out-of-range won't skew averages.
+    conditions: list[tuple] = []
+    if bounds:
+        conditions.append((~column.between(bounds[0], bounds[1]), None))
+    if spike_threshold:
+        lag_col = func.lag(column, 1).over(order_by=SensorReadingModel.timestamp)
+        lead_col = func.lead(column, 1).over(order_by=SensorReadingModel.timestamp)
+        conditions.append((
+            and_(
+                func.abs(column - lag_col) > spike_threshold,
+                func.abs(column - lead_col) > spike_threshold,
+            ),
+            None,
+        ))
+    clean_col = case(*conditions, else_=column) if conditions else column
+
     query = (
-        db.query(time_label, func.avg(column))
+        db.query(time_label, func.avg(clean_col))
         .filter(SensorReadingModel.timestamp >= start_dt)
         .filter(SensorReadingModel.timestamp <= end_dt)
         .filter(column.isnot(None))
+        .group_by(group_key)
+        .order_by(group_key)
     )
-    # Exclude out-of-range values from the average
-    if bounds:
-        query = query.filter(column.between(bounds[0], bounds[1]))
 
-    results = query.group_by(group_key).order_by(group_key).all()
+    results = query.all()
 
     return [
         {"timestamp": r[0] + "Z", "value": round(r[1] / divisor, 2) if r[1] is not None else None}
