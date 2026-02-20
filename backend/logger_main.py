@@ -333,8 +333,6 @@ class LoggerDaemon:
             raise RuntimeError("Not connected")
         archive_period = await self.driver.async_read_archive_period()
         sample_period = await self.driver.async_read_sample_period()
-        # Re-read calibration from station to ensure fresh data
-        await self.driver.async_read_calibration()
         cal = self.driver.calibration
         return {
             "archive_period": archive_period,
