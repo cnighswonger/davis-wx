@@ -342,10 +342,16 @@ export default function Settings() {
         return;
       }
       const resp = await updateWeatherLinkConfig(update);
-      setWlConfig(resp.config);
-      setWlCal(resp.config.calibration);
-      if (resp.config.archive_period != null) setWlArchivePeriod(resp.config.archive_period);
-      if (resp.config.sample_period != null) setWlSamplePeriod(resp.config.sample_period);
+      if ("error" in resp) {
+        setWlError(String((resp as Record<string, unknown>).error));
+        return;
+      }
+      if (resp.config) {
+        setWlConfig(resp.config);
+        setWlCal(resp.config.calibration);
+        if (resp.config.archive_period != null) setWlArchivePeriod(resp.config.archive_period);
+        if (resp.config.sample_period != null) setWlSamplePeriod(resp.config.sample_period);
+      }
       const failures = Object.entries(resp.results).filter(([, v]) => v !== "ok");
       if (failures.length > 0) {
         setWlError("Partial failure: " + failures.map(([k, v]) => `${k}: ${v}`).join(", "));
