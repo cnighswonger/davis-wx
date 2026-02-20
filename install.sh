@@ -33,8 +33,23 @@ apt install -y /tmp/davis-wx_0.1.0_all.deb
 
 rm -f /tmp/davis-wx_0.1.0_all.deb
 
+# Place desktop shortcut for the user who ran sudo
+REAL_USER="${SUDO_USER:-$USER}"
+if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
+    USER_DESKTOP=$(eval echo "~$REAL_USER/Desktop")
+    if [ -d "$USER_DESKTOP" ]; then
+        SHORTCUT="$USER_DESKTOP/davis-wx.desktop"
+        cp /usr/share/applications/davis-wx.desktop "$SHORTCUT"
+        chmod +x "$SHORTCUT"
+        chown "$REAL_USER":"$REAL_USER" "$SHORTCUT"
+        # Mark trusted on GNOME so it's clickable without prompts
+        su "$REAL_USER" -c "gio set '$SHORTCUT' metadata::trusted true" 2>/dev/null || true
+        echo "Desktop shortcut created."
+    fi
+fi
+
 echo ""
 echo "Installation complete!"
-echo "You can open Davis Weather Station from the application menu"
+echo "You can open Davis Weather Station from the desktop shortcut"
 echo "or visit http://localhost:8000 in your browser."
 echo ""
