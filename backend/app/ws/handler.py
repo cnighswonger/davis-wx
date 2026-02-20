@@ -111,7 +111,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "pong"})
             except json.JSONDecodeError:
                 pass
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, ConnectionResetError, OSError):
+        # OSError covers Windows semaphore timeout on client disconnect
         ws_manager.disconnect(websocket)
     except Exception:
+        logger.debug("WebSocket closed unexpectedly", exc_info=True)
         ws_manager.disconnect(websocket)
