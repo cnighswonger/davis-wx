@@ -148,7 +148,7 @@ export default function History() {
     return presetRange(preset);
   }, [preset, customStart, customEnd]);
 
-  const { data, loading, error } = useHistoricalData(
+  const { data, summary, loading, error } = useHistoricalData(
     sensor,
     start,
     end,
@@ -178,9 +178,17 @@ export default function History() {
       })
       .filter((pt): pt is [number, number | null] => pt !== null);
 
-    const yValues = seriesData
-      .map(([, y]) => y)
-      .filter((y): y is number => y !== null && Number.isFinite(y));
+    // Use true min/max from API summary when available (aggregated data
+    // returns bucket averages, so point values don't reflect true extremes)
+    const yValues: number[] = [];
+    if (summary?.min != null) yValues.push(summary.min);
+    if (summary?.max != null) yValues.push(summary.max);
+    if (yValues.length === 0) {
+      // Fallback to point values (raw resolution or missing summary)
+      for (const [, y] of seriesData) {
+        if (y !== null && Number.isFinite(y)) yValues.push(y);
+      }
+    }
     const yScale = computeYAxisScale(sensor, yValues);
 
     return {
@@ -242,7 +250,7 @@ export default function History() {
         },
       ],
     };
-  }, [data, sensor, tz, isMobile]);
+  }, [data, summary, sensor, tz, isMobile]);
 
   const presets: { key: Preset; label: string }[] = [
     { key: "1h", label: "1 Hour" },
@@ -412,6 +420,52 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {/* Summary stats bar */}
+      {!loading && !error && summary && (summary.min != null || summary.max != null) && (
+        <div
+          style={{
+            ...cardStyle,
+            padding: isMobile ? "10px 12px" : "12px 20px",
+            display: "flex",
+            gap: isMobile ? "16px" : "32px",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {summary.max != null && (
+            <div>
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-body)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>High </span>
+              <span style={{ fontSize: "16px", fontFamily: "var(--font-heading)", color: "var(--color-text)", fontWeight: "bold" }}>
+                {summary.max}{(UNIT_LABELS[SENSOR_UNITS[sensor] ?? ""] ?? "").trim()}
+              </span>
+            </div>
+          )}
+          {summary.min != null && (
+            <div>
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-body)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Low </span>
+              <span style={{ fontSize: "16px", fontFamily: "var(--font-heading)", color: "var(--color-text)", fontWeight: "bold" }}>
+                {summary.min}{(UNIT_LABELS[SENSOR_UNITS[sensor] ?? ""] ?? "").trim()}
+              </span>
+            </div>
+          )}
+          {summary.avg != null && (
+            <div>
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-body)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Avg </span>
+              <span style={{ fontSize: "16px", fontFamily: "var(--font-heading)", color: "var(--color-text)", fontWeight: "bold" }}>
+                {summary.avg}{(UNIT_LABELS[SENSOR_UNITS[sensor] ?? ""] ?? "").trim()}
+              </span>
+            </div>
+          )}
+          {summary.count > 0 && (
+            <div style={{ marginLeft: "auto" }}>
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-body)", color: "var(--color-text-muted)" }}>
+                {summary.count.toLocaleString()} points
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chart area */}
       <div style={cardStyle}>

@@ -4,11 +4,12 @@
 // ============================================================
 
 import { useEffect, useState } from "react";
-import type { HistoryPoint } from "../api/types.ts";
+import type { HistoryPoint, HistorySummary } from "../api/types.ts";
 import { fetchHistory } from "../api/client.ts";
 
 interface UseHistoricalDataReturn {
   data: HistoryPoint[];
+  summary: HistorySummary | null;
   loading: boolean;
   error: string | null;
 }
@@ -20,6 +21,7 @@ export function useHistoricalData(
   resolution: string = "5m",
 ): UseHistoricalDataReturn {
   const [data, setData] = useState<HistoryPoint[]>([]);
+  const [summary, setSummary] = useState<HistorySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +29,7 @@ export function useHistoricalData(
     // Skip fetch if required params are missing.
     if (!sensor || !start || !end) {
       setData([]);
+      setSummary(null);
       setLoading(false);
       return;
     }
@@ -39,6 +42,7 @@ export function useHistoricalData(
       .then((res) => {
         if (!cancelled) {
           setData(res.points);
+          setSummary(res.summary ?? null);
           setLoading(false);
         }
       })
@@ -46,6 +50,7 @@ export function useHistoricalData(
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
           setData([]);
+          setSummary(null);
           setLoading(false);
         }
       });
@@ -55,5 +60,5 @@ export function useHistoricalData(
     };
   }, [sensor, start, end, resolution]);
 
-  return { data, loading, error };
+  return { data, summary, loading, error };
 }
