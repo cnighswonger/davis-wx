@@ -99,7 +99,7 @@ export default function TrendModal({
                 Loading...
               </div>
             ) : chartData.length > 0 ? (
-              <TrendChart title="" data={chartData} unit={unit} height={200} />
+              <TrendChart title="" data={chartData} unit={unit} height={200} sensor={sensor} />
             ) : (
               <div
                 style={{

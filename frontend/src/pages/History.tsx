@@ -7,6 +7,7 @@ import {
   UNIT_LABELS,
 } from "../utils/constants.ts";
 import { getHighchartsTimeConfig, resolveTimezone } from "../utils/timezone.ts";
+import { computeYAxisScale } from "../utils/chartScaling.ts";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 // --- Sensor unit mapping (sensor key -> unit string) ---
@@ -177,6 +178,11 @@ export default function History() {
       })
       .filter((pt): pt is [number, number | null] => pt !== null);
 
+    const yValues = seriesData
+      .map(([, y]) => y)
+      .filter((y): y is number => y !== null && Number.isFinite(y));
+    const yScale = computeYAxisScale(sensor, yValues);
+
     return {
       time: getHighchartsTimeConfig(),
       chart: {
@@ -206,6 +212,9 @@ export default function History() {
             },
         gridLineColor: borderColor,
         labels: { style: { color: textMuted, fontSize: isMobile ? "9px" : "11px" } },
+        softMin: yScale.softMin,
+        softMax: yScale.softMax,
+        ...(yScale.tickInterval != null && { tickInterval: yScale.tickInterval }),
       },
       legend: { enabled: false },
       tooltip: {
