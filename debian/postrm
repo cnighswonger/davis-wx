@@ -2,15 +2,16 @@
 set -e
 
 case "$1" in
+    remove|upgrade)
+        # Remove the venv (will be recreated on upgrade)
+        rm -rf /opt/davis-wx/backend/.venv
+        ;;
     purge)
-        # Remove data and config on purge (not on regular remove)
+        # Remove data, config, and system user on purge
         rm -rf /var/lib/davis-wx
         rm -rf /etc/davis-wx
-        # Remove system user
+        rm -rf /opt/davis-wx
         deluser --quiet davis 2>/dev/null || true
-        ;;
-    remove)
-        # Keep data and config on regular remove
         ;;
 esac
 

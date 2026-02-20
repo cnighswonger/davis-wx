@@ -5,18 +5,13 @@
 override_dh_auto_build:
 	# Build frontend
 	cd frontend && npm ci && npm run build
-	# Create Python venv and install backend
-	python3 -m venv debian/venv
-	debian/venv/bin/pip install --upgrade pip
-	debian/venv/bin/pip install backend/
 
 override_dh_auto_install:
-	# App files
+	# App files (venv created at install time by postinst)
 	install -d debian/davis-wx/opt/davis-wx/backend
 	cp -r backend/app debian/davis-wx/opt/davis-wx/backend/
 	cp backend/logger_main.py debian/davis-wx/opt/davis-wx/backend/
 	cp backend/pyproject.toml debian/davis-wx/opt/davis-wx/backend/
-	cp -r debian/venv debian/davis-wx/opt/davis-wx/backend/.venv
 	# Frontend
 	install -d debian/davis-wx/opt/davis-wx/frontend
 	cp -r frontend/dist debian/davis-wx/opt/davis-wx/frontend/
@@ -39,4 +34,4 @@ override_dh_auto_test:
 	# Skip tests during package build
 
 override_dh_auto_clean:
-	rm -rf debian/venv frontend/dist frontend/node_modules
+	rm -rf frontend/dist frontend/node_modules
