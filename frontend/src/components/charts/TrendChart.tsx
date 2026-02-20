@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import { getHighchartsTimeConfig, resolveTimezone } from "../../utils/timezone.ts";
+import { computeYAxisScale } from "../../utils/chartScaling.ts";
 
 interface TrendChartProps {
   title: string;
@@ -13,6 +14,7 @@ interface TrendChartProps {
   unit: string;
   color?: string;
   height?: number;
+  sensor?: string;
 }
 
 function getCSSVar(name: string): string {
@@ -27,6 +29,7 @@ export default function TrendChart({
   unit,
   color,
   height = 120,
+  sensor,
 }: TrendChartProps) {
   const tz = resolveTimezone();
   const options: Highcharts.Options = useMemo(() => {
@@ -34,6 +37,10 @@ export default function TrendChart({
     const mutedColor = getCSSVar("--color-text-muted") || "#5c6478";
     const borderColor = getCSSVar("--color-border") || "#2a2d3e";
     const lineColor = color || getCSSVar("--color-accent") || "#3b82f6";
+
+    const yScale = sensor
+      ? computeYAxisScale(sensor, data.map((pt) => pt.y).filter(Number.isFinite))
+      : undefined;
 
     return {
       time: getHighchartsTimeConfig(),
@@ -75,6 +82,11 @@ export default function TrendChart({
         gridLineColor: borderColor,
         gridLineWidth: 1,
         gridLineDashStyle: "Dot",
+        ...(yScale && {
+          softMin: yScale.softMin,
+          softMax: yScale.softMax,
+          ...(yScale.tickInterval != null && { tickInterval: yScale.tickInterval }),
+        }),
       },
       tooltip: {
         xDateFormat: "%b %e, %l:%M %p",
@@ -101,7 +113,7 @@ export default function TrendChart({
         },
       ],
     };
-  }, [title, data, unit, color, height, tz]);
+  }, [title, data, unit, color, height, sensor, tz]);
 
   return (
     <div

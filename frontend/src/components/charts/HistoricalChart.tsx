@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import { getHighchartsTimeConfig, resolveTimezone } from "../../utils/timezone.ts";
+import { computeYAxisScale } from "../../utils/chartScaling.ts";
 
 interface HistoricalChartProps {
   title: string;
@@ -39,6 +40,11 @@ export default function HistoricalChart({
       new Date(pt.timestamp).getTime(),
       pt.value,
     ]);
+
+    const yScale = computeYAxisScale(
+      sensor,
+      data.map((pt) => pt.value).filter(Number.isFinite),
+    );
 
     return {
       time: getHighchartsTimeConfig(),
@@ -90,6 +96,9 @@ export default function HistoricalChart({
         gridLineColor: borderColor,
         gridLineWidth: 1,
         gridLineDashStyle: "Dot",
+        softMin: yScale.softMin,
+        softMax: yScale.softMax,
+        ...(yScale.tickInterval != null && { tickInterval: yScale.tickInterval }),
       },
       tooltip: {
         xDateFormat: "%A, %b %e %Y %l:%M %p",

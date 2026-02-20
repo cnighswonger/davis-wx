@@ -120,7 +120,7 @@ export default function FlipTile({
             </div>
           ) : chartData.length > 0 ? (
             <div style={{ flex: 1, minHeight: 0 }}>
-              <TrendChart title="" data={chartData} unit={unit} />
+              <TrendChart title="" data={chartData} unit={unit} sensor={sensor} />
             </div>
           ) : (
             <div
