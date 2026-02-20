@@ -182,12 +182,38 @@ def get_history(
         data = _aggregate(db, column, start_dt, end_dt, resolution, divisor,
                           bounds, spike_threshold)
 
+    # Compute summary stats from the returned points
+    if resolution == "raw":
+        vals = [pt["value"] for pt in data if pt["value"] is not None]
+    else:
+        # Use per-bucket min/max for true extremes
+        vals_min = [pt["min"] for pt in data if pt["min"] is not None]
+        vals_max = [pt["max"] for pt in data if pt["max"] is not None]
+        vals_avg = [pt["value"] for pt in data if pt["value"] is not None]
+        vals = vals_avg  # for avg/count
+
+    if resolution == "raw":
+        summary = {
+            "min": min(vals) if vals else None,
+            "max": max(vals) if vals else None,
+            "avg": round(sum(vals) / len(vals), 2) if vals else None,
+            "count": len(vals),
+        }
+    else:
+        summary = {
+            "min": min(vals_min) if vals_min else None,
+            "max": max(vals_max) if vals_max else None,
+            "avg": round(sum(vals_avg) / len(vals_avg), 2) if vals_avg else None,
+            "count": len(data),
+        }
+
     return {
         "sensor": sensor,
         "unit": SENSOR_UNITS.get(sensor, ""),
         "start": start_dt.isoformat() + ("" if start_dt.tzinfo else "Z"),
         "end": end_dt.isoformat() + ("" if end_dt.tzinfo else "Z"),
         "resolution": resolution,
+        "summary": summary,
         "points": data,
     }
 
@@ -249,7 +275,7 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1,
         group_key = func.strftime("%Y-%m-%dT00:00:00", ts_col)
         time_label = group_key
 
-    query = db.query(time_label, func.avg(val_col))
+    query = db.query(time_label, func.avg(val_col), func.min(val_col), func.max(val_col))
 
     if not need_subquery:
         # Apply filters directly (subquery already has them baked in)
@@ -263,6 +289,11 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1,
     results = query.group_by(group_key).order_by(group_key).all()
 
     return [
-        {"timestamp": r[0] + "Z", "value": round(r[1] / divisor, 2) if r[1] is not None else None}
+        {
+            "timestamp": r[0] + "Z",
+            "value": round(r[1] / divisor, 2) if r[1] is not None else None,
+            "min": round(r[2] / divisor, 2) if r[2] is not None else None,
+            "max": round(r[3] / divisor, 2) if r[3] is not None else None,
+        }
         for r in results
     ]

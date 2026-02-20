@@ -169,6 +169,15 @@ export interface ConfigItem {
 export interface HistoryPoint {
   timestamp: string;
   value: number | null;
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface HistorySummary {
+  min: number | null;
+  max: number | null;
+  avg: number | null;
+  count: number;
 }
 
 export interface HistoryResponse {
@@ -176,6 +185,7 @@ export interface HistoryResponse {
   start: string;
   end: string;
   resolution: string;
+  summary: HistorySummary | null;
   points: HistoryPoint[];
 }
 
