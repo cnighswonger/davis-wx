@@ -184,6 +184,7 @@ export default function History() {
         spacing: isMobile ? [8, 4, 8, 4] : undefined,
       },
       title: { text: undefined },
+      accessibility: { enabled: false },
       credits: { enabled: false },
       xAxis: {
         type: "datetime",
