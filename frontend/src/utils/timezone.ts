@@ -6,14 +6,18 @@
  */
 import Highcharts from "highcharts";
 
-// Monkey-patch Highcharts Time.prototype.dateTimeFormat to guard against
+// Monkey-patch Highcharts Time.prototype.getTimezoneOffset to guard against
 // non-finite timestamps. Highcharts internally generates non-finite tick
-// values during axis calculation and passes them to Intl.DateTimeFormat,
-// which throws RangeError on some platforms (notably Windows desktop browsers).
-const origDtf = (Highcharts as unknown as { Time: { prototype: { dateTimeFormat: (...args: unknown[]) => string } } }).Time.prototype.dateTimeFormat;
-(Highcharts as unknown as { Time: { prototype: { dateTimeFormat: (opts: unknown, ts: number, locale?: string) => string } } }).Time.prototype.dateTimeFormat = function (options: unknown, timestamp: number, locale?: string): string {
-  if (!Number.isFinite(timestamp)) return "";
-  return origDtf.call(this, options, timestamp, locale);
+// values during axis calculation and passes them through getTimezoneOffset
+// into Intl.DateTimeFormat.format(), which throws RangeError on some
+// platforms (notably Windows desktop browsers).
+// Patching getTimezoneOffset (not dateTimeFormat) keeps label/tooltip
+// rendering untouched.
+const HCTime = (Highcharts as unknown as { Time: { prototype: Record<string, unknown> } }).Time.prototype;
+const origGetTzOffset = HCTime.getTimezoneOffset as (ts: number) => number;
+HCTime.getTimezoneOffset = function (timestamp: number): number {
+  if (!Number.isFinite(timestamp)) return 0;
+  return origGetTzOffset.call(this, timestamp);
 };
 
 const STORAGE_KEY = "davis-wx-timezone";
