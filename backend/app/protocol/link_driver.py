@@ -150,7 +150,7 @@ class LinkDriver:
             BasicBank1.BAR_CAL.nibbles,
         )
         if data and len(data) >= 2:
-            self.calibration.barometer = struct.unpack("<H", data[:2])[0]
+            self.calibration.barometer = struct.unpack("<h", data[:2])[0]
 
         # Outside humidity calibration
         logger.debug("Reading outside humidity calibration...")
@@ -709,8 +709,8 @@ class LinkDriver:
                     data,
                 )
 
-                # Barometer (unsigned u16, thousandths inHg)
-                data = struct.pack("<H", offsets.barometer)
+                # Barometer (signed i16, thousandths inHg)
+                data = struct.pack("<h", offsets.barometer)
                 ok &= self.write_station_memory(
                     BasicBank1.BAR_CAL.bank,
                     BasicBank1.BAR_CAL.address,
