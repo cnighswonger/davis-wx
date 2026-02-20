@@ -1,13 +1,12 @@
 import { useState, useMemo } from "react";
 import Highcharts from "highcharts";
-import "highcharts/modules/debugger";
 import HighchartsReact from "highcharts-react-official";
 import { useHistoricalData } from "../hooks/useHistoricalData.ts";
 import {
   SENSOR_DISPLAY_NAMES,
   UNIT_LABELS,
 } from "../utils/constants.ts";
-import { resolveTimezone } from "../utils/timezone.ts";
+import { getHighchartsTimeConfig, resolveTimezone } from "../utils/timezone.ts";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 // --- Sensor unit mapping (sensor key -> unit string) ---
@@ -173,18 +172,15 @@ export default function History() {
       .map((p) => [new Date(p.timestamp).getTime(), p.value] as const)
       .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
 
-    // DEBUG: log data reaching Highcharts
-    console.log("[History] seriesData.length =", seriesData.length, "first =", seriesData[0], "last =", seriesData[seriesData.length - 1]);
-
     return {
-      // time: getHighchartsTimeConfig(),  // DEBUG: timezone disabled
+      time: getHighchartsTimeConfig(),
       chart: {
         type: "areaspline",
         height: isMobile ? 280 : 400,
         backgroundColor: bgCard,
         style: { fontFamily: "var(--font-body)" },
         zooming: { type: "x" },
-        spacing: isMobile ? [8, 4, 8, 4] : undefined,
+        ...(isMobile ? { spacing: [8, 4, 8, 4] } : {}),
       },
       title: { text: undefined },
       accessibility: { enabled: false },
