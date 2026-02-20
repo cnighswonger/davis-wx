@@ -31,10 +31,9 @@ export default function TrendModal({
     fetchHistory(sensor, hourAgo.toISOString(), now.toISOString(), "raw")
       .then((res) => {
         setChartData(
-          res.points.map((p) => ({
-            x: new Date(p.timestamp).getTime(),
-            y: p.value,
-          })),
+          res.points
+            .map((p) => ({ x: new Date(p.timestamp).getTime(), y: p.value }))
+            .filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y)),
         );
       })
       .catch(() => setChartData([]))

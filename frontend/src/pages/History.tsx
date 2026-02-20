@@ -168,10 +168,9 @@ export default function History() {
     const unitKey = SENSOR_UNITS[sensor] ?? "";
     const unitLabel = UNIT_LABELS[unitKey] ?? (unitKey ? ` ${unitKey}` : "");
 
-    const seriesData = data.map((p) => [
-      new Date(p.timestamp).getTime(),
-      p.value,
-    ]);
+    const seriesData = data
+      .map((p) => [new Date(p.timestamp).getTime(), p.value] as const)
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
 
     return {
       time: getHighchartsTimeConfig(),

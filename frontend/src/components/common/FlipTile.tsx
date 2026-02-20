@@ -47,10 +47,9 @@ export default function FlipTile({
       const hourAgo = new Date(now.getTime() - 3_600_000);
       fetchHistory(sensor, hourAgo.toISOString(), now.toISOString(), "raw")
         .then((res) => {
-          const pts = res.points.map((p) => ({
-            x: new Date(p.timestamp).getTime(),
-            y: p.value,
-          }));
+          const pts = res.points
+            .map((p) => ({ x: new Date(p.timestamp).getTime(), y: p.value }))
+            .filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y));
           setChartData(pts);
         })
         .catch(() => setChartData([]))
