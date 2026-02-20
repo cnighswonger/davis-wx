@@ -145,7 +145,7 @@ export default function DashboardGrid() {
             color: "var(--color-text)",
           }}
         >
-          Dashboard
+          Current Conditions
           <button
             style={editToggleStyle}
             onClick={() => setEditMode(true)}
@@ -156,7 +156,7 @@ export default function DashboardGrid() {
           </button>
         </h2>
 
-        <div style={gridStyle}>
+        <div className="dashboard-grid" style={gridStyle}>
           {layout.tiles.map((placement) => {
             const def = TILE_REGISTRY[placement.tileId];
             if (!def) return null;
@@ -202,7 +202,7 @@ export default function DashboardGrid() {
           color: "var(--color-text)",
         }}
       >
-        Dashboard
+        Current Conditions
       </h2>
 
       {/* Edit toolbar */}
@@ -243,7 +243,7 @@ export default function DashboardGrid() {
           items={tileIds}
           strategy={rectSortingStrategy}
         >
-          <div style={gridStyle}>
+          <div className="dashboard-grid" style={gridStyle}>
             {layout.tiles.map((placement) => {
               const def = TILE_REGISTRY[placement.tileId];
               if (!def) return null;

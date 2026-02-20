@@ -145,6 +145,17 @@ a:hover {
   .dashboard-toolbar {
     flex-wrap: wrap !important;
   }
+
+  /* Header: hide station name on mobile */
+  .header-title {
+    display: none !important;
+  }
+
+  /* Dashboard: two-column compact grid */
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+    gap: 10px !important;
+  }
 }
 
 @media (min-width: 769px) {
