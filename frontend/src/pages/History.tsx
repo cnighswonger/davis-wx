@@ -239,6 +239,7 @@ export default function History() {
           lineWidth: 2,
           marker: { enabled: false, radius: 3 },
           states: { hover: { lineWidth: 3 } },
+          threshold: null,
         },
       },
       series: [
