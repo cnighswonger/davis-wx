@@ -21,9 +21,8 @@ Supports the full range of classic Davis stations: Weather Wizard III, Weather W
 Prerequisites: **Python 3.10+** and **Node.js 18+**
 
 ```bash
-git clone https://github.com/cnighswonger/davis_wx.git
-cd davis_wx
-git checkout dev/wx-app
+git clone https://github.com/cnighswonger/davis-wx.git
+cd davis-wx
 
 python station.py setup
 python station.py run
@@ -151,6 +150,17 @@ The application auto-detects the station model on startup by reading the model n
 
 ## Deployment
 
+### Ubuntu / Debian (.deb installer)
+
+Download the latest release from [Releases](https://github.com/cnighswonger/davis-wx/releases), extract, and run:
+
+```bash
+tar xzf davis-wx_*.tar.gz
+./install.sh
+```
+
+The installer handles all dependencies, creates systemd services, and places a desktop shortcut. Requires an internet connection during install for Python packages.
+
 ### Docker
 
 ```bash
@@ -159,7 +169,7 @@ docker compose up -d
 
 The `docker-compose.yml` passes through `/dev/ttyUSB0` and persists the database via a named volume.
 
-### systemd (Linux)
+### Manual systemd (Linux)
 
 ```bash
 sudo cp davis-wx.service /etc/systemd/system/
