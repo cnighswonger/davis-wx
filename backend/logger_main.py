@@ -47,6 +47,9 @@ class LoggerDaemon:
         self.poller_task: Optional[asyncio.Task] = None
         self.ipc_server: Optional[IPCServer] = None
         self.state_file = Path(settings.db_path).parent / ".logger_state.json"
+        # Cached hardware config (read at connect, updated on write)
+        self._archive_period: Optional[int] = None
+        self._sample_period: Optional[int] = None
 
     # ---- public entry point ----
 
@@ -103,6 +106,12 @@ class LoggerDaemon:
         station = await self.driver.async_detect_station_type()
         logger.info("Station: %s", STATION_NAMES.get(station, "Unknown"))
         await self.driver.async_read_calibration()
+
+        # Cache hardware config so read_config doesn't need serial I/O
+        self._archive_period = await self.driver.async_read_archive_period()
+        self._sample_period = await self.driver.async_read_sample_period()
+        logger.info("Archive period: %s min, Sample period: %s sec",
+                     self._archive_period, self._sample_period)
 
         # Sync station clock to system time
         now = datetime.now()
@@ -331,12 +340,10 @@ class LoggerDaemon:
     async def _h_read_config(self, _msg: dict) -> dict[str, Any]:
         if not self.driver or not self.driver.connected:
             raise RuntimeError("Not connected")
-        archive_period = await self.driver.async_read_archive_period()
-        sample_period = await self.driver.async_read_sample_period()
         cal = self.driver.calibration
         return {
-            "archive_period": archive_period,
-            "sample_period": sample_period,
+            "archive_period": self._archive_period,
+            "sample_period": self._sample_period,
             "calibration": {
                 "inside_temp": cal.inside_temp,
                 "outside_temp": cal.outside_temp,
@@ -354,10 +361,14 @@ class LoggerDaemon:
         if msg.get("archive_period") is not None:
             ok = await self.driver.async_set_archive_period(msg["archive_period"])
             results["archive_period"] = "ok" if ok else "failed"
+            if ok:
+                self._archive_period = msg["archive_period"]
 
         if msg.get("sample_period") is not None:
             ok = await self.driver.async_set_sample_period(msg["sample_period"])
             results["sample_period"] = "ok" if ok else "failed"
+            if ok:
+                self._sample_period = msg["sample_period"]
 
         if msg.get("calibration") is not None:
             cal = msg["calibration"]
