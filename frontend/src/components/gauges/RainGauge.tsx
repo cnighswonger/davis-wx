@@ -1,6 +1,8 @@
 /**
  * Rain display: current rate + daily/yearly totals as a compact numeric panel.
  */
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
 
 interface RainGaugeProps {
   rate: number | null;       // inches/hr (or display unit per hr)
@@ -25,6 +27,23 @@ export default function RainGauge({ rate, daily, yearly, unit, peakRate }: RainG
   const yearlyStr = yearly !== null ? yearly.toFixed(decimals) : '--';
 
   const color = rate !== null ? rateColor(rate) : 'var(--color-text-muted)';
+
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <CompactCard
+        label="Rain"
+        secondary={<span>Day {dailyStr} / Yr {yearlyStr}</span>}
+      >
+        <span style={{ fontSize: "28px", fontFamily: "var(--font-gauge)", fontWeight: "bold", color }}>
+          {rateStr}
+        </span>
+        <span style={{ fontSize: "12px", fontFamily: "var(--font-gauge)", color: "var(--color-text-muted)", marginLeft: "2px" }}>
+          {unit}/hr
+        </span>
+      </CompactCard>
+    );
+  }
 
   // Animated rain drops for active rain
   const isRaining = rate !== null && rate > 0;

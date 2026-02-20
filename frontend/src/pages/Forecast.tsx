@@ -1,5 +1,6 @@
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import { formatTimestamp } from "../utils/formatting.ts";
+import { useIsMobile } from "../hooks/useIsMobile.ts";
 import type { NWSPeriod } from "../api/types.ts";
 
 // --- Shared styles ---
@@ -39,10 +40,12 @@ function ZambrettiSection({
   text,
   confidence,
   updated,
+  isMobile,
 }: {
   text: string;
   confidence: number;
   updated: string;
+  isMobile?: boolean;
 }) {
   // Determine confidence color
   let barColor = "var(--color-success)";
@@ -50,8 +53,8 @@ function ZambrettiSection({
   else if (confidence < 70) barColor = "var(--color-warning)";
 
   return (
-    <div style={cardStyle}>
-      <h3 style={sectionTitle}>Local Forecast (Zambretti)</h3>
+    <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+      <h3 style={{ ...sectionTitle, fontSize: isMobile ? "16px" : "18px" }}>Local Forecast (Zambretti)</h3>
 
       {/* Forecast text */}
       <p
@@ -112,38 +115,39 @@ function ZambrettiSection({
   );
 }
 
-function NWSPeriodCard({ period }: { period: NWSPeriod }) {
+function NWSPeriodCard({ period, isMobile }: { period: NWSPeriod; isMobile?: boolean }) {
   return (
     <div
       style={{
         background: "var(--color-bg-secondary)",
         borderRadius: "var(--gauge-border-radius)",
         border: "1px solid var(--color-border-light)",
-        padding: "16px",
+        padding: isMobile ? "10px 12px" : "16px",
         display: "flex",
         flexDirection: "column",
-        gap: "8px",
+        gap: isMobile ? "6px" : "8px",
+        minWidth: 0,
       }}
     >
       {/* Header row: icon + name + short forecast */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "10px", minWidth: 0 }}>
         {period.icon_url && (
           <img
             src={period.icon_url}
             alt={period.short_forecast || period.name}
             style={{
-              width: "48px",
-              height: "48px",
+              width: isMobile ? "40px" : "48px",
+              height: isMobile ? "40px" : "48px",
               borderRadius: "6px",
               flexShrink: 0,
             }}
           />
         )}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h4
             style={{
               margin: 0,
-              fontSize: "15px",
+              fontSize: isMobile ? "14px" : "15px",
               fontFamily: "var(--font-heading)",
               color: "var(--color-text)",
             }}
@@ -153,9 +157,13 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
           {period.short_forecast && (
             <span
               style={{
-                fontSize: "12px",
+                fontSize: isMobile ? "11px" : "12px",
                 fontFamily: "var(--font-body)",
                 color: "var(--color-text-muted)",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
               {period.short_forecast}
@@ -167,9 +175,9 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
       <div
         style={{
           display: "flex",
-          gap: "16px",
+          gap: isMobile ? "10px" : "16px",
           flexWrap: "wrap",
-          fontSize: "13px",
+          fontSize: isMobile ? "12px" : "13px",
           fontFamily: "var(--font-body)",
         }}
       >
@@ -189,7 +197,7 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
       <p
         style={{
           margin: 0,
-          fontSize: "13px",
+          fontSize: isMobile ? "12px" : "13px",
           lineHeight: "1.45",
           color: "var(--color-text-secondary)",
           fontFamily: "var(--font-body)",
@@ -204,6 +212,7 @@ function NWSPeriodCard({ period }: { period: NWSPeriod }) {
 // --- Main component ---
 
 export default function Forecast() {
+  const isMobile = useIsMobile();
   const { forecast, refreshForecast } = useWeatherData();
 
   const local = forecast?.local ?? null;
@@ -253,10 +262,11 @@ export default function Forecast() {
           text={local.text}
           confidence={local.confidence}
           updated={local.updated}
+          isMobile={isMobile}
         />
       ) : (
-        <div style={cardStyle}>
-          <h3 style={sectionTitle}>Local Forecast (Zambretti)</h3>
+        <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+          <h3 style={{ ...sectionTitle, fontSize: isMobile ? "16px" : "18px" }}>Local Forecast (Zambretti)</h3>
           <div style={emptyState}>
             No local forecast available. The Zambretti algorithm requires
             barometric pressure history to generate predictions.
@@ -266,16 +276,16 @@ export default function Forecast() {
 
       {/* NWS forecast */}
       {nws && nws.periods.length > 0 ? (
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "baseline",
-              marginBottom: "16px",
+              marginBottom: isMobile ? "10px" : "16px",
             }}
           >
-            <h3 style={{ ...sectionTitle, margin: 0 }}>
+            <h3 style={{ ...sectionTitle, margin: 0, fontSize: isMobile ? "16px" : "18px" }}>
               NWS Forecast
             </h3>
             <span style={mutedText}>
@@ -286,12 +296,14 @@ export default function Forecast() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: "12px",
+              gridTemplateColumns: isMobile
+                ? "1fr"
+                : "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: isMobile ? "10px" : "12px",
             }}
           >
             {nws.periods.map((period, idx) => (
-              <NWSPeriodCard key={idx} period={period} />
+              <NWSPeriodCard key={idx} period={period} isMobile={isMobile} />
             ))}
           </div>
         </div>

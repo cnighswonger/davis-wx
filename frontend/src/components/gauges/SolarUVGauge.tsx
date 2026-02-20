@@ -2,6 +2,8 @@
  * Combined Solar Radiation and UV Index gauge.
  * Only shown when the station supports solar/UV sensors.
  */
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
 
 interface SolarUVGaugeProps {
   solarRadiation: number | null;  // W/m2
@@ -59,6 +61,25 @@ export default function SolarUVGauge({ solarRadiation, uvIndex }: SolarUVGaugePr
   const uvFillAngle = startAngle + uvFrac * sweep;
   const uvCol = uvIndex !== null ? uvColor(uvIndex) : 'var(--color-text-muted)';
   const solar = solarRadiation !== null ? solarIntensity(solarRadiation) : null;
+
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <CompactCard
+        label="Solar & UV"
+        secondary={
+          <span>Solar: {solarRadiation !== null ? `${solarRadiation} W/m\u00B2` : "--"}</span>
+        }
+      >
+        <span style={{ fontSize: "28px", fontFamily: "var(--font-gauge)", fontWeight: "bold", color: uvCol }}>
+          {uvIndex !== null ? uvIndex.toFixed(1) : "--"}
+        </span>
+        <span style={{ fontSize: "12px", fontFamily: "var(--font-gauge)", color: "var(--color-text-muted)", marginLeft: "2px" }}>
+          UV
+        </span>
+      </CompactCard>
+    );
+  }
 
   return (
     <div style={{

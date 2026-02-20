@@ -4,6 +4,7 @@
  */
 import { useWeatherData } from "../../context/WeatherDataContext.tsx";
 import type { ValueWithUnit } from "../../api/types.ts";
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
 
 interface DerivedItem {
   label: string;
@@ -17,6 +18,7 @@ function formatValue(item: ValueWithUnit | null | undefined): string {
 
 export default function CurrentConditions() {
   const { currentConditions } = useWeatherData();
+  const isMobile = useIsMobile();
 
   const derived = currentConditions?.derived;
 
@@ -33,7 +35,7 @@ export default function CurrentConditions() {
       style={{
         display: "flex",
         flexDirection: "column",
-        padding: "16px",
+        padding: isMobile ? "8px" : "16px",
         background: "var(--color-bg-card)",
         borderRadius: "var(--gauge-border-radius, 16px)",
         boxShadow: "var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))",
@@ -59,7 +61,7 @@ export default function CurrentConditions() {
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "12px 16px",
+          gap: isMobile ? "6px 8px" : "12px 16px",
         }}
       >
         {items.map((item) => (
@@ -77,7 +79,7 @@ export default function CurrentConditions() {
             </div>
             <div
               style={{
-                fontSize: "16px",
+                fontSize: isMobile ? "14px" : "16px",
                 fontFamily: "var(--font-gauge)",
                 fontWeight: "bold",
                 color: item.data

@@ -2,6 +2,9 @@
  * SVG vertical thermometer gauge with mercury fill and hi/lo whiskers.
  * Uses CSS custom properties for theming.
  */
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
+
 interface TemperatureGaugeProps {
   value: number | null;       // Current temp in display units (e.g. 72.5)
   unit: string;               // 'F' or 'C'
@@ -69,6 +72,24 @@ export default function TemperatureGauge({
   const displayVal = value !== null ? value : null;
   const mercuryY = displayVal !== null ? yForTemp(displayVal) : tubeBot;
   const fillColor = displayVal !== null ? tempColor(displayVal, unit) : 'var(--color-text-muted)';
+
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <CompactCard
+        label={label ?? "Temperature"}
+        secondary={
+          high != null || low != null ? (
+            <span>H {high != null ? `${high.toFixed(0)}°` : "--"} / L {low != null ? `${low.toFixed(0)}°` : "--"}</span>
+          ) : undefined
+        }
+      >
+        <span style={{ fontSize: "28px", fontFamily: "var(--font-gauge)", fontWeight: "bold", color: fillColor }}>
+          {displayVal !== null ? `${displayVal.toFixed(1)}°${unit}` : "--.-°"}
+        </span>
+      </CompactCard>
+    );
+  }
 
   // Generate scale ticks
   const step = unit === 'C' ? 10 : 20;

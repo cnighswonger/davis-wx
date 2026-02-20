@@ -26,7 +26,9 @@ import TileRenderer from "./TileRenderer.tsx";
 import SortableTile from "./SortableTile.tsx";
 import TileCatalogModal from "./TileCatalogModal.tsx";
 import FlipTile from "../components/common/FlipTile.tsx";
+import TrendModal from "../components/common/TrendModal.tsx";
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
+import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -97,6 +99,7 @@ export default function DashboardGrid() {
     resetToDefault,
   } = useDashboardLayout();
   const { currentConditions } = useWeatherData();
+  const isMobile = useIsMobile();
   const [showCatalog, setShowCatalog] = useState(false);
 
   const hasSolar =
@@ -138,14 +141,16 @@ export default function DashboardGrid() {
     return (
       <div>
         <h2
+          className="dashboard-heading"
           style={{
             margin: "0 0 16px 0",
             fontSize: "24px",
             fontFamily: "var(--font-heading)",
             color: "var(--color-text)",
+            whiteSpace: "nowrap",
           }}
         >
-          Dashboard
+          Current Conditions
           <button
             style={editToggleStyle}
             onClick={() => setEditMode(true)}
@@ -156,21 +161,31 @@ export default function DashboardGrid() {
           </button>
         </h2>
 
-        <div style={gridStyle}>
+        <div className="dashboard-grid" style={gridStyle}>
           {layout.tiles.map((placement) => {
             const def = TILE_REGISTRY[placement.tileId];
             if (!def) return null;
-            const colSpan = placement.colSpan ?? def.minColSpan;
+            const colSpan = isMobile ? 1 : (placement.colSpan ?? def.minColSpan);
 
             const content = <TileRenderer tileId={placement.tileId} />;
             const wrapped = def.hasFlipTile ? (
-              <FlipTile
-                sensor={def.sensor!}
-                label={def.chartLabel!}
-                unit={def.chartUnit!}
-              >
-                {content}
-              </FlipTile>
+              isMobile ? (
+                <TrendModal
+                  sensor={def.sensor!}
+                  label={def.chartLabel!}
+                  unit={def.chartUnit!}
+                >
+                  {content}
+                </TrendModal>
+              ) : (
+                <FlipTile
+                  sensor={def.sensor!}
+                  label={def.chartLabel!}
+                  unit={def.chartUnit!}
+                >
+                  {content}
+                </FlipTile>
+              )
             ) : (
               content
             );
@@ -202,11 +217,11 @@ export default function DashboardGrid() {
           color: "var(--color-text)",
         }}
       >
-        Dashboard
+        Current Conditions
       </h2>
 
       {/* Edit toolbar */}
-      <div style={toolbarStyle}>
+      <div className="dashboard-toolbar" style={toolbarStyle}>
         <span style={{ color: "var(--color-accent)", fontWeight: 600 }}>
           Editing Layout
         </span>
@@ -243,14 +258,14 @@ export default function DashboardGrid() {
           items={tileIds}
           strategy={rectSortingStrategy}
         >
-          <div style={gridStyle}>
+          <div className="dashboard-grid" style={gridStyle}>
             {layout.tiles.map((placement) => {
               const def = TILE_REGISTRY[placement.tileId];
               if (!def) return null;
-              const colSpan = placement.colSpan ?? def.minColSpan;
+              const colSpan = isMobile ? 1 : (placement.colSpan ?? def.minColSpan);
 
               const content = <TileRenderer tileId={placement.tileId} />;
-              const wrapped = def.hasFlipTile ? (
+              const wrapped = (!isMobile && def.hasFlipTile) ? (
                 <FlipTile
                   sensor={def.sensor!}
                   label={def.chartLabel!}

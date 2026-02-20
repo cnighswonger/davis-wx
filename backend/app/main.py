@@ -27,6 +27,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s:     %(name)s - %(message)s",
 )
+# Suppress noisy websockets library tracebacks on client disconnect (Windows semaphore timeout)
+logging.getLogger("websockets").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 

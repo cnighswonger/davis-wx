@@ -355,7 +355,7 @@ function SunSection({ sun }: { sun: SunData }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
+          gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
           gap: "0",
           fontSize: "13px",
           fontFamily: "var(--font-body)",
@@ -571,7 +571,7 @@ export default function Astronomy() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))",
           gap: "16px",
         }}
       >

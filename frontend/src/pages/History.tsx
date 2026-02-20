@@ -7,6 +7,7 @@ import {
   UNIT_LABELS,
 } from "../utils/constants.ts";
 import { getHighchartsTimeConfig, resolveTimezone } from "../utils/timezone.ts";
+import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 // --- Sensor unit mapping (sensor key -> unit string) ---
 
@@ -120,8 +121,9 @@ const inputStyle: React.CSSProperties = {
 // --- Component ---
 
 export default function History() {
+  const isMobile = useIsMobile();
   const sensorKeys = Object.keys(SENSOR_DISPLAY_NAMES);
-  const [sensor, setSensor] = useState(sensorKeys[1] ?? "temperature_outside");
+  const [sensor, setSensor] = useState(sensorKeys[0] ?? "temperature_inside");
   const [preset, setPreset] = useState<Preset>("24h");
   const [resolution, setResolution] = useState("5m");
 
@@ -166,36 +168,44 @@ export default function History() {
     const unitKey = SENSOR_UNITS[sensor] ?? "";
     const unitLabel = UNIT_LABELS[unitKey] ?? (unitKey ? ` ${unitKey}` : "");
 
-    const seriesData = data.map((p) => [
-      new Date(p.timestamp).getTime(),
-      p.value,
-    ]);
+    const seriesData: [number, number | null][] = data
+      .map((p) => {
+        const x = new Date(p.timestamp).getTime();
+        if (!Number.isFinite(x)) return null;
+        const y = (p.value != null && Number.isFinite(p.value)) ? p.value : null;
+        return [x, y] as [number, number | null];
+      })
+      .filter((pt): pt is [number, number | null] => pt !== null);
 
     return {
       time: getHighchartsTimeConfig(),
       chart: {
         type: "areaspline",
-        height: 400,
+        height: isMobile ? 280 : 400,
         backgroundColor: bgCard,
         style: { fontFamily: "var(--font-body)" },
         zooming: { type: "x" },
+        ...(isMobile ? { spacing: [8, 4, 8, 4] } : {}),
       },
       title: { text: undefined },
+      accessibility: { enabled: false },
       credits: { enabled: false },
       xAxis: {
         type: "datetime",
         lineColor: borderColor,
         tickColor: borderColor,
-        labels: { style: { color: textMuted, fontSize: "11px" } },
+        labels: { style: { color: textMuted, fontSize: isMobile ? "9px" : "11px" } },
         crosshair: true,
       },
       yAxis: {
-        title: {
-          text: `${SENSOR_DISPLAY_NAMES[sensor] ?? sensor} (${unitLabel.trim()})`,
-          style: { color: textMuted, fontSize: "12px" },
-        },
+        title: isMobile
+          ? { text: undefined }
+          : {
+              text: `${SENSOR_DISPLAY_NAMES[sensor] ?? sensor} (${unitLabel.trim()})`,
+              style: { color: textMuted, fontSize: "12px" },
+            },
         gridLineColor: borderColor,
-        labels: { style: { color: textMuted, fontSize: "11px" } },
+        labels: { style: { color: textMuted, fontSize: isMobile ? "9px" : "11px" } },
       },
       legend: { enabled: false },
       tooltip: {
@@ -223,7 +233,7 @@ export default function History() {
         },
       ],
     };
-  }, [data, sensor, tz]);
+  }, [data, sensor, tz, isMobile]);
 
   const presets: { key: Preset; label: string }[] = [
     { key: "1h", label: "1 Hour" },
@@ -244,6 +254,7 @@ export default function History() {
   return (
     <div>
       <h2
+        className="dashboard-heading"
         style={{
           margin: "0 0 16px 0",
           fontSize: "24px",
@@ -255,20 +266,21 @@ export default function History() {
       </h2>
 
       {/* Controls card */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <div
           style={{
             display: "flex",
+            flexDirection: isMobile ? "column" : "row",
             flexWrap: "wrap",
-            gap: "16px",
-            alignItems: "flex-end",
+            gap: isMobile ? "12px" : "16px",
+            alignItems: isMobile ? "stretch" : "flex-end",
           }}
         >
           {/* Sensor selector */}
           <div>
             <label style={labelStyle}>Sensor</label>
             <select
-              style={selectStyle}
+              style={{ ...selectStyle, width: isMobile ? "100%" : undefined, minWidth: isMobile ? 0 : "180px" }}
               value={sensor}
               onChange={(e) => setSensor(e.target.value)}
             >
@@ -283,12 +295,18 @@ export default function History() {
           {/* Date range presets */}
           <div>
             <label style={labelStyle}>Date Range</label>
-            <div style={{ display: "flex", gap: "6px" }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, auto)",
+              gap: "6px",
+            }}>
               {presets.map((p) => (
                 <button
                   key={p.key}
                   style={{
                     ...presetBtnBase,
+                    padding: isMobile ? "8px 6px" : "6px 14px",
+                    fontSize: isMobile ? "12px" : "13px",
                     background:
                       preset === p.key
                         ? "var(--color-accent)"
@@ -310,38 +328,45 @@ export default function History() {
             </div>
           </div>
 
-          {/* Resolution selector */}
-          <div>
-            <label style={labelStyle}>Resolution</label>
-            <select
-              style={selectStyle}
-              value={resolution}
-              onChange={(e) => setResolution(e.target.value)}
-            >
-              {resolutions.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Resolution + CSV row */}
+          <div style={{
+            display: "flex",
+            gap: isMobile ? "10px" : "16px",
+            alignItems: "flex-end",
+          }}>
+            <div style={{ flex: isMobile ? 1 : undefined }}>
+              <label style={labelStyle}>Resolution</label>
+              <select
+                style={{ ...selectStyle, width: isMobile ? "100%" : undefined, minWidth: isMobile ? 0 : "180px" }}
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+              >
+                {resolutions.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* CSV export */}
-          <div>
-            <label style={labelStyle}>&nbsp;</label>
-            <a
-              href={`/api/export?sensors=${encodeURIComponent(sensor)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&resolution=${encodeURIComponent(resolution)}`}
-              download
-              style={{
-                ...presetBtnBase,
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-text-secondary)",
-                textDecoration: "none",
-                display: "inline-block",
-              }}
-            >
-              Download CSV
-            </a>
+            <div>
+              {!isMobile && <label style={labelStyle}>&nbsp;</label>}
+              <a
+                href={`/api/export?sensors=${encodeURIComponent(sensor)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&resolution=${encodeURIComponent(resolution)}`}
+                download
+                style={{
+                  ...presetBtnBase,
+                  padding: isMobile ? "8px 12px" : "6px 14px",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-secondary)",
+                  textDecoration: "none",
+                  display: "inline-block",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                CSV
+              </a>
+            </div>
           </div>
         </div>
 
@@ -350,17 +375,18 @@ export default function History() {
           <div
             style={{
               display: "flex",
-              gap: "16px",
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? "10px" : "16px",
               marginTop: "12px",
               flexWrap: "wrap",
-              alignItems: "flex-end",
+              alignItems: isMobile ? "stretch" : "flex-end",
             }}
           >
             <div>
               <label style={labelStyle}>Start</label>
               <input
                 type="datetime-local"
-                style={inputStyle}
+                style={{ ...inputStyle, width: isMobile ? "100%" : undefined }}
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
               />
@@ -369,7 +395,7 @@ export default function History() {
               <label style={labelStyle}>End</label>
               <input
                 type="datetime-local"
-                style={inputStyle}
+                style={{ ...inputStyle, width: isMobile ? "100%" : undefined }}
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
               />
@@ -386,7 +412,7 @@ export default function History() {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              height: "400px",
+              height: isMobile ? "280px" : "400px",
             }}
           >
             <div
@@ -409,7 +435,7 @@ export default function History() {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              height: "400px",
+              height: isMobile ? "280px" : "400px",
               flexDirection: "column",
               gap: "8px",
             }}
@@ -438,7 +464,7 @@ export default function History() {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              height: "400px",
+              height: isMobile ? "280px" : "400px",
               color: "var(--color-text-muted)",
               fontSize: "14px",
             }}

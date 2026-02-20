@@ -1,6 +1,8 @@
 /**
  * SVG circular analog barometer dial with needle and trend arrow overlay.
  */
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
 
 interface BarometerDialProps {
   value: number | null;        // Pressure in display units (e.g. 29.921 inHg)
@@ -69,6 +71,31 @@ export default function BarometerDial({ value, unit, trend, high, low }: Baromet
       ];
 
   const trendSymbol = trend === 'rising' ? '\u2191' : trend === 'falling' ? '\u2193' : trend === 'steady' ? '\u2192' : '';
+  const trendColor = trend === 'rising' ? 'var(--color-success)' : trend === 'falling' ? 'var(--color-warning)' : 'var(--color-text-muted)';
+
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <CompactCard
+        label="Barometer"
+        secondary={
+          <>
+            {trendSymbol && <span style={{ color: trendColor }}>{trendSymbol} </span>}
+            {(high != null || low != null) && (
+              <span>H {high?.toFixed(decimals) ?? "--"} / L {low?.toFixed(decimals) ?? "--"}</span>
+            )}
+          </>
+        }
+      >
+        <span style={{ fontSize: "28px", fontFamily: "var(--font-gauge)", fontWeight: "bold", color: "var(--color-text)" }}>
+          {value !== null ? value.toFixed(decimals) : "--"}
+        </span>
+        <span style={{ fontSize: "12px", fontFamily: "var(--font-gauge)", color: "var(--color-text-muted)", marginLeft: "2px" }}>
+          {unit}
+        </span>
+      </CompactCard>
+    );
+  }
 
   return (
     <div style={{
