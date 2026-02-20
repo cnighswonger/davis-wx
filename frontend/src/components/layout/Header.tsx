@@ -74,14 +74,14 @@ function IconStorm() {
   );
 }
 
-function mapForecastIcon(text: string): React.ReactNode {
+function mapForecastIcon(text: string): { icon: React.ReactNode; color: string } {
   const t = text.toLowerCase();
-  if (t.includes("stormy")) return <IconStorm />;
-  if (t.includes("rain") || t.includes("very unsettled")) return <IconRain />;
-  if (t.includes("shower")) return <IconCloudDrizzle />;
-  if (t.includes("changeable") || t.includes("unsettled") || t.includes("less settled")) return <IconCloud />;
-  if (t.includes("fairly fine") || t.includes("becoming fine") || t.includes("improving")) return <IconSunCloud />;
-  return <IconSun />;
+  if (t.includes("stormy")) return { icon: <IconStorm />, color: "#a855f7" };
+  if (t.includes("rain") || t.includes("very unsettled")) return { icon: <IconRain />, color: "#3b82f6" };
+  if (t.includes("shower")) return { icon: <IconCloudDrizzle />, color: "#60a5fa" };
+  if (t.includes("changeable") || t.includes("unsettled") || t.includes("less settled")) return { icon: <IconCloud />, color: "#94a3b8" };
+  if (t.includes("fairly fine") || t.includes("becoming fine") || t.includes("improving")) return { icon: <IconSunCloud />, color: "#fbbf24" };
+  return { icon: <IconSun />, color: "#f59e0b" };
 }
 
 function trendArrow(trend: string | null): { symbol: string; color: string } {
@@ -155,34 +155,40 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
         >
           Davis Weather Station
         </h1>
+        {local && (() => {
+          const { icon, color } = mapForecastIcon(local.text);
+          return (
+            <div
+              className="header-forecast"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '13px',
+                color: 'var(--color-text-secondary)',
+                whiteSpace: 'nowrap',
+                background: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border-light)',
+                borderRadius: '20px',
+                padding: '4px 12px 4px 8px',
+              }}
+            >
+              <span style={{ display: 'flex', color }}>
+                {icon}
+              </span>
+              <span>{local.text}</span>
+              <span style={{ color: trendArrow(local.trend).color, fontSize: '10px' }}>
+                {trendArrow(local.trend).symbol}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                {local.confidence}%
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {local && (
-          <div
-            className="header-forecast"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: 'var(--color-text-secondary)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span style={{ display: 'flex', color: 'var(--color-text)' }}>
-              {mapForecastIcon(local.text)}
-            </span>
-            <span>{local.text}</span>
-            <span style={{ color: trendArrow(local.trend).color, fontSize: '10px' }}>
-              {trendArrow(local.trend).symbol}
-            </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-              {local.confidence}%
-            </span>
-          </div>
-        )}
-
         <div
           className="header-hilo"
           style={{
