@@ -60,6 +60,7 @@ async def get_forecast(db: Session = Depends(get_db)):
             "source": "zambretti",
             "text": result.forecast_text,
             "confidence": round(result.confidence * 100),
+            "trend": result.trend,
             "updated": now.isoformat(),
         }
 

@@ -83,6 +83,7 @@ export interface LocalForecast {
   source: "zambretti";
   text: string;
   confidence: number;
+  trend: string | null;
   updated: string;
 }
 
