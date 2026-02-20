@@ -9,7 +9,7 @@ User=davis
 Group=davis
 WorkingDirectory=/opt/davis-wx/backend
 EnvironmentFile=/etc/davis-wx/davis-wx.conf
-ExecStart=/opt/davis-wx/backend/.venv/bin/uvicorn app.main:app --host ${DAVIS_HOST} --port ${DAVIS_PORT}
+ExecStart=/opt/davis-wx/backend/.venv/bin/python -m uvicorn app.main:app --host ${DAVIS_HOST} --port ${DAVIS_PORT}
 Restart=on-failure
 RestartSec=5
 
