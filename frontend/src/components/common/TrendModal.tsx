@@ -33,7 +33,7 @@ export default function TrendModal({
         setChartData(
           res.points
             .map((p) => ({ x: new Date(p.timestamp).getTime(), y: p.value }))
-            .filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y)),
+            .filter((pt): pt is { x: number; y: number } => Number.isFinite(pt.x) && Number.isFinite(pt.y)),
         );
       })
       .catch(() => setChartData([]))

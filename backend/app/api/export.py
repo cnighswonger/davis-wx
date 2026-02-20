@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..models.database import get_db
 from ..models.sensor_reading import SensorReadingModel
-from .history import SENSOR_COLUMNS, SENSOR_DIVISORS, SENSOR_UNITS, SENSOR_ALIASES, _aggregate
+from .history import SENSOR_COLUMNS, SENSOR_DIVISORS, SENSOR_UNITS, SENSOR_ALIASES, SENSOR_BOUNDS, _aggregate
 
 router = APIRouter()
 
@@ -74,8 +74,12 @@ def export_csv(
                     if raw is None:
                         values.append("")
                     else:
-                        divisor = SENSOR_DIVISORS.get(s, 1)
-                        values.append(str(round(raw / divisor, 2)))
+                        bounds = SENSOR_BOUNDS.get(s)
+                        if bounds and not (bounds[0] <= raw <= bounds[1]):
+                            values.append("")
+                        else:
+                            divisor = SENSOR_DIVISORS.get(s, 1)
+                            values.append(str(round(raw / divisor, 2)))
                 writer.writerow(values)
                 yield output.getvalue()
                 output.seek(0)

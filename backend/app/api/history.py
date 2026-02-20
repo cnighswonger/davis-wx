@@ -3,7 +3,7 @@
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Query, Depends
-from sqlalchemy import func, Integer
+from sqlalchemy import case, func, Integer
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
@@ -72,6 +72,29 @@ SENSOR_ALIASES = {
     "rain_rate": "rain_total",
 }
 
+# Physically reasonable bounds for raw DB values.
+# Values outside these ranges indicate a disconnected or faulty sensor
+# (e.g. Davis 32767/255/65535 sentinel values).
+SENSOR_BOUNDS: dict[str, tuple[int, int]] = {
+    "inside_temp": (-400, 1500),       # -40 to 150 °F  (raw × 10)
+    "outside_temp": (-400, 1500),
+    "heat_index": (-400, 1850),        # -40 to 185 °F  (raw × 10)
+    "dew_point": (-400, 1500),         # -40 to 150 °F  (raw × 10)
+    "wind_chill": (-1000, 1500),       # -100 to 150 °F (raw × 10)
+    "feels_like": (-1000, 1850),       # -100 to 185 °F (raw × 10)
+    "theta_e": (2000, 4500),           # 200 to 450 K   (raw × 10)
+    "inside_humidity": (1, 100),       # 1 to 100 %
+    "outside_humidity": (1, 100),
+    "wind_speed": (0, 200),            # 0 to 200 mph
+    "wind_direction": (0, 360),        # 0 to 360 °
+    "barometer": (25000, 35000),       # 25 to 35 inHg  (raw × 1000)
+    "rain_total": (0, 99900),          # 0 to 999 in    (raw clicks)
+    "rain_rate": (0, 10000),           # 0 to 100 in/hr (raw clicks/hr)
+    "rain_yearly": (0, 99900),
+    "solar_radiation": (0, 1800),      # 0 to 1800 W/m²
+    "uv_index": (0, 160),             # 0 to 16        (raw × 10)
+}
+
 
 @router.get("/history")
 def get_history(
@@ -102,10 +125,16 @@ def get_history(
 
     column = SENSOR_COLUMNS[sensor]
     divisor = SENSOR_DIVISORS.get(sensor, 1)
+    bounds = SENSOR_BOUNDS.get(sensor)
 
     if resolution == "raw":
+        # Use CASE to null-out readings outside physical bounds (chart gaps)
+        value_expr = (
+            case((column.between(bounds[0], bounds[1]), column), else_=None)
+            if bounds else column
+        )
         results = (
-            db.query(SensorReadingModel.timestamp, column)
+            db.query(SensorReadingModel.timestamp, value_expr)
             .filter(SensorReadingModel.timestamp >= start_dt)
             .filter(SensorReadingModel.timestamp <= end_dt)
             .filter(column.isnot(None))
@@ -113,12 +142,15 @@ def get_history(
             .all()
         )
         data = [
-            {"timestamp": r[0].isoformat() + "Z", "value": round(r[1] / divisor, 2)}
+            {
+                "timestamp": r[0].isoformat() + "Z",
+                "value": round(r[1] / divisor, 2) if r[1] is not None else None,
+            }
             for r in results
         ]
     else:
-        # For hourly/daily, return averages
-        data = _aggregate(db, column, start_dt, end_dt, resolution, divisor)
+        # For hourly/daily, return averages (bad values excluded)
+        data = _aggregate(db, column, start_dt, end_dt, resolution, divisor, bounds)
 
     return {
         "sensor": sensor,
@@ -130,7 +162,7 @@ def get_history(
     }
 
 
-def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1):
+def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1, bounds=None):
     """Aggregate readings by 5-minute, hourly, or daily buckets."""
     if resolution == "5m":
         # Group by epoch seconds rounded to 300s (5 min) boundaries
@@ -148,15 +180,17 @@ def _aggregate(db, column, start_dt, end_dt, resolution, divisor=1):
         group_key = func.strftime("%Y-%m-%dT00:00:00", SensorReadingModel.timestamp)
         time_label = group_key
 
-    results = (
+    query = (
         db.query(time_label, func.avg(column))
         .filter(SensorReadingModel.timestamp >= start_dt)
         .filter(SensorReadingModel.timestamp <= end_dt)
         .filter(column.isnot(None))
-        .group_by(group_key)
-        .order_by(group_key)
-        .all()
     )
+    # Exclude out-of-range values from the average
+    if bounds:
+        query = query.filter(column.between(bounds[0], bounds[1]))
+
+    results = query.group_by(group_key).order_by(group_key).all()
 
     return [
         {"timestamp": r[0] + "Z", "value": round(r[1] / divisor, 2) if r[1] is not None else None}

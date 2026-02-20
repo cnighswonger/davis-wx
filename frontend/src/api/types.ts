@@ -168,7 +168,7 @@ export interface ConfigItem {
 
 export interface HistoryPoint {
   timestamp: string;
-  value: number;
+  value: number | null;
 }
 
 export interface HistoryResponse {

@@ -168,9 +168,14 @@ export default function History() {
     const unitKey = SENSOR_UNITS[sensor] ?? "";
     const unitLabel = UNIT_LABELS[unitKey] ?? (unitKey ? ` ${unitKey}` : "");
 
-    const seriesData = data
-      .map((p) => [new Date(p.timestamp).getTime(), p.value] as const)
-      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+    const seriesData: [number, number | null][] = data
+      .map((p) => {
+        const x = new Date(p.timestamp).getTime();
+        if (!Number.isFinite(x)) return null;
+        const y = (p.value != null && Number.isFinite(p.value)) ? p.value : null;
+        return [x, y] as [number, number | null];
+      })
+      .filter((pt): pt is [number, number | null] => pt !== null);
 
     return {
       time: getHighchartsTimeConfig(),
