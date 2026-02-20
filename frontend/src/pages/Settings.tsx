@@ -7,6 +7,7 @@ import { themes } from "../themes/index.ts";
 import { ALL_SCENES, SCENE_LABELS, SCENE_GRADIENTS } from "../components/WeatherBackground.tsx";
 import { API_BASE } from "../utils/constants.ts";
 import { getTimezone, setTimezone as storeTimezone, resolveTimezone, getTimezoneOptions } from "../utils/timezone.ts";
+import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 // --- Shared styles ---
 
@@ -109,11 +110,13 @@ const btnPrimary: React.CSSProperties = {
   transition: "background 0.15s",
 };
 
-const gridTwoCol: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: "16px",
-};
+function gridTwoCol(mobile?: boolean): React.CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: mobile ? "1fr" : "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: mobile ? "12px" : "16px",
+  };
+}
 
 // --- Config key helpers ---
 
@@ -144,6 +147,7 @@ function setConfigValue(
 // --- Component ---
 
 export default function Settings() {
+  const isMobile = useIsMobile();
   const [configItems, setConfigItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -444,9 +448,9 @@ export default function Settings() {
       </h2>
 
       {/* Station section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Station</h3>
-        <div style={gridTwoCol}>
+        <div style={gridTwoCol(isMobile)}>
           <div style={fieldGroup}>
             <label style={labelStyle}>
               Serial Port
@@ -515,11 +519,11 @@ export default function Settings() {
       </div>
 
       {/* WeatherLink section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>WeatherLink</h3>
 
         {/* Timing row */}
-        <div style={gridTwoCol}>
+        <div style={gridTwoCol(isMobile)}>
           <div style={fieldGroup}>
             <label style={labelStyle} title="How often the WeatherLink saves a summary record to its internal memory. Shorter intervals give finer history but fill the buffer faster.">
               Archive Period (minutes)
@@ -553,7 +557,7 @@ export default function Settings() {
         </div>
 
         {/* Calibration row */}
-        <div style={gridTwoCol}>
+        <div style={gridTwoCol(isMobile)}>
           <div style={fieldGroup}>
             <label style={labelStyle} title="Added to raw inside temperature reading (tenths of °F). Use to correct a known sensor bias.">
               Inside Temp Offset (tenths °F)
@@ -612,12 +616,19 @@ export default function Settings() {
         </div>
 
         {/* Actions row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "8px" }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "auto auto auto auto",
+          gap: isMobile ? "8px" : "12px",
+          marginTop: "8px",
+          alignItems: "center",
+        }}>
           <button
             style={{
               ...btnPrimary,
               opacity: wlSaving ? 0.6 : 1,
               cursor: wlSaving ? "wait" : "pointer",
+              ...(isMobile ? { gridColumn: "1 / -1", fontSize: "13px", padding: "8px 12px" } : {}),
             }}
             onClick={handleWlSave}
             disabled={wlSaving}
@@ -632,6 +643,7 @@ export default function Settings() {
               background: "var(--color-bg-secondary)",
               color: "var(--color-text)",
               border: "1px solid var(--color-border)",
+              ...(isMobile ? { fontSize: "13px", padding: "8px 12px" } : {}),
             }}
             onClick={handleForceArchive}
             title="Immediately write current conditions to the archive buffer, regardless of the archive timer"
@@ -645,6 +657,7 @@ export default function Settings() {
               background: "var(--color-bg-secondary)",
               color: "var(--color-text)",
               border: "1px solid var(--color-border)",
+              ...(isMobile ? { fontSize: "13px", padding: "8px 12px" } : {}),
             }}
             onClick={handleClearRainDaily}
             title="Reset the daily rain accumulator to zero"
@@ -658,6 +671,7 @@ export default function Settings() {
               background: "var(--color-bg-secondary)",
               color: "var(--color-text)",
               border: "1px solid var(--color-border)",
+              ...(isMobile ? { fontSize: "13px", padding: "8px 12px" } : {}),
             }}
             onClick={handleClearRainYearly}
             title="Reset the yearly rain accumulator to zero"
@@ -666,12 +680,12 @@ export default function Settings() {
           </button>
 
           {wlMsg && (
-            <span style={{ color: "var(--color-success)", fontSize: "14px", fontFamily: "var(--font-body)" }}>
+            <span style={{ color: "var(--color-success)", fontSize: "14px", fontFamily: "var(--font-body)", gridColumn: "1 / -1" }}>
               {wlMsg}
             </span>
           )}
           {wlError && (
-            <span style={{ color: "var(--color-danger)", fontSize: "14px", fontFamily: "var(--font-body)" }}>
+            <span style={{ color: "var(--color-danger)", fontSize: "14px", fontFamily: "var(--font-body)", gridColumn: "1 / -1" }}>
               Error: {wlError}
             </span>
           )}
@@ -679,9 +693,9 @@ export default function Settings() {
       </div>
 
       {/* Location section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Location</h3>
-        <div style={gridTwoCol}>
+        <div style={gridTwoCol(isMobile)}>
           <div style={fieldGroup}>
             <label style={labelStyle}>Latitude</label>
             <input
@@ -722,7 +736,7 @@ export default function Settings() {
       </div>
 
       {/* Units section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Units</h3>
 
         <div style={fieldGroup}>
@@ -795,7 +809,7 @@ export default function Settings() {
       </div>
 
       {/* Display section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Display</h3>
         <div style={fieldGroup}>
           <label style={labelStyle}>Theme</label>
@@ -883,8 +897,8 @@ export default function Settings() {
                 {scenesExpanded && (
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: "12px",
+                    gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fill, minmax(200px, 1fr))",
+                    gap: isMobile ? "8px" : "12px",
                     marginTop: "8px",
                   }}>
                     {ALL_SCENES.map((scene) => {
@@ -967,7 +981,7 @@ export default function Settings() {
       </div>
 
       {/* Services section */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Services</h3>
         <div style={fieldGroup}>
           <label style={checkboxLabel}>
@@ -1002,7 +1016,7 @@ export default function Settings() {
       </div>
 
       {/* ==================== Alerts ==================== */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Alerts</h3>
 
         {alertThresholds.length > 0 && (
@@ -1013,9 +1027,10 @@ export default function Settings() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "12px",
+                  gap: isMobile ? "8px" : "12px",
                   padding: "8px 0",
                   borderBottom: idx < alertThresholds.length - 1 ? "1px solid var(--color-border)" : "none",
+                  flexWrap: isMobile ? "wrap" : "nowrap",
                 }}
               >
                 <input
@@ -1028,10 +1043,10 @@ export default function Settings() {
                     setAlertSuccess(false);
                   }}
                 />
-                <span style={{ flex: 1, fontSize: "14px", fontFamily: "var(--font-body)", color: t.enabled ? "var(--color-text)" : "var(--color-text-muted)" }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: isMobile ? "13px" : "14px", fontFamily: "var(--font-body)", color: t.enabled ? "var(--color-text)" : "var(--color-text-muted)" }}>
                   <strong>{t.label}</strong> — {t.sensor} {t.operator} {t.value}
                 </span>
-                <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                <span style={{ fontSize: "12px", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
                   {t.cooldown_min}m cooldown
                 </span>
                 <button
@@ -1046,6 +1061,7 @@ export default function Settings() {
                     cursor: "pointer",
                     fontSize: "16px",
                     padding: "4px 8px",
+                    flexShrink: 0,
                   }}
                   title="Delete"
                 >
@@ -1063,21 +1079,26 @@ export default function Settings() {
         )}
 
         {showAddAlert && (
-          <div style={{ ...cardStyle, background: "var(--color-bg-secondary)", marginBottom: "12px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-end" }}>
-              <div>
+          <div style={{ ...cardStyle, background: "var(--color-bg-secondary)", marginBottom: "12px", padding: isMobile ? "12px" : "20px" }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr 1fr" : "180px 160px 70px 90px 80px",
+              gap: isMobile ? "10px" : "12px",
+              alignItems: "end",
+            }}>
+              <div style={isMobile ? { gridColumn: "1 / -1" } : undefined}>
                 <label style={labelStyle}>Label</label>
                 <input
-                  style={{ ...inputStyle, width: "180px" }}
+                  style={inputStyle}
                   placeholder="e.g. Freeze Warning"
                   value={newAlert.label ?? ""}
                   onChange={(e) => setNewAlert({ ...newAlert, label: e.target.value })}
                 />
               </div>
-              <div>
+              <div style={isMobile ? { gridColumn: "1 / -1" } : undefined}>
                 <label style={labelStyle}>Sensor</label>
                 <select
-                  style={{ ...inputStyle, width: "160px" }}
+                  style={selectStyle}
                   value={newAlert.sensor ?? "outside_temp"}
                   onChange={(e) => setNewAlert({ ...newAlert, sensor: e.target.value })}
                 >
@@ -1092,7 +1113,7 @@ export default function Settings() {
               <div>
                 <label style={labelStyle}>Condition</label>
                 <select
-                  style={{ ...inputStyle, width: "70px" }}
+                  style={selectStyle}
                   value={newAlert.operator ?? "<="}
                   onChange={(e) => setNewAlert({ ...newAlert, operator: e.target.value as AlertThreshold["operator"] })}
                 >
@@ -1106,16 +1127,16 @@ export default function Settings() {
                 <label style={labelStyle}>Value</label>
                 <input
                   type="number"
-                  style={{ ...inputStyle, width: "90px" }}
+                  style={inputStyle}
                   value={newAlert.value ?? 0}
                   onChange={(e) => setNewAlert({ ...newAlert, value: parseFloat(e.target.value) || 0 })}
                 />
               </div>
-              <div>
+              <div style={isMobile ? { gridColumn: "1 / -1" } : undefined}>
                 <label style={labelStyle}>Cooldown (min)</label>
                 <input
                   type="number"
-                  style={{ ...inputStyle, width: "80px" }}
+                  style={inputStyle}
                   value={newAlert.cooldown_min ?? 15}
                   onChange={(e) => setNewAlert({ ...newAlert, cooldown_min: parseInt(e.target.value) || 15 })}
                 />
@@ -1191,12 +1212,19 @@ export default function Settings() {
       </div>
 
       {/* Save buttons and status */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: isMobile ? "8px" : "12px",
+        flexWrap: "wrap",
+        ...(isMobile ? { flexDirection: "column", alignItems: "stretch" } : {}),
+      }}>
         <button
           style={{
             ...btnPrimary,
             opacity: saving ? 0.6 : 1,
             cursor: saving ? "wait" : "pointer",
+            ...(isMobile ? { fontSize: "13px", padding: "10px 16px" } : {}),
           }}
           onClick={handleSave}
           disabled={saving || reconnecting}
@@ -1212,6 +1240,7 @@ export default function Settings() {
             border: "1px solid var(--color-border)",
             opacity: reconnecting ? 0.6 : 1,
             cursor: reconnecting ? "wait" : "pointer",
+            ...(isMobile ? { fontSize: "13px", padding: "10px 16px" } : {}),
           }}
           onClick={handleSaveAndReconnect}
           disabled={saving || reconnecting}
