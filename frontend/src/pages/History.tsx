@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import Highcharts from "highcharts";
+import "highcharts/modules/debugger";
 import HighchartsReact from "highcharts-react-official";
 import { useHistoricalData } from "../hooks/useHistoricalData.ts";
 import {
