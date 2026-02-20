@@ -20,6 +20,43 @@ const DEFAULT_RANGES = {
   C: { min: -30, max: 50 },
 };
 
+/** Compute a tight gauge range from the current value and daily hi/lo. */
+function autoRange(
+  value: number | null,
+  high: number | null | undefined,
+  low: number | null | undefined,
+  unit: string,
+): { min: number; max: number } {
+  const defaults = DEFAULT_RANGES[unit as 'F' | 'C'] || DEFAULT_RANGES.F;
+  const pts = [value, high ?? null, low ?? null].filter(
+    (v): v is number => v != null && Number.isFinite(v),
+  );
+  if (pts.length === 0) return defaults;
+
+  const dataMin = Math.min(...pts);
+  const dataMax = Math.max(...pts);
+  const PAD = unit === 'C' ? 8 : 15;
+  const MIN_SPAN = unit === 'C' ? 20 : 30;
+  const TICK = unit === 'C' ? 5 : 10;
+
+  let lo = Math.floor((dataMin - PAD) / TICK) * TICK;
+  let hi = Math.ceil((dataMax + PAD) / TICK) * TICK;
+
+  // Ensure minimum span
+  const span = hi - lo;
+  if (span < MIN_SPAN) {
+    const center = (lo + hi) / 2;
+    lo = Math.floor((center - MIN_SPAN / 2) / TICK) * TICK;
+    hi = Math.ceil((center + MIN_SPAN / 2) / TICK) * TICK;
+  }
+
+  // Clamp to physical limits
+  lo = Math.max(defaults.min, lo);
+  hi = Math.min(defaults.max, hi);
+
+  return { min: lo, max: hi };
+}
+
 function tempColor(value: number, unit: string): string {
   // Map temperature to a color gradient: blue → green → red
   const range = DEFAULT_RANGES[unit as 'F' | 'C'] || DEFAULT_RANGES.F;
@@ -49,9 +86,9 @@ export default function TemperatureGauge({
   min: customMin,
   max: customMax,
 }: TemperatureGaugeProps) {
-  const range = DEFAULT_RANGES[unit as 'F' | 'C'] || DEFAULT_RANGES.F;
-  const min = customMin ?? range.min;
-  const max = customMax ?? range.max;
+  const auto = autoRange(value, high, low, unit);
+  const min = customMin ?? auto.min;
+  const max = customMax ?? auto.max;
 
   // SVG dimensions
   const width = 100;
