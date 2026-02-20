@@ -7,7 +7,7 @@ import {
   SENSOR_DISPLAY_NAMES,
   UNIT_LABELS,
 } from "../utils/constants.ts";
-import { getHighchartsTimeConfig, resolveTimezone } from "../utils/timezone.ts";
+import { resolveTimezone } from "../utils/timezone.ts";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 // --- Sensor unit mapping (sensor key -> unit string) ---
@@ -158,74 +158,28 @@ export default function History() {
   // Build Highcharts options
   const tz = resolveTimezone();
   const chartOptions: Highcharts.Options = useMemo(() => {
-    const root = document.documentElement;
-    const cs = getComputedStyle(root);
-    const textColor = cs.getPropertyValue("--color-text").trim();
-    const textMuted = cs.getPropertyValue("--color-text-muted").trim();
-    const accent = cs.getPropertyValue("--color-accent").trim();
-    const bgCard = cs.getPropertyValue("--color-bg-card-solid").trim() || cs.getPropertyValue("--color-bg-card").trim();
-    const borderColor = cs.getPropertyValue("--color-border").trim();
-
-    const unitKey = SENSOR_UNITS[sensor] ?? "";
-    const unitLabel = UNIT_LABELS[unitKey] ?? (unitKey ? ` ${unitKey}` : "");
+    void UNIT_LABELS; void SENSOR_UNITS; // used later when full options restored
 
     const seriesData = data
       .map((p) => [new Date(p.timestamp).getTime(), p.value] as const)
       .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
 
+    // DEBUG: log data reaching Highcharts
+    console.log("[History] seriesData.length =", seriesData.length, "first =", seriesData[0], "last =", seriesData[seriesData.length - 1]);
+
     return {
-      time: getHighchartsTimeConfig(),
       chart: {
         type: "areaspline",
         height: isMobile ? 280 : 400,
-        backgroundColor: bgCard,
-        style: { fontFamily: "var(--font-body)" },
-        zooming: { type: "x" },
-        spacing: isMobile ? [8, 4, 8, 4] : undefined,
       },
-      title: { text: undefined },
       accessibility: { enabled: false },
       credits: { enabled: false },
-      xAxis: {
-        type: "datetime",
-        lineColor: borderColor,
-        tickColor: borderColor,
-        labels: { style: { color: textMuted, fontSize: isMobile ? "9px" : "11px" } },
-        crosshair: true,
-      },
-      yAxis: {
-        title: isMobile
-          ? { text: undefined }
-          : {
-              text: `${SENSOR_DISPLAY_NAMES[sensor] ?? sensor} (${unitLabel.trim()})`,
-              style: { color: textMuted, fontSize: "12px" },
-            },
-        gridLineColor: borderColor,
-        labels: { style: { color: textMuted, fontSize: isMobile ? "9px" : "11px" } },
-      },
-      legend: { enabled: false },
-      tooltip: {
-        shared: true,
-        valueSuffix: unitLabel,
-        backgroundColor: bgCard,
-        borderColor: borderColor,
-        style: { color: textColor, fontSize: "12px" },
-        xDateFormat: "%b %e, %Y %l:%M %p",
-      },
-      plotOptions: {
-        areaspline: {
-          fillOpacity: 0.15,
-          lineWidth: 2,
-          marker: { enabled: false, radius: 3 },
-          states: { hover: { lineWidth: 3 } },
-        },
-      },
+      xAxis: { type: "datetime" },
       series: [
         {
           type: "areaspline" as const,
           name: SENSOR_DISPLAY_NAMES[sensor] ?? sensor,
           data: seriesData,
-          color: accent,
         },
       ],
     };
