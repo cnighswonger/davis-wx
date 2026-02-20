@@ -1,9 +1,12 @@
 /**
  * Compact panel showing station connection and health information.
+ * On mobile: compact card that opens a modal with full details.
  */
 import { useState } from "react";
 import { useWeatherData } from "../../context/WeatherDataContext.tsx";
 import { syncStationTime } from "../../api/client.ts";
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -28,15 +31,24 @@ function formatTime(iso: string | null): string {
   }
 }
 
+function highlightColor(hl: "success" | "danger" | "warning" | null | undefined): string {
+  if (hl === "success") return "var(--color-success)";
+  if (hl === "danger") return "var(--color-danger)";
+  if (hl === "warning") return "var(--color-warning)";
+  return "var(--color-text)";
+}
+
+interface StatusRow {
+  label: string;
+  value: string;
+  highlight?: "success" | "danger" | "warning" | null;
+}
+
 export default function StationStatus() {
   const { stationStatus, connected, wsConnected } = useWeatherData();
   const [syncing, setSyncing] = useState(false);
-
-  interface StatusRow {
-    label: string;
-    value: string;
-    highlight?: "success" | "danger" | "warning" | null;
-  }
+  const [showModal, setShowModal] = useState(false);
+  const isMobile = useIsMobile();
 
   const rows: StatusRow[] = [
     {
@@ -92,40 +104,21 @@ export default function StationStatus() {
     },
   ];
 
-  function highlightColor(hl: "success" | "danger" | "warning" | null | undefined): string {
-    if (hl === "success") return "var(--color-success)";
-    if (hl === "danger") return "var(--color-danger)";
-    if (hl === "warning") return "var(--color-warning)";
-    return "var(--color-text)";
-  }
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await syncStationTime();
+    } catch {
+      /* ignore */
+    } finally {
+      setSyncing(false);
+    }
+  };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        padding: "16px",
-        background: "var(--color-bg-card)",
-        borderRadius: "var(--gauge-border-radius, 16px)",
-        boxShadow: "var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))",
-        border: "1px solid var(--color-border)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "12px",
-          fontFamily: "var(--font-body)",
-          color: "var(--color-text-secondary)",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          marginBottom: "12px",
-          textAlign: "center",
-        }}
-      >
-        Station Status
-      </div>
-
-      {/* Station Time row - full width with sync button */}
+  // --- Shared status detail content (used in both desktop card and mobile modal) ---
+  const statusContent = (
+    <>
+      {/* Station Time row */}
       <div
         style={{
           display: "flex",
@@ -160,16 +153,7 @@ export default function StationStatus() {
           </span>
         </div>
         <button
-          onClick={async () => {
-            setSyncing(true);
-            try {
-              await syncStationTime();
-            } catch {
-              /* ignore */
-            } finally {
-              setSyncing(false);
-            }
-          }}
+          onClick={handleSync}
           disabled={syncing || !stationStatus?.connected}
           style={{
             fontSize: "10px",
@@ -187,6 +171,7 @@ export default function StationStatus() {
         </button>
       </div>
 
+      {/* Status rows grid */}
       <div
         style={{
           display: "grid",
@@ -226,6 +211,126 @@ export default function StationStatus() {
           </div>
         ))}
       </div>
+    </>
+  );
+
+  // --- Mobile: compact card + modal ---
+  if (isMobile) {
+    const isConnected = stationStatus?.connected ?? false;
+    return (
+      <>
+        <CompactCard
+          label="Station Status"
+          onClick={() => setShowModal(true)}
+          secondary={
+            stationStatus
+              ? formatUptime(stationStatus.uptime_seconds)
+              : undefined
+          }
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: isConnected
+                  ? "var(--color-success)"
+                  : "var(--color-danger)",
+                display: "inline-block",
+                boxShadow: isConnected
+                  ? "0 0 6px var(--color-success)"
+                  : "0 0 6px var(--color-danger)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "16px",
+                fontFamily: "var(--font-gauge)",
+                fontWeight: "bold",
+                color: highlightColor(isConnected ? "success" : "danger"),
+              }}
+            >
+              {isConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+        </CompactCard>
+
+        {showModal && (
+          <div
+            onClick={() => setShowModal(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 200,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "var(--color-bg-card)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--gauge-border-radius, 16px)",
+                padding: "20px",
+                width: "90vw",
+                maxWidth: 400,
+                maxHeight: "80vh",
+                overflowY: "auto",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text-secondary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "12px",
+                  textAlign: "center",
+                }}
+              >
+                Station Status
+              </div>
+              {statusContent}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // --- Desktop: full inline card ---
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        padding: "16px",
+        background: "var(--color-bg-card)",
+        borderRadius: "var(--gauge-border-radius, 16px)",
+        boxShadow: "var(--gauge-shadow, 0 4px 24px rgba(0,0,0,0.4))",
+        border: "1px solid var(--color-border)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "12px",
+          fontFamily: "var(--font-body)",
+          color: "var(--color-text-secondary)",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          marginBottom: "12px",
+          textAlign: "center",
+        }}
+      >
+        Station Status
+      </div>
+      {statusContent}
     </div>
   );
 }

@@ -2,6 +2,8 @@
  * SVG compass rose with direction arrow and speed display.
  * 16-point compass with animated direction arrow and speed in center.
  */
+import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import CompactCard from "../common/CompactCard.tsx";
 
 interface WindCompassProps {
   direction: number | null;  // 0-359 degrees
@@ -16,6 +18,28 @@ const CARDINALS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
 export default function WindCompass({ direction, speed, gust, peak, unit, cardinal }: WindCompassProps) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <CompactCard
+        label="Wind"
+        secondary={
+          <>
+            <span>{cardinal ?? "--"}{direction != null ? ` ${direction}°` : ""}</span>
+            {gust != null && <span style={{ color: "var(--color-warning)" }}> G {gust.toFixed(0)}</span>}
+          </>
+        }
+      >
+        <span style={{ fontSize: "28px", fontFamily: "var(--font-gauge)", fontWeight: "bold", color: "var(--color-wind-arrow, #3b82f6)" }}>
+          {speed !== null ? speed.toFixed(0) : "--"}
+        </span>
+        <span style={{ fontSize: "12px", fontFamily: "var(--font-gauge)", color: "var(--color-text-muted)", marginLeft: "2px" }}>
+          {unit}
+        </span>
+      </CompactCard>
+    );
+  }
+
   const cx = 130;
   const cy = 130;
   const outerR = 110;

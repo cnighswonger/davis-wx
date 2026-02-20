@@ -27,6 +27,7 @@ import SortableTile from "./SortableTile.tsx";
 import TileCatalogModal from "./TileCatalogModal.tsx";
 import FlipTile from "../components/common/FlipTile.tsx";
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
+import { useIsMobile } from "../hooks/useIsMobile.ts";
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -97,6 +98,7 @@ export default function DashboardGrid() {
     resetToDefault,
   } = useDashboardLayout();
   const { currentConditions } = useWeatherData();
+  const isMobile = useIsMobile();
   const [showCatalog, setShowCatalog] = useState(false);
 
   const hasSolar =
@@ -160,10 +162,10 @@ export default function DashboardGrid() {
           {layout.tiles.map((placement) => {
             const def = TILE_REGISTRY[placement.tileId];
             if (!def) return null;
-            const colSpan = placement.colSpan ?? def.minColSpan;
+            const colSpan = isMobile ? 1 : (placement.colSpan ?? def.minColSpan);
 
             const content = <TileRenderer tileId={placement.tileId} />;
-            const wrapped = def.hasFlipTile ? (
+            const wrapped = (!isMobile && def.hasFlipTile) ? (
               <FlipTile
                 sensor={def.sensor!}
                 label={def.chartLabel!}
@@ -247,10 +249,10 @@ export default function DashboardGrid() {
             {layout.tiles.map((placement) => {
               const def = TILE_REGISTRY[placement.tileId];
               if (!def) return null;
-              const colSpan = placement.colSpan ?? def.minColSpan;
+              const colSpan = isMobile ? 1 : (placement.colSpan ?? def.minColSpan);
 
               const content = <TileRenderer tileId={placement.tileId} />;
-              const wrapped = def.hasFlipTile ? (
+              const wrapped = (!isMobile && def.hasFlipTile) ? (
                 <FlipTile
                   sensor={def.sensor!}
                   label={def.chartLabel!}
