@@ -120,6 +120,31 @@ a:hover {
   .sidebar-overlay {
     display: block !important;
   }
+
+  /* Header: show icon-only forecast pill, hide text */
+  .header-forecast-text {
+    display: none !important;
+  }
+
+  /* Header: hide connected label, keep status dot */
+  .header-connected-label {
+    display: none !important;
+  }
+
+  /* Header: hide theme selector on mobile */
+  .header-theme-select {
+    display: none !important;
+  }
+
+  /* Reduce main content padding */
+  .app-main-content {
+    padding: 12px !important;
+  }
+
+  /* Dashboard edit toolbar: allow wrapping */
+  .dashboard-toolbar {
+    flex-wrap: wrap !important;
+  }
 }
 
 @media (min-width: 769px) {

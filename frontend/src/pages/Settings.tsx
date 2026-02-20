@@ -111,7 +111,7 @@ const btnPrimary: React.CSSProperties = {
 
 const gridTwoCol: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: "16px",
 };
 

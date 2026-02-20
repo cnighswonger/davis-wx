@@ -206,7 +206,7 @@ export default function DashboardGrid() {
       </h2>
 
       {/* Edit toolbar */}
-      <div style={toolbarStyle}>
+      <div className="dashboard-toolbar" style={toolbarStyle}>
         <span style={{ color: "var(--color-accent)", fontWeight: 600 }}>
           Editing Layout
         </span>

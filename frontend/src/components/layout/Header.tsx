@@ -176,7 +176,7 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
               <span style={{ display: 'flex', color }}>
                 {icon}
               </span>
-              <span>{local.text}</span>
+              <span className="header-forecast-text">{local.text}</span>
               <span style={{ color: trendArrow(local.trend).color, fontSize: '10px' }}>
                 {trendArrow(local.trend).symbol}
               </span>
@@ -228,10 +228,11 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
                 : '0 0 6px var(--color-danger)',
             }}
           />
-          <span>{connected ? 'Connected' : 'Disconnected'}</span>
+          <span className="header-connected-label">{connected ? 'Connected' : 'Disconnected'}</span>
         </div>
 
         <select
+          className="header-theme-select"
           value={themeName}
           onChange={(e) => setThemeName(e.target.value)}
           style={{

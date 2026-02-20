@@ -62,6 +62,7 @@ export default function AppShell({
           }}
         >
           <div
+            className="app-main-content"
             style={{
               flex: 1,
               overflowY: 'auto',
