@@ -1073,6 +1073,55 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* CWOP / APRS section */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>CWOP / APRS</h3>
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("cwop_enabled") === true}
+              onChange={(e) => updateField("cwop_enabled", e.target.checked)}
+            />
+            Enable CWOP uploads
+          </label>
+        </div>
+        <div style={gridTwoCol(isMobile)}>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Callsign</label>
+            <input
+              style={inputStyle}
+              type="text"
+              placeholder="e.g. CW1234 or N0CALL"
+              value={String(val("cwop_callsign") || "")}
+              onChange={(e) => updateField("cwop_callsign", e.target.value)}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Passcode</label>
+            <input
+              style={inputStyle}
+              type="text"
+              placeholder="-1 for CWOP, computed for HAM"
+              value={String(val("cwop_passcode") ?? "-1")}
+              onChange={(e) => updateField("cwop_passcode", e.target.value)}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Upload Interval</label>
+            <select
+              style={selectStyle}
+              value={String(val("cwop_upload_interval") || "300")}
+              onChange={(e) => updateField("cwop_upload_interval", parseInt(e.target.value))}
+            >
+              <option value="300">5 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="900">15 minutes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* ==================== Alerts ==================== */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Alerts</h3>

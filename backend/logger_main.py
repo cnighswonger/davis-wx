@@ -33,6 +33,7 @@ from app.services.archive_sync import async_sync_archive
 from app.ipc.server import IPCServer
 from app.ipc import protocol as ipc
 from app.services.wunderground import WundergroundUploader
+from app.services.cwop import CwopUploader
 
 logger = logging.getLogger("davis.logger")
 
@@ -52,6 +53,7 @@ class LoggerDaemon:
         self._archive_period: Optional[int] = None
         self._sample_period: Optional[int] = None
         self.wu_uploader = WundergroundUploader()
+        self.cwop_uploader = CwopUploader()
 
     # ---- public entry point ----
 
@@ -127,11 +129,13 @@ class LoggerDaemon:
 
         self.poller = Poller(self.driver, poll_interval=settings.poll_interval_sec)
         self.wu_uploader.reload_config()
+        self.cwop_uploader.reload_config()
 
         async def _broadcast_and_upload(msg: dict) -> None:
             await self.ipc_server.broadcast_to_subscribers(msg)
             if msg.get("type") == "sensor_update":
                 await self.wu_uploader.maybe_upload(msg["data"])
+                await self.cwop_uploader.maybe_upload(msg["data"])
 
         self.poller.set_broadcast_callback(_broadcast_and_upload)
 
