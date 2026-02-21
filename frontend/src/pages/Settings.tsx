@@ -1021,6 +1021,58 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Weather Underground section */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Weather Underground</h3>
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("wu_enabled") === true}
+              onChange={(e) => updateField("wu_enabled", e.target.checked)}
+            />
+            Enable Weather Underground uploads
+          </label>
+        </div>
+        <div style={gridTwoCol(isMobile)}>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Station ID</label>
+            <input
+              style={inputStyle}
+              type="text"
+              placeholder="e.g. KNCDUNN12"
+              value={String(val("wu_station_id") || "")}
+              onChange={(e) => updateField("wu_station_id", e.target.value)}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Station Key</label>
+            <input
+              style={inputStyle}
+              type="password"
+              placeholder="Your WU station key"
+              value={String(val("wu_station_key") || "")}
+              onChange={(e) => updateField("wu_station_key", e.target.value)}
+            />
+          </div>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Upload Interval</label>
+            <select
+              style={selectStyle}
+              value={String(val("wu_upload_interval") || "60")}
+              onChange={(e) => updateField("wu_upload_interval", parseInt(e.target.value))}
+            >
+              <option value="10">10 seconds</option>
+              <option value="15">15 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="60">60 seconds</option>
+              <option value="120">2 minutes</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* ==================== Alerts ==================== */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Alerts</h3>

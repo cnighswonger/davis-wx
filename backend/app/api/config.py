@@ -30,6 +30,10 @@ _DEFAULTS: dict[str, object] = {
     "nws_enabled": settings.nws_enabled,
     "setup_complete": False,
     "alert_thresholds": "[]",
+    "wu_enabled": False,
+    "wu_station_id": "",
+    "wu_station_key": "",
+    "wu_upload_interval": 60,
 }
 
 
