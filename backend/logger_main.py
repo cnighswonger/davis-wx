@@ -32,6 +32,7 @@ from app.services.poller import Poller
 from app.services.archive_sync import async_sync_archive
 from app.ipc.server import IPCServer
 from app.ipc import protocol as ipc
+from app.services.wunderground import WundergroundUploader
 
 logger = logging.getLogger("davis.logger")
 
@@ -50,6 +51,7 @@ class LoggerDaemon:
         # Cached hardware config (read at connect, updated on write)
         self._archive_period: Optional[int] = None
         self._sample_period: Optional[int] = None
+        self.wu_uploader = WundergroundUploader()
 
     # ---- public entry point ----
 
@@ -124,7 +126,14 @@ class LoggerDaemon:
         asyncio.create_task(self._bg_archive_sync())
 
         self.poller = Poller(self.driver, poll_interval=settings.poll_interval_sec)
-        self.poller.set_broadcast_callback(self.ipc_server.broadcast_to_subscribers)
+        self.wu_uploader.reload_config()
+
+        async def _broadcast_and_upload(msg: dict) -> None:
+            await self.ipc_server.broadcast_to_subscribers(msg)
+            if msg.get("type") == "sensor_update":
+                await self.wu_uploader.maybe_upload(msg["data"])
+
+        self.poller.set_broadcast_callback(_broadcast_and_upload)
 
         # Restore rain state from a previous run
         self._restore_rain_state()
