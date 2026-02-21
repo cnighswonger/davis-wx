@@ -34,6 +34,10 @@ _DEFAULTS: dict[str, object] = {
     "wu_station_id": "",
     "wu_station_key": "",
     "wu_upload_interval": 60,
+    "cwop_enabled": False,
+    "cwop_callsign": "",
+    "cwop_passcode": "-1",
+    "cwop_upload_interval": 300,
 }
 
 
