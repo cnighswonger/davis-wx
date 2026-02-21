@@ -19,10 +19,10 @@ Web dashboard and logger daemon for Davis weather stations (Vantage Pro, Weather
 
 ## Git Workflow
 
-- **Development branch**: `dev/wx-app` — all development work happens here
+- **Development branch**: `dev/wx-app` (local) — all development work happens here; tracks `origin/main`
 - **Debian packaging branch**: `deb` — for Debian package builds; cherry-pick from dev/wx-app
-- **Main branch**: `main` — stable releases
-- Always commit and push to `dev/wx-app` unless explicitly told otherwise
+- **Main branch**: `origin/main` — receives pushes from dev/wx-app; will become stable-only after post-beta release
+- Always commit to `dev/wx-app` and push to `origin/main` unless explicitly told otherwise
 
 ## Build
 
