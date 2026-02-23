@@ -106,9 +106,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                 borderRadius: '6px',
                 color: 'var(--color-text-secondary)',
                 cursor: 'pointer',
-                padding: '6px 0',
-                fontSize: '16px',
-                fontWeight: 600,
+                padding: '8px 0',
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
@@ -116,7 +114,44 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                 transition: 'background 0.15s ease, color 0.15s ease',
               }}
             >
-              {collapsed ? '\u25B6' : '\u25C0'}
+              {/* Animated hamburger-to-arrow */}
+              <div style={{
+                width: '18px',
+                height: '14px',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{
+                  display: 'block',
+                  height: '2px',
+                  background: 'currentColor',
+                  borderRadius: '1px',
+                  transformOrigin: 'right center',
+                  transition: 'transform 0.3s ease, width 0.3s ease',
+                  transform: collapsed ? 'none' : 'rotate(-30deg)',
+                  width: collapsed ? '100%' : '60%',
+                }} />
+                <span style={{
+                  display: 'block',
+                  height: '2px',
+                  background: 'currentColor',
+                  borderRadius: '1px',
+                  transition: 'transform 0.3s ease',
+                  width: '100%',
+                }} />
+                <span style={{
+                  display: 'block',
+                  height: '2px',
+                  background: 'currentColor',
+                  borderRadius: '1px',
+                  transformOrigin: 'right center',
+                  transition: 'transform 0.3s ease, width 0.3s ease',
+                  transform: collapsed ? 'none' : 'rotate(30deg)',
+                  width: collapsed ? '100%' : '60%',
+                }} />
+              </div>
             </button>
           </div>
         )}
