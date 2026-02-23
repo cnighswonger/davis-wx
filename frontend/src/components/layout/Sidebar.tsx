@@ -3,6 +3,8 @@ import { NavLink } from 'react-router-dom';
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface NavItem {
@@ -19,7 +21,7 @@ const navItems: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: '\u2699' },
 ];
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   return (
     <>
       {/* Overlay for mobile */}
@@ -45,7 +47,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           top: '56px',
           left: 0,
           bottom: 0,
-          width: '220px',
+          width: collapsed ? '56px' : '220px',
           background: 'var(--color-sidebar-bg)',
           borderRight: '1px solid var(--color-border)',
           display: 'flex',
@@ -53,22 +55,25 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           padding: '12px 0',
           zIndex: 50,
           overflowY: 'auto',
+          overflowX: 'hidden',
           fontFamily: 'var(--font-body)',
-          transition: 'transform 0.2s ease',
+          transition: 'transform 0.2s ease, width 0.2s ease',
         }}
       >
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0 8px' }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0 8px', flex: 1 }}>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/'}
               onClick={onClose}
+              title={collapsed ? item.label : undefined}
               style={({ isActive }) => ({
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
+                gap: collapsed ? '0' : '10px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                padding: collapsed ? '10px 0' : '10px 12px',
                 borderRadius: '8px',
                 textDecoration: 'none',
                 fontSize: '14px',
@@ -76,15 +81,41 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 background: isActive ? 'var(--color-accent-muted)' : 'transparent',
                 transition: 'background 0.15s ease, color 0.15s ease',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
               })}
             >
-              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>
+              <span style={{ fontSize: '16px', width: '20px', textAlign: 'center', flexShrink: 0 }}>
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              {!collapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
+
+        {/* Collapse toggle (desktop only) */}
+        {onToggleCollapse && (
+          <button
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              background: 'none',
+              border: 'none',
+              borderTop: '1px solid var(--color-border)',
+              color: 'var(--color-text-muted)',
+              cursor: 'pointer',
+              padding: '10px 0',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'color 0.15s ease',
+            }}
+          >
+            {collapsed ? '\u00BB' : '\u00AB'}
+          </button>
+        )}
       </aside>
     </>
   );

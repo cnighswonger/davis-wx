@@ -17,7 +17,21 @@ export default function AppShell({
   lastUpdate = null,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true'; }
+    catch { return false; }
+  });
   const { enabled } = useWeatherBackground();
+
+  const toggleCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('sidebar-collapsed', String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const sidebarWidth = sidebarCollapsed ? '56px' : '220px';
 
   return (
     <>
@@ -26,7 +40,7 @@ export default function AppShell({
         style={{
           display: 'grid',
           gridTemplateRows: '56px 1fr',
-          gridTemplateColumns: '220px 1fr',
+          gridTemplateColumns: `${sidebarWidth} 1fr`,
           gridTemplateAreas: `
             "header header"
             "sidebar main"
@@ -35,7 +49,7 @@ export default function AppShell({
           background: enabled ? 'transparent' : 'var(--color-bg)',
           position: 'relative',
           zIndex: 3,
-          transition: 'background-color 0.3s ease',
+          transition: 'background-color 0.3s ease, grid-template-columns 0.2s ease',
         }}
         className="app-shell"
       >
@@ -48,7 +62,12 @@ export default function AppShell({
         </div>
 
         <div style={{ gridArea: 'sidebar' }}>
-          <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <Sidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleCollapse}
+          />
         </div>
 
         <main

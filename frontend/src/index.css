@@ -161,6 +161,15 @@ a:hover {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
     gap: 10px !important;
   }
+
+  /* Mobile: always full-width sidebar, hide collapse button */
+  .sidebar {
+    width: 220px !important;
+  }
+
+  .sidebar-collapse-btn {
+    display: none !important;
+  }
 }
 
 @media (min-width: 769px) {
