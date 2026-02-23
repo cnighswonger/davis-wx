@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useWeatherData } from "../../context/WeatherDataContext.tsx";
 import { syncStationTime } from "../../api/client.ts";
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 function formatUptime(seconds: number): string {
@@ -48,7 +48,7 @@ export default function StationStatus() {
   const { stationStatus, connected, wsConnected } = useWeatherData();
   const [syncing, setSyncing] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
 
   const rows: StatusRow[] = [
     {

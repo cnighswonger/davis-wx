@@ -23,6 +23,8 @@ import {
 
 interface DashboardLayoutContextValue {
   layout: DashboardLayout;
+  columns: 2 | 3 | 4;
+  setColumns: (n: 2 | 3 | 4) => void;
   editMode: boolean;
   setEditMode: (v: boolean) => void;
   reorderTiles: (fromIndex: number, toIndex: number) => void;
@@ -38,6 +40,15 @@ const DashboardLayoutContext =
 // --- localStorage helpers ---
 
 const STORAGE_KEY = "davis-wx-dashboard-layout";
+const COLUMNS_KEY = "davis-wx-dashboard-columns";
+
+function loadColumns(): 2 | 3 | 4 {
+  try {
+    const v = parseInt(localStorage.getItem(COLUMNS_KEY) || "3", 10);
+    if (v === 2 || v === 3 || v === 4) return v;
+  } catch {}
+  return 3;
+}
 
 function loadLayout(): DashboardLayout {
   try {
@@ -77,7 +88,13 @@ export function DashboardLayoutProvider({
   children: ReactNode;
 }) {
   const [layout, setLayoutState] = useState<DashboardLayout>(loadLayout);
+  const [columns, setColumnsState] = useState<2 | 3 | 4>(loadColumns);
   const [editMode, setEditMode] = useState(false);
+
+  const setColumns = useCallback((n: 2 | 3 | 4) => {
+    setColumnsState(n);
+    try { localStorage.setItem(COLUMNS_KEY, String(n)); } catch {}
+  }, []);
 
   const updateLayout = useCallback((next: DashboardLayout) => {
     setLayoutState(next);
@@ -150,6 +167,8 @@ export function DashboardLayoutProvider({
     <DashboardLayoutContext.Provider
       value={{
         layout,
+        columns,
+        setColumns,
         editMode,
         setEditMode,
         reorderTiles,

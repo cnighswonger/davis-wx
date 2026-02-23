@@ -2,7 +2,7 @@
  * SVG semicircular arc gauge for humidity.
  * Yellow (dry) → Green (comfortable) → Blue (humid)
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface HumidityGaugeProps {
@@ -54,7 +54,7 @@ export default function HumidityGauge({ value, label, high, low }: HumidityGauge
   const fillAngle = startAngle + frac * sweep;
   const color = value !== null ? humidityColor(value) : 'var(--color-text-muted)';
 
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

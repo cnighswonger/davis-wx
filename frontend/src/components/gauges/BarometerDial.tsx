@@ -1,7 +1,7 @@
 /**
  * SVG circular analog barometer dial with needle and trend arrow overlay.
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface BarometerDialProps {
@@ -73,7 +73,7 @@ export default function BarometerDial({ value, unit, trend, high, low }: Baromet
   const trendSymbol = trend === 'rising' ? '\u2191' : trend === 'falling' ? '\u2193' : trend === 'steady' ? '\u2192' : '';
   const trendColor = trend === 'rising' ? 'var(--color-success)' : trend === 'falling' ? 'var(--color-warning)' : 'var(--color-text-muted)';
 
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

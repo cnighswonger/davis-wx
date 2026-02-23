@@ -2,7 +2,7 @@
  * Combined Solar Radiation and UV Index gauge.
  * Only shown when the station supports solar/UV sensors.
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface SolarUVGaugeProps {
@@ -62,7 +62,7 @@ export default function SolarUVGauge({ solarRadiation, uvIndex }: SolarUVGaugePr
   const uvCol = uvIndex !== null ? uvColor(uvIndex) : 'var(--color-text-muted)';
   const solar = solarRadiation !== null ? solarIntensity(solarRadiation) : null;
 
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

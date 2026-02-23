@@ -1,7 +1,7 @@
 /**
  * Rain display: current rate + daily/yearly totals as a compact numeric panel.
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface RainGaugeProps {
@@ -28,7 +28,7 @@ export default function RainGauge({ rate, daily, yearly, unit, peakRate }: RainG
 
   const color = rate !== null ? rateColor(rate) : 'var(--color-text-muted)';
 
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

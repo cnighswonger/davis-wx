@@ -2,7 +2,7 @@
  * SVG compass rose with direction arrow and speed display.
  * 16-point compass with animated direction arrow and speed in center.
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface WindCompassProps {
@@ -18,7 +18,7 @@ const CARDINALS_16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
                        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
 export default function WindCompass({ direction, speed, gust, peak, unit, cardinal }: WindCompassProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

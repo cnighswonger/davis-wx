@@ -2,7 +2,7 @@
  * SVG vertical thermometer gauge with mercury fill and hi/lo whiskers.
  * Uses CSS custom properties for theming.
  */
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 import CompactCard from "../common/CompactCard.tsx";
 
 interface TemperatureGaugeProps {
@@ -110,7 +110,7 @@ export default function TemperatureGauge({
   const mercuryY = displayVal !== null ? yForTemp(displayVal) : tubeBot;
   const fillColor = displayVal !== null ? tempColor(displayVal, unit) : 'var(--color-text-muted)';
 
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
   if (isMobile) {
     return (
       <CompactCard

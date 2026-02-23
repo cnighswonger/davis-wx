@@ -4,7 +4,7 @@
  */
 import { useWeatherData } from "../../context/WeatherDataContext.tsx";
 import type { ValueWithUnit } from "../../api/types.ts";
-import { useIsMobile } from "../../hooks/useIsMobile.ts";
+import { useCompact } from "../../dashboard/CompactContext.tsx";
 
 interface DerivedItem {
   label: string;
@@ -18,7 +18,7 @@ function formatValue(item: ValueWithUnit | null | undefined): string {
 
 export default function CurrentConditions() {
   const { currentConditions } = useWeatherData();
-  const isMobile = useIsMobile();
+  const isMobile = useCompact();
 
   const derived = currentConditions?.derived;
 
