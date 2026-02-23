@@ -95,26 +95,30 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
 
         {/* Collapse toggle (desktop only) */}
         {onToggleCollapse && (
-          <button
-            className="sidebar-collapse-btn"
-            onClick={onToggleCollapse}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{
-              background: 'none',
-              border: 'none',
-              borderTop: '1px solid var(--color-border)',
-              color: 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: '10px 0',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'color 0.15s ease',
-            }}
-          >
-            {collapsed ? '\u00BB' : '\u00AB'}
-          </button>
+          <div style={{ padding: '8px', borderTop: '1px solid var(--color-border)' }}>
+            <button
+              className="sidebar-collapse-btn"
+              onClick={onToggleCollapse}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              style={{
+                background: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '6px',
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                padding: '6px 0',
+                fontSize: '16px',
+                fontWeight: 600,
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.15s ease, color 0.15s ease',
+              }}
+            >
+              {collapsed ? '\u25B6' : '\u25C0'}
+            </button>
+          </div>
         )}
       </aside>
     </>
