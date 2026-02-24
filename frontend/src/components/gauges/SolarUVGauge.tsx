@@ -53,11 +53,11 @@ export default function SolarUVGauge({ solarRadiation, uvIndex }: SolarUVGaugePr
     const y1 = cy + radius * Math.sin(sr);
     const x2 = cx + radius * Math.cos(er);
     const y2 = cy + radius * Math.sin(er);
-    const la = end - start > 180 ? 1 : 0;
+    const la = end - start >= 180 ? 1 : 0;
     return `M ${x1} ${y1} A ${radius} ${radius} 0 ${la} 1 ${x2} ${y2}`;
   };
 
-  const uvFrac = uvIndex !== null ? Math.min(uvIndex / maxUV, 1) : 0;
+  const uvFrac = uvIndex !== null ? Math.min(uvIndex / maxUV, 0.998) : 0;
   const uvFillAngle = startAngle + uvFrac * sweep;
   const uvCol = uvIndex !== null ? uvColor(uvIndex) : 'var(--color-text-muted)';
   const solar = solarRadiation !== null ? solarIntensity(solarRadiation) : null;

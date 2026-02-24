@@ -46,11 +46,11 @@ export default function HumidityGauge({ value, label, high, low }: HumidityGauge
     const y1 = cy + radius * Math.sin(startRad);
     const x2 = cx + radius * Math.cos(endRad);
     const y2 = cy + radius * Math.sin(endRad);
-    const largeArc = end - start > 180 ? 1 : 0;
+    const largeArc = end - start >= 180 ? 1 : 0;
     return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`;
   };
 
-  const frac = value !== null ? Math.max(0, Math.min(100, value)) / 100 : 0;
+  const frac = value !== null ? Math.max(0, Math.min(0.998, value / 100)) : 0;
   const fillAngle = startAngle + frac * sweep;
   const color = value !== null ? humidityColor(value) : 'var(--color-text-muted)';
 
