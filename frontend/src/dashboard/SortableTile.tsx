@@ -11,8 +11,9 @@ import { CSS } from "@dnd-kit/utilities";
 interface SortableTileProps {
   id: string;
   colSpan: 1 | 2 | 3;
+  maxSpan: 1 | 2 | 3 | 4;
   onRemove: () => void;
-  onToggleSpan: () => void;
+  onSetSpan: (n: 1 | 2 | 3) => void;
   children: ReactNode;
 }
 
@@ -55,30 +56,22 @@ const removeBtnStyle: React.CSSProperties = {
   zIndex: 10,
 };
 
-const spanBtnStyle: React.CSSProperties = {
+const spanPickerStyle: React.CSSProperties = {
   position: "absolute",
   bottom: 6,
   right: 6,
-  height: 24,
-  padding: "0 8px",
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center",
-  borderRadius: 4,
-  background: "var(--color-bg-secondary)",
-  border: "1px solid var(--color-border)",
-  color: "var(--color-text-secondary)",
-  fontSize: 11,
-  fontFamily: "var(--font-body)",
-  cursor: "pointer",
+  gap: 4,
   zIndex: 10,
 };
 
 export default function SortableTile({
   id,
   colSpan,
+  maxSpan,
   onRemove,
-  onToggleSpan,
+  onSetSpan,
   children,
 }: SortableTileProps) {
   const {
@@ -131,17 +124,33 @@ export default function SortableTile({
         {"\u00D7"}
       </button>
 
-      {/* Span toggle */}
-      <button
-        style={spanBtnStyle}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSpan();
-        }}
-        aria-label={`Change tile width (currently ${colSpan}col)`}
-      >
-        {colSpan === 1 ? "2col \u25B6" : colSpan === 2 ? "3col \u25B6" : "\u25C0 1col"}
-      </button>
+      {/* Span picker pills */}
+      <div style={spanPickerStyle}>
+        <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginRight: 2 }}>Width</span>
+        {([1, 2, 3] as const).filter((n) => n <= maxSpan).map((n) => (
+          <button
+            key={n}
+            onClick={(e) => { e.stopPropagation(); onSetSpan(n); }}
+            aria-label={`Set tile width to ${n} column${n > 1 ? "s" : ""}`}
+            style={{
+              width: 22,
+              height: 22,
+              border: "1px solid var(--color-border)",
+              borderRadius: 4,
+              background: n === colSpan ? "var(--color-accent)" : "var(--color-bg-secondary)",
+              color: n === colSpan ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 600,
+              fontFamily: "var(--font-body)",
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
 
       {children}
     </div>
