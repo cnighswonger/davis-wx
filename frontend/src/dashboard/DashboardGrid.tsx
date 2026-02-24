@@ -86,7 +86,7 @@ const addTilePlaceholderStyle: React.CSSProperties = {
 
 function ColumnPicker({ columns, setColumns }: { columns: 2|3|4; setColumns: (n: 2|3|4) => void }) {
   return (
-    <span style={{ display: "inline-flex", gap: 0, marginLeft: 12, verticalAlign: "middle" }}>
+    <span style={{ display: "inline-flex", gap: 0, verticalAlign: "middle" }}>
       {([2, 3, 4] as const).map((n) => (
         <button
           key={n}
@@ -216,7 +216,6 @@ export default function DashboardGrid() {
             >
               {"\u270E"}
             </button>
-            {!isMobile && <ColumnPicker columns={columns} setColumns={setColumns} />}
           </h2>
 
           <div ref={gridRef} className="dashboard-grid" style={gridStyle}>
@@ -286,7 +285,12 @@ export default function DashboardGrid() {
           <span style={{ color: "var(--color-accent)", fontWeight: 600 }}>
             Editing Layout
           </span>
-          {!isMobile && <ColumnPicker columns={columns} setColumns={setColumns} />}
+          {!isMobile && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Columns</span>
+              <ColumnPicker columns={columns} setColumns={setColumns} />
+            </span>
+          )}
           <span style={{ flex: 1 }} />
           <button
             style={{
