@@ -5,11 +5,15 @@
 
 // --- Types ---
 
+export const GRID_COLUMNS = 12;
+export const DEFAULT_COL_SPAN = 4;
+export const GAP = 16;
+
 export interface TileDefinition {
   id: string;
   label: string;
   category: "temperature" | "atmosphere" | "wind" | "rain" | "solar" | "status";
-  minColSpan: 1 | 2 | 3;
+  minColSpan: number;
   requiresSolar?: boolean;
   hasFlipTile: boolean;
   sensor?: string;
@@ -19,11 +23,11 @@ export interface TileDefinition {
 
 export interface TilePlacement {
   tileId: string;
-  colSpan?: 1 | 2 | 3;
+  colSpan?: number;
 }
 
 export interface DashboardLayout {
-  version: 1;
+  version: number;
   tiles: TilePlacement[];
 }
 
@@ -34,7 +38,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "outside-temp",
     label: "Outside Temperature",
     category: "temperature",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "outside_temp",
     chartLabel: "Outside Temperature",
@@ -44,7 +48,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "inside-temp",
     label: "Inside Temperature",
     category: "temperature",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "inside_temp",
     chartLabel: "Inside Temperature",
@@ -54,7 +58,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "barometer",
     label: "Barometer",
     category: "atmosphere",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "barometer",
     chartLabel: "Barometer",
@@ -64,7 +68,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "wind",
     label: "Wind",
     category: "wind",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "wind_speed",
     chartLabel: "Wind Speed",
@@ -74,7 +78,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "outside-humidity",
     label: "Outside Humidity",
     category: "atmosphere",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "outside_humidity",
     chartLabel: "Outside Humidity",
@@ -84,7 +88,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "inside-humidity",
     label: "Inside Humidity",
     category: "atmosphere",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "inside_humidity",
     chartLabel: "Inside Humidity",
@@ -94,7 +98,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "rain",
     label: "Rain",
     category: "rain",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: true,
     sensor: "rain_total",
     chartLabel: "Rain",
@@ -104,7 +108,7 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "solar-uv",
     label: "Solar & UV",
     category: "solar",
-    minColSpan: 1,
+    minColSpan: 2,
     requiresSolar: true,
     hasFlipTile: true,
     sensor: "solar_radiation",
@@ -115,24 +119,24 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     id: "current-conditions",
     label: "Derived Conditions",
     category: "status",
-    minColSpan: 1,
+    minColSpan: 2,
     hasFlipTile: false,
   },
   "station-status": {
     id: "station-status",
     label: "Station Status",
     category: "status",
-    minColSpan: 2,
+    minColSpan: 4,
     hasFlipTile: false,
   },
 };
 
 // --- Default layout (matches the current hardcoded Dashboard.tsx) ---
 
-export const LAYOUT_VERSION = 1;
+export const LAYOUT_VERSION = 2;
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
-  version: 1,
+  version: 2,
   tiles: [
     { tileId: "outside-temp" },
     { tileId: "inside-temp" },
@@ -143,6 +147,6 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
     { tileId: "rain" },
     { tileId: "solar-uv" },
     { tileId: "current-conditions" },
-    { tileId: "station-status", colSpan: 3 },
+    { tileId: "station-status", colSpan: 12 },
   ],
 };

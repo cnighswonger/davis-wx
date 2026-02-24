@@ -1,19 +1,22 @@
 /**
  * Sortable tile wrapper for edit mode. Uses @dnd-kit/sortable.
- * In edit mode: shows drag handle, remove button, span toggle.
+ * In edit mode: shows drag handle, remove button, resize handle, span badge.
  * In normal mode: renders children only (no extra DOM).
  */
 
 import { type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import ResizeHandle from "./ResizeHandle.tsx";
+import { GRID_COLUMNS } from "./tileRegistry.ts";
 
 interface SortableTileProps {
   id: string;
-  colSpan: 1 | 2 | 3;
-  maxSpan: 1 | 2 | 3 | 4;
+  colSpan: number;
+  minSpan: number;
+  gridWidth: number;
   onRemove: () => void;
-  onSetSpan: (n: 1 | 2 | 3) => void;
+  onSetSpan: (n: number) => void;
   children: ReactNode;
 }
 
@@ -56,20 +59,27 @@ const removeBtnStyle: React.CSSProperties = {
   zIndex: 10,
 };
 
-const spanPickerStyle: React.CSSProperties = {
+const spanBadgeStyle: React.CSSProperties = {
   position: "absolute",
   bottom: 6,
   right: 6,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
+  padding: "2px 6px",
+  borderRadius: 4,
+  background: "var(--color-bg-secondary)",
+  border: "1px solid var(--color-border)",
+  color: "var(--color-text-muted)",
+  fontSize: 10,
+  fontFamily: "var(--font-body)",
+  fontWeight: 600,
   zIndex: 10,
+  userSelect: "none",
 };
 
 export default function SortableTile({
   id,
   colSpan,
-  maxSpan,
+  minSpan,
+  gridWidth,
   onRemove,
   onSetSpan,
   children,
@@ -124,32 +134,17 @@ export default function SortableTile({
         {"\u00D7"}
       </button>
 
-      {/* Span picker pills */}
-      <div style={spanPickerStyle}>
-        <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginRight: 2 }}>Width</span>
-        {([1, 2, 3] as const).filter((n) => n <= maxSpan).map((n) => (
-          <button
-            key={n}
-            onClick={(e) => { e.stopPropagation(); onSetSpan(n); }}
-            aria-label={`Set tile width to ${n} column${n > 1 ? "s" : ""}`}
-            style={{
-              width: 22,
-              height: 22,
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              background: n === colSpan ? "var(--color-accent)" : "var(--color-bg-secondary)",
-              color: n === colSpan ? "#fff" : "var(--color-text-secondary)",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: 600,
-              fontFamily: "var(--font-body)",
-              padding: 0,
-              lineHeight: 1,
-            }}
-          >
-            {n}
-          </button>
-        ))}
+      {/* Resize handle (right edge) */}
+      <ResizeHandle
+        currentSpan={colSpan}
+        minSpan={minSpan}
+        gridWidth={gridWidth}
+        onSpanChange={onSetSpan}
+      />
+
+      {/* Span indicator badge */}
+      <div style={spanBadgeStyle}>
+        {colSpan}/{GRID_COLUMNS}
       </div>
 
       {children}

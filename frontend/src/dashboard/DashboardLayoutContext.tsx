@@ -17,20 +17,20 @@ import {
   TILE_REGISTRY,
   DEFAULT_LAYOUT,
   LAYOUT_VERSION,
+  GRID_COLUMNS,
 } from "./tileRegistry.ts";
 
 // --- Types ---
 
 interface DashboardLayoutContextValue {
   layout: DashboardLayout;
-  columns: 2 | 3 | 4;
-  setColumns: (n: 2 | 3 | 4) => void;
   editMode: boolean;
   setEditMode: (v: boolean) => void;
   reorderTiles: (fromIndex: number, toIndex: number) => void;
-  addTile: (tileId: string, colSpan?: 1 | 2) => void;
+  addTile: (tileId: string, colSpan?: number) => void;
   removeTile: (tileId: string) => void;
-  setTileColSpan: (tileId: string, colSpan: 1 | 2 | 3) => void;
+  setTileColSpan: (tileId: string, colSpan: number) => void;
+  setAllTilesSpan: (colSpan: number) => void;
   resetToDefault: () => void;
 }
 
@@ -40,14 +40,30 @@ const DashboardLayoutContext =
 // --- localStorage helpers ---
 
 const STORAGE_KEY = "davis-wx-dashboard-layout";
-const COLUMNS_KEY = "davis-wx-dashboard-columns";
+const OLD_COLUMNS_KEY = "davis-wx-dashboard-columns";
 
-function loadColumns(): 2 | 3 | 4 {
+function migrateV1(parsed: { version: number; tiles: { tileId: string; colSpan?: number }[] }): DashboardLayout {
+  // Read old columns setting for span conversion
+  let oldColumns = 3;
   try {
-    const v = parseInt(localStorage.getItem(COLUMNS_KEY) || "3", 10);
-    if (v === 2 || v === 3 || v === 4) return v;
+    const v = parseInt(localStorage.getItem(OLD_COLUMNS_KEY) || "3", 10);
+    if (v >= 2 && v <= 4) oldColumns = v;
   } catch {}
-  return 3;
+
+  const factor = Math.round(GRID_COLUMNS / oldColumns);
+  const migratedTiles: TilePlacement[] = parsed.tiles
+    .filter((t) => t.tileId in TILE_REGISTRY)
+    .map((t) => ({
+      tileId: t.tileId,
+      colSpan: t.colSpan ? Math.min(t.colSpan * factor, GRID_COLUMNS) : undefined,
+    }));
+
+  // Clean up old columns key
+  try { localStorage.removeItem(OLD_COLUMNS_KEY); } catch {}
+
+  const migrated: DashboardLayout = { version: LAYOUT_VERSION, tiles: migratedTiles };
+  saveLayout(migrated);
+  return migrated;
 }
 
 function loadLayout(): DashboardLayout {
@@ -56,6 +72,11 @@ function loadLayout(): DashboardLayout {
     if (!raw) return DEFAULT_LAYOUT;
 
     const parsed = JSON.parse(raw) as DashboardLayout;
+
+    // Migrate v1 layouts
+    if (parsed.version === 1) {
+      return migrateV1(parsed);
+    }
 
     // Version check — fall back to default if schema changed
     if (parsed.version !== LAYOUT_VERSION) return DEFAULT_LAYOUT;
@@ -88,13 +109,7 @@ export function DashboardLayoutProvider({
   children: ReactNode;
 }) {
   const [layout, setLayoutState] = useState<DashboardLayout>(loadLayout);
-  const [columns, setColumnsState] = useState<2 | 3 | 4>(loadColumns);
   const [editMode, setEditMode] = useState(false);
-
-  const setColumns = useCallback((n: 2 | 3 | 4) => {
-    setColumnsState(n);
-    try { localStorage.setItem(COLUMNS_KEY, String(n)); } catch {}
-  }, []);
 
   const updateLayout = useCallback((next: DashboardLayout) => {
     setLayoutState(next);
@@ -116,7 +131,7 @@ export function DashboardLayoutProvider({
   );
 
   const addTile = useCallback(
-    (tileId: string, colSpan?: 1 | 2) => {
+    (tileId: string, colSpan?: number) => {
       if (!(tileId in TILE_REGISTRY)) return;
       setLayoutState((prev) => {
         // Prevent duplicates
@@ -143,12 +158,15 @@ export function DashboardLayoutProvider({
   }, []);
 
   const setTileColSpan = useCallback(
-    (tileId: string, colSpan: 1 | 2 | 3) => {
+    (tileId: string, colSpan: number) => {
+      const def = TILE_REGISTRY[tileId];
+      const min = def?.minColSpan ?? 2;
+      const clamped = Math.max(min, Math.min(GRID_COLUMNS, colSpan));
       setLayoutState((prev) => {
         const next = {
           ...prev,
           tiles: prev.tiles.map((t) =>
-            t.tileId === tileId ? { ...t, colSpan } : t,
+            t.tileId === tileId ? { ...t, colSpan: clamped } : t,
           ),
         };
         saveLayout(next);
@@ -157,6 +175,21 @@ export function DashboardLayoutProvider({
     },
     [],
   );
+
+  const setAllTilesSpan = useCallback((colSpan: number) => {
+    setLayoutState((prev) => {
+      const next = {
+        ...prev,
+        tiles: prev.tiles.map((t) => {
+          const def = TILE_REGISTRY[t.tileId];
+          const min = def?.minColSpan ?? 2;
+          return { ...t, colSpan: Math.max(min, Math.min(GRID_COLUMNS, colSpan)) };
+        }),
+      };
+      saveLayout(next);
+      return next;
+    });
+  }, []);
 
   const resetToDefault = useCallback(() => {
     updateLayout(DEFAULT_LAYOUT);
@@ -167,14 +200,13 @@ export function DashboardLayoutProvider({
     <DashboardLayoutContext.Provider
       value={{
         layout,
-        columns,
-        setColumns,
         editMode,
         setEditMode,
         reorderTiles,
         addTile,
         removeTile,
         setTileColSpan,
+        setAllTilesSpan,
         resetToDefault,
       }}
     >
