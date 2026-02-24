@@ -6,7 +6,7 @@
 // --- Types ---
 
 export const GRID_COLUMNS = 12;
-export const DEFAULT_COL_SPAN = 4;
+export const DEFAULT_COL_SPAN = 2;
 export const GAP = 16;
 
 export interface TileDefinition {
