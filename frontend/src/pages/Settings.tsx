@@ -157,6 +157,7 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts">("station");
 
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
@@ -454,6 +455,40 @@ export default function Settings() {
         Settings
       </h2>
 
+      {/* Tab bar */}
+      <div style={{
+        display: "flex",
+        gap: "6px",
+        marginBottom: "20px",
+        flexWrap: "wrap",
+      }}>
+        {([
+          ["station", "Station"],
+          ["display", "Display"],
+          ["services", "Services"],
+          ["alerts", "Alerts"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "14px",
+              padding: isMobile ? "8px 14px" : "8px 20px",
+              borderRadius: "6px",
+              border: "1px solid var(--color-border)",
+              background: activeTab === key ? "var(--color-accent)" : "var(--color-bg-secondary)",
+              color: activeTab === key ? "#fff" : "var(--color-text-secondary)",
+              cursor: "pointer",
+              transition: "background 0.15s ease, color 0.15s ease",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "station" && (<>
       {/* Station section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Station</h3>
@@ -713,7 +748,9 @@ export default function Settings() {
           }}
         />
       </div>
+      </>)}
 
+      {activeTab === "display" && (<>
       {/* Units section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Units</h3>
@@ -958,7 +995,9 @@ export default function Settings() {
           )}
         </div>
       </div>
+      </>)}
 
+      {activeTab === "services" && (<>
       {/* Services section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Services</h3>
@@ -1094,7 +1133,9 @@ export default function Settings() {
           </div>
         </div>
       </div>
+      </>)}
 
+      {activeTab === "alerts" && (<>
       {/* ==================== Alerts ==================== */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Alerts</h3>
@@ -1290,6 +1331,7 @@ export default function Settings() {
           )}
         </div>
       </div>
+      </>)}
 
       {/* Save buttons and status */}
       <div style={{
