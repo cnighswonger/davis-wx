@@ -355,7 +355,7 @@ function SunSection({ sun }: { sun: SunData }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
+          gridTemplateColumns: "auto 1fr 1fr",
           gap: "0",
           fontSize: "13px",
           fontFamily: "var(--font-body)",
