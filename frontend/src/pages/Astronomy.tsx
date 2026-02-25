@@ -356,7 +356,6 @@ function SunSection({ sun }: { sun: SunData }) {
         style={{
           display: "grid",
           gridTemplateColumns: "1fr auto auto",
-          columnGap: "48px",
           gap: "0",
           fontSize: "13px",
           fontFamily: "var(--font-body)",
@@ -375,7 +374,7 @@ function SunSection({ sun }: { sun: SunData }) {
         </div>
         <div
           style={{
-            padding: "8px 0",
+            padding: "8px 0 8px 24px",
             color: "var(--color-text-muted)",
             borderBottom: "1px solid var(--color-border)",
             fontWeight: 600,
@@ -386,7 +385,7 @@ function SunSection({ sun }: { sun: SunData }) {
         </div>
         <div
           style={{
-            padding: "8px 0",
+            padding: "8px 0 8px 24px",
             color: "var(--color-text-muted)",
             borderBottom: "1px solid var(--color-border)",
             fontWeight: 600,
@@ -411,7 +410,7 @@ function SunSection({ sun }: { sun: SunData }) {
             </div>
             <div
               style={{
-                padding: "8px 0",
+                padding: "8px 0 8px 24px",
                 color: "var(--color-text)",
                 fontFamily: "var(--font-mono)",
                 textAlign: "right",
@@ -425,7 +424,7 @@ function SunSection({ sun }: { sun: SunData }) {
             </div>
             <div
               style={{
-                padding: "8px 0",
+                padding: "8px 0 8px 24px",
                 color: "var(--color-text)",
                 fontFamily: "var(--font-mono)",
                 textAlign: "right",
