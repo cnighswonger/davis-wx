@@ -355,7 +355,8 @@ function SunSection({ sun }: { sun: SunData }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "auto 1fr 1fr",
+          gridTemplateColumns: "1fr auto auto",
+          columnGap: "24px",
           gap: "0",
           fontSize: "13px",
           fontFamily: "var(--font-body)",
@@ -378,7 +379,7 @@ function SunSection({ sun }: { sun: SunData }) {
             color: "var(--color-text-muted)",
             borderBottom: "1px solid var(--color-border)",
             fontWeight: 600,
-            textAlign: "center",
+            textAlign: "right",
           }}
         >
           Dawn
@@ -413,7 +414,7 @@ function SunSection({ sun }: { sun: SunData }) {
                 padding: "8px 0",
                 color: "var(--color-text)",
                 fontFamily: "var(--font-mono)",
-                textAlign: "center",
+                textAlign: "right",
                 borderBottom:
                   idx < twilightRows.length - 1
                     ? "1px solid var(--color-border-light)"
