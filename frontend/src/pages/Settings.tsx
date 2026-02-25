@@ -8,6 +8,7 @@ import { ALL_SCENES, SCENE_LABELS, SCENE_GRADIENTS } from "../components/Weather
 import { API_BASE } from "../utils/constants.ts";
 import { getTimezone, setTimezone as storeTimezone, resolveTimezone, getTimezoneOptions } from "../utils/timezone.ts";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
+import StepLocation from "../components/setup/StepLocation.tsx";
 
 // --- Shared styles ---
 
@@ -701,44 +702,16 @@ export default function Settings() {
       {/* Location section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Location</h3>
-        <div style={gridTwoCol(isMobile)}>
-          <div style={fieldGroup}>
-            <label style={labelStyle}>Latitude</label>
-            <input
-              style={inputStyle}
-              type="number"
-              step="0.0001"
-              value={String(val("latitude"))}
-              onChange={(e) =>
-                updateField("latitude", parseFloat(e.target.value) || 0)
-              }
-            />
-          </div>
-          <div style={fieldGroup}>
-            <label style={labelStyle}>Longitude</label>
-            <input
-              style={inputStyle}
-              type="number"
-              step="0.0001"
-              value={String(val("longitude"))}
-              onChange={(e) =>
-                updateField("longitude", parseFloat(e.target.value) || 0)
-              }
-            />
-          </div>
-          <div style={fieldGroup}>
-            <label style={labelStyle}>Elevation (ft)</label>
-            <input
-              style={inputStyle}
-              type="number"
-              step="1"
-              value={String(val("elevation"))}
-              onChange={(e) =>
-                updateField("elevation", parseFloat(e.target.value) || 0)
-              }
-            />
-          </div>
-        </div>
+        <StepLocation
+          latitude={Number(val("latitude")) || 0}
+          longitude={Number(val("longitude")) || 0}
+          elevation={Number(val("elevation")) || 0}
+          onChange={(partial) => {
+            if (partial.latitude !== undefined) updateField("latitude", partial.latitude);
+            if (partial.longitude !== undefined) updateField("longitude", partial.longitude);
+            if (partial.elevation !== undefined) updateField("elevation", partial.elevation);
+          }}
+        />
       </div>
 
       {/* Units section */}
