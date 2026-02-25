@@ -356,7 +356,7 @@ function SunSection({ sun }: { sun: SunData }) {
         style={{
           display: "grid",
           gridTemplateColumns: "1fr auto auto",
-          columnGap: "24px",
+          columnGap: "48px",
           gap: "0",
           fontSize: "13px",
           fontFamily: "var(--font-body)",
