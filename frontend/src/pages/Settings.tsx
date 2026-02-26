@@ -1380,6 +1380,94 @@ export default function Settings() {
           </label>
         </div>
 
+        {/* Nearby Stations sub-section */}
+        <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "16px", marginTop: "8px", marginBottom: "16px" }}>
+          <div style={{ fontSize: "15px", fontFamily: "var(--font-heading)", color: "var(--color-text)", marginBottom: "8px" }}>
+            Nearby Stations
+          </div>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginBottom: "12px" }}>
+            Adds observations from nearby weather stations so the AI can detect approaching weather patterns and spatial differences.
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={val("nowcast_nearby_iem_enabled") !== false}
+                onChange={(e) => updateField("nowcast_nearby_iem_enabled", e.target.checked)}
+              />
+              ASOS/AWOS stations (IEM Mesonet)
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px" }}>
+                Official NWS airport stations — free, no API key needed
+              </span>
+            </label>
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={val("nowcast_nearby_wu_enabled") === true}
+                onChange={(e) => updateField("nowcast_nearby_wu_enabled", e.target.checked)}
+              />
+              Weather Underground PWS
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px" }}>
+                Personal weather stations — requires WU API key
+              </span>
+            </label>
+          </div>
+
+          {val("nowcast_nearby_wu_enabled") === true && (
+            <div style={{ ...fieldGroup, marginLeft: "24px" }}>
+              <label style={labelStyle}>WU API Key</label>
+              <input
+                style={{ ...inputStyle, maxWidth: "480px" }}
+                type="password"
+                placeholder="Your Weather Underground API key"
+                value={String(val("nowcast_wu_api_key") || "")}
+                onChange={(e) => updateField("nowcast_wu_api_key", e.target.value)}
+              />
+            </div>
+          )}
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? "12px" : "16px",
+          }}>
+            {val("nowcast_nearby_iem_enabled") !== false && (
+              <div style={fieldGroup}>
+                <label style={labelStyle}>Max ASOS Stations</label>
+                <select
+                  style={selectStyle}
+                  value={String(val("nowcast_nearby_max_iem") || "5")}
+                  onChange={(e) => updateField("nowcast_nearby_max_iem", parseInt(e.target.value))}
+                >
+                  <option value="3">3</option>
+                  <option value="5">5</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+            )}
+            {val("nowcast_nearby_wu_enabled") === true && (
+              <div style={fieldGroup}>
+                <label style={labelStyle}>Max WU Stations</label>
+                <select
+                  style={selectStyle}
+                  value={String(val("nowcast_nearby_max_wu") || "5")}
+                  onChange={(e) => updateField("nowcast_nearby_max_wu", parseInt(e.target.value))}
+                >
+                  <option value="3">3</option>
+                  <option value="5">5</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* API Key — full width */}
         <div style={fieldGroup}>
           <label style={labelStyle}>

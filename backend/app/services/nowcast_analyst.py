@@ -155,6 +155,39 @@ def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
             parts.append(f"  - {entry}")
         parts.append("")
 
+    # Nearby station observations
+    if data.nearby_stations and data.nearby_stations.stations:
+        parts.append("=== NEARBY STATION OBSERVATIONS (spatial context) ===")
+        for obs in data.nearby_stations.stations:
+            header = (
+                f"  {obs.station_id} ({obs.station_name}) "
+                f"— {obs.distance_miles:.1f} mi {obs.bearing_cardinal}, {obs.source}"
+            )
+            fields = []
+            if obs.temp_f is not None:
+                fields.append(f"Temp={obs.temp_f:.1f}F")
+            if obs.dew_point_f is not None:
+                fields.append(f"Dewpt={obs.dew_point_f:.1f}F")
+            if obs.humidity_pct is not None:
+                fields.append(f"Hum={obs.humidity_pct}%")
+            if obs.wind_speed_mph is not None:
+                wind = f"Wind={obs.wind_speed_mph:.0f}mph"
+                if obs.wind_dir_deg is not None:
+                    wind += f"@{obs.wind_dir_deg}deg"
+                fields.append(wind)
+            if obs.wind_gust_mph is not None:
+                fields.append(f"Gust={obs.wind_gust_mph:.0f}mph")
+            if obs.pressure_inhg is not None:
+                fields.append(f"Baro={obs.pressure_inhg:.2f}inHg")
+            if obs.precip_in is not None:
+                fields.append(f"Precip={obs.precip_in:.2f}in")
+            if obs.sky_cover:
+                fields.append(f"Sky={obs.sky_cover}")
+            parts.append(header)
+            if fields:
+                parts.append(f"    {', '.join(fields)}")
+        parts.append("")
+
     return "\n".join(parts)
 
 

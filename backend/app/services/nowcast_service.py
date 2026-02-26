@@ -41,6 +41,12 @@ class NowcastService:
         self._auto_accept_hours: int = 48
         self._station_timezone: str = ""
         self._radar_enabled: bool = True
+        self._nearby_iem_enabled: bool = True
+        self._nearby_wu_enabled: bool = False
+        self._nearby_max_iem: int = 5
+        self._nearby_max_wu: int = 5
+        self._wu_api_key: str = ""
+        self._nearby_radius: int = 25
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
 
@@ -53,6 +59,9 @@ class NowcastService:
                 "nowcast_interval", "nowcast_horizon", "latitude",
                 "longitude", "nowcast_knowledge_auto_accept_hours",
                 "station_timezone", "nowcast_radar_enabled",
+                "nowcast_nearby_iem_enabled", "nowcast_nearby_wu_enabled",
+                "nowcast_wu_api_key", "nowcast_nearby_max_iem",
+                "nowcast_nearby_max_wu", "nowcast_radius",
             ]
             rows = db.query(StationConfigModel).filter(
                 StationConfigModel.key.in_(keys)
@@ -84,6 +93,25 @@ class NowcastService:
                 self._auto_accept_hours = 48
             self._station_timezone = cfg.get("station_timezone", "")
             self._radar_enabled = cfg.get("nowcast_radar_enabled", "true").lower() == "true"
+            self._nearby_iem_enabled = cfg.get(
+                "nowcast_nearby_iem_enabled", "true"
+            ).lower() == "true"
+            self._nearby_wu_enabled = cfg.get(
+                "nowcast_nearby_wu_enabled", "false"
+            ).lower() == "true"
+            self._wu_api_key = cfg.get("nowcast_wu_api_key", "")
+            try:
+                self._nearby_max_iem = int(cfg.get("nowcast_nearby_max_iem", "5"))
+            except ValueError:
+                self._nearby_max_iem = 5
+            try:
+                self._nearby_max_wu = int(cfg.get("nowcast_nearby_max_wu", "5"))
+            except ValueError:
+                self._nearby_max_wu = 5
+            try:
+                self._nearby_radius = int(cfg.get("nowcast_radius", "25"))
+            except ValueError:
+                self._nearby_radius = 25
         finally:
             db.close()
 
@@ -146,6 +174,12 @@ class NowcastService:
                 nws_forecast=nws,
                 station_timezone=self._station_timezone,
                 radar_enabled=self._radar_enabled,
+                nearby_iem_enabled=self._nearby_iem_enabled,
+                nearby_wu_enabled=self._nearby_wu_enabled,
+                nearby_radius=self._nearby_radius,
+                nearby_max_iem=self._nearby_max_iem,
+                nearby_max_wu=self._nearby_max_wu,
+                wu_api_key=self._wu_api_key,
             )
 
             if not data.station.has_data:
@@ -234,6 +268,10 @@ class NowcastService:
         sources.append("nws_forecast")
         if result.radar_analysis:
             sources.append("nexrad_radar")
+        if self._nearby_iem_enabled:
+            sources.append("iem_asos_nearby")
+        if self._nearby_wu_enabled and self._wu_api_key:
+            sources.append("wu_pws_nearby")
         return sources
 
     def _store_proposed_knowledge(self, db: Session, proposed: dict[str, str]) -> None:

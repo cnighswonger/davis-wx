@@ -47,6 +47,11 @@ _DEFAULTS: dict[str, object] = {
     "nowcast_radius": 25,
     "nowcast_knowledge_auto_accept_hours": 48,
     "nowcast_radar_enabled": True,
+    "nowcast_nearby_iem_enabled": True,
+    "nowcast_nearby_wu_enabled": False,
+    "nowcast_wu_api_key": "",
+    "nowcast_nearby_max_iem": 5,
+    "nowcast_nearby_max_wu": 5,
 }
 
 

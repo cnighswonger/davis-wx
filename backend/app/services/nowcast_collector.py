@@ -101,6 +101,7 @@ class CollectedData:
     nws_summary: Optional[str] = None
     knowledge_entries: list[str] = field(default_factory=list)
     radar_images: list[RadarImage] = field(default_factory=list)
+    nearby_stations: Any = None  # Optional[NearbyStationsResult] — avoid circular import
     collected_at: str = ""
     location: dict[str, float] = field(default_factory=dict)
     station_timezone: str = ""
@@ -318,6 +319,12 @@ async def collect_all(
     nws_forecast=None,
     station_timezone: str = "",
     radar_enabled: bool = True,
+    nearby_iem_enabled: bool = False,
+    nearby_wu_enabled: bool = False,
+    nearby_radius: int = 25,
+    nearby_max_iem: int = 5,
+    nearby_max_wu: int = 5,
+    wu_api_key: str = "",
 ) -> CollectedData:
     """Gather all data sources into a single snapshot for the analyst."""
     station = gather_station_data(db)
@@ -326,12 +333,28 @@ async def collect_all(
     knowledge = gather_knowledge(db)
     radar_images = await fetch_radar_images(lat, lon) if radar_enabled else []
 
+    # Fetch nearby station observations if either source is enabled.
+    nearby = None
+    if nearby_iem_enabled or nearby_wu_enabled:
+        from .nearby_stations import fetch_nearby_stations
+        nearby = await fetch_nearby_stations(
+            lat=lat,
+            lon=lon,
+            radius_miles=nearby_radius,
+            max_iem=nearby_max_iem,
+            max_wu=nearby_max_wu,
+            wu_api_key=wu_api_key,
+            iem_enabled=nearby_iem_enabled,
+            wu_enabled=nearby_wu_enabled,
+        )
+
     return CollectedData(
         station=station,
         model_guidance=model,
         nws_summary=nws_summary,
         knowledge_entries=knowledge,
         radar_images=radar_images,
+        nearby_stations=nearby,
         collected_at=datetime.now(timezone.utc).isoformat(),
         location={"latitude": lat, "longitude": lon},
         station_timezone=station_timezone,
