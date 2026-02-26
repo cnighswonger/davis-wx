@@ -1366,6 +1366,20 @@ export default function Settings() {
           </label>
         </div>
 
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("nowcast_radar_enabled") !== false}
+              onChange={(e) => updateField("nowcast_radar_enabled", e.target.checked)}
+            />
+            Include NEXRAD radar imagery
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px" }}>
+              Sends radar image to Claude for precipitation analysis (~250 extra tokens/call)
+            </span>
+          </label>
+        </div>
+
         {/* API Key — full width */}
         <div style={fieldGroup}>
           <label style={labelStyle}>

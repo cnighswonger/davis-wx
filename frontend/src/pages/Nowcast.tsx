@@ -251,6 +251,47 @@ export default function Nowcast() {
         <ElementCard label="Sky Conditions" element={elements.sky} />
       </div>
 
+      {/* Radar */}
+      {nowcast.radar_analysis && (
+        <div style={cardStyle}>
+          <h4 style={sectionTitle}>Radar Analysis</h4>
+          <div
+            style={{
+              display: isMobile ? "block" : "flex",
+              gap: "16px",
+              alignItems: "flex-start",
+            }}
+          >
+            <img
+              src="/api/nowcast/radar"
+              alt="NEXRAD composite reflectivity"
+              style={{
+                width: isMobile ? "100%" : "280px",
+                height: "auto",
+                borderRadius: "8px",
+                border: "1px solid var(--color-border)",
+                marginBottom: isMobile ? "12px" : 0,
+                flexShrink: 0,
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <p
+              style={{
+                margin: 0,
+                fontSize: "14px",
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text)",
+                lineHeight: 1.5,
+              }}
+            >
+              {nowcast.radar_analysis}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Special conditions */}
       {elements.special && (
         <div

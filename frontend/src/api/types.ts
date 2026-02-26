@@ -234,6 +234,7 @@ export interface NowcastData {
   };
   farming_impact: string | null;
   current_vs_model: string;
+  radar_analysis: string | null;
   data_quality: string;
   sources_used: string[];
   input_tokens: number;

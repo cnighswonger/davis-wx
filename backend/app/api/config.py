@@ -46,6 +46,7 @@ _DEFAULTS: dict[str, object] = {
     "nowcast_horizon": 2,
     "nowcast_radius": 25,
     "nowcast_knowledge_auto_accept_hours": 48,
+    "nowcast_radar_enabled": True,
 }
 
 

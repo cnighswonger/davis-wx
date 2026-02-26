@@ -1,8 +1,9 @@
 """Data collector for AI nowcast — gathers station observations,
-model guidance (Open-Meteo HRRR/GFS), NWS forecast, and local knowledge
-into a unified snapshot for the Claude analyst.
+model guidance (Open-Meteo HRRR/GFS), NWS forecast, radar imagery,
+and local knowledge into a unified snapshot for the Claude analyst.
 """
 
+import base64
 import logging
 import time
 from dataclasses import dataclass, field
@@ -36,6 +37,46 @@ HRRR_HOURLY_VARS = [
 ]
 
 
+# IEM RadMap API for NEXRAD radar composites (free, no key).
+IEM_RADMAP_URL = "https://mesonet.agron.iastate.edu/GIS/radmap.php"
+IEM_RADMAP_TIMEOUT = 20.0
+RADAR_IMAGE_WIDTH = 480
+RADAR_IMAGE_HEIGHT = 480
+RADAR_BBOX_RADIUS = 1.5  # degrees (~100 miles at mid-latitudes)
+RADAR_CACHE_TTL = 300  # 5 minutes (matches NEXRAD scan rate)
+
+# Product configuration registry — maps product_id to fetch parameters.
+# Add entries here for future products (velocity, dual-pol, etc.).
+RADAR_PRODUCTS: dict[str, dict[str, Any]] = {
+    "nexrad_composite": {
+        "label": "NEXRAD Composite Reflectivity",
+        "layers": ["nexrad"],
+    },
+}
+
+
+@dataclass
+class RadarImage:
+    """A single radar imagery product fetched for the analyst."""
+    product_id: str
+    label: str
+    png_base64: str
+    width: int
+    height: int
+    bbox: tuple[float, float, float, float]  # lon_min, lat_min, lon_max, lat_max
+    fetched_at: float
+    source_url: str
+
+
+@dataclass
+class _RadarCacheEntry:
+    image: RadarImage
+    expires_at: float
+
+
+_radar_cache: dict[str, _RadarCacheEntry] = {}
+
+
 @dataclass
 class StationSnapshot:
     """Current + trend observations from the local station."""
@@ -59,6 +100,7 @@ class CollectedData:
     model_guidance: Optional[ModelGuidance] = None
     nws_summary: Optional[str] = None
     knowledge_entries: list[str] = field(default_factory=list)
+    radar_images: list[RadarImage] = field(default_factory=list)
     collected_at: str = ""
     location: dict[str, float] = field(default_factory=dict)
     station_timezone: str = ""
@@ -169,6 +211,105 @@ def gather_knowledge(db: Session) -> list[str]:
     return [f"[{e.category}] {e.content}" for e in entries]
 
 
+def _compute_bbox(
+    lat: float, lon: float, radius_deg: float = RADAR_BBOX_RADIUS,
+) -> tuple[float, float, float, float]:
+    """Compute bounding box centered on station. Returns (lon_min, lat_min, lon_max, lat_max)."""
+    return (
+        round(lon - radius_deg, 4),
+        round(lat - radius_deg, 4),
+        round(lon + radius_deg, 4),
+        round(lat + radius_deg, 4),
+    )
+
+
+async def fetch_radar_image(
+    lat: float,
+    lon: float,
+    product_id: str = "nexrad_composite",
+    layers: list[str] | None = None,
+    extra_params: dict[str, str] | None = None,
+) -> Optional[RadarImage]:
+    """Fetch a radar image from the IEM RadMap API.
+
+    Returns RadarImage on success, None on failure (logged, never raises).
+    """
+    cached = _radar_cache.get(product_id)
+    if cached is not None and time.time() < cached.expires_at:
+        logger.debug("Radar cache hit for %s", product_id)
+        return cached.image
+
+    if layers is None:
+        layers = ["nexrad"]
+
+    bbox = _compute_bbox(lat, lon)
+    label = RADAR_PRODUCTS.get(product_id, {}).get("label", product_id)
+
+    param_tuples = [
+        ("bbox", f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"),
+        ("width", str(RADAR_IMAGE_WIDTH)),
+        ("height", str(RADAR_IMAGE_HEIGHT)),
+    ]
+    for layer in layers:
+        param_tuples.append(("layers[]", layer))
+    if extra_params:
+        for k, v in extra_params.items():
+            param_tuples.append((k, v))
+
+    try:
+        async with httpx.AsyncClient(timeout=IEM_RADMAP_TIMEOUT) as client:
+            resp = await client.get(IEM_RADMAP_URL, params=param_tuples)
+            resp.raise_for_status()
+
+            content_type = resp.headers.get("content-type", "")
+            if "image" not in content_type:
+                logger.warning("Radar %s: non-image content-type: %s", product_id, content_type)
+                return None
+
+            png_b64 = base64.b64encode(resp.content).decode("ascii")
+            image = RadarImage(
+                product_id=product_id,
+                label=label,
+                png_base64=png_b64,
+                width=RADAR_IMAGE_WIDTH,
+                height=RADAR_IMAGE_HEIGHT,
+                bbox=bbox,
+                fetched_at=time.time(),
+                source_url=str(resp.url),
+            )
+            _radar_cache[product_id] = _RadarCacheEntry(
+                image=image, expires_at=time.time() + RADAR_CACHE_TTL,
+            )
+            logger.info("Radar image fetched: %s (%d bytes)", product_id, len(resp.content))
+            return image
+
+    except Exception as exc:
+        logger.warning("Radar fetch failed for %s: %s", product_id, exc)
+        return None
+
+
+async def fetch_radar_images(lat: float, lon: float) -> list[RadarImage]:
+    """Fetch all configured radar products. Returns only successful fetches."""
+    images = []
+    for pid, cfg in RADAR_PRODUCTS.items():
+        img = await fetch_radar_image(
+            lat=lat, lon=lon, product_id=pid,
+            layers=cfg.get("layers"),
+            extra_params=cfg.get("extra_params"),
+        )
+        if img is not None:
+            images.append(img)
+    return images
+
+
+def get_cached_radar(product_id: str = "nexrad_composite") -> Optional[RadarImage]:
+    """Return a cached radar image if available (for the API endpoint)."""
+    cached = _radar_cache.get(product_id)
+    if cached is not None and time.time() < cached.expires_at:
+        return cached.image
+    return None
+
+
 async def collect_all(
     db: Session,
     lat: float,
@@ -176,18 +317,21 @@ async def collect_all(
     horizon_hours: int = 12,
     nws_forecast=None,
     station_timezone: str = "",
+    radar_enabled: bool = True,
 ) -> CollectedData:
     """Gather all data sources into a single snapshot for the analyst."""
     station = gather_station_data(db)
     model = await fetch_model_guidance(lat, lon, horizon_hours)
     nws_summary = gather_nws_summary(nws_forecast)
     knowledge = gather_knowledge(db)
+    radar_images = await fetch_radar_images(lat, lon) if radar_enabled else []
 
     return CollectedData(
         station=station,
         model_guidance=model,
         nws_summary=nws_summary,
         knowledge_entries=knowledge,
+        radar_images=radar_images,
         collected_at=datetime.now(timezone.utc).isoformat(),
         location={"latitude": lat, "longitude": lon},
         station_timezone=station_timezone,

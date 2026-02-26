@@ -39,6 +39,7 @@ class NowcastService:
         self._longitude: float = 0.0
         self._auto_accept_hours: int = 48
         self._station_timezone: str = ""
+        self._radar_enabled: bool = True
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
 
@@ -50,7 +51,7 @@ class NowcastService:
                 "nowcast_enabled", "nowcast_api_key", "nowcast_model",
                 "nowcast_interval", "nowcast_horizon", "latitude",
                 "longitude", "nowcast_knowledge_auto_accept_hours",
-                "station_timezone",
+                "station_timezone", "nowcast_radar_enabled",
             ]
             rows = db.query(StationConfigModel).filter(
                 StationConfigModel.key.in_(keys)
@@ -81,6 +82,7 @@ class NowcastService:
             except ValueError:
                 self._auto_accept_hours = 48
             self._station_timezone = cfg.get("station_timezone", "")
+            self._radar_enabled = cfg.get("nowcast_radar_enabled", "true").lower() == "true"
         finally:
             db.close()
 
@@ -141,6 +143,7 @@ class NowcastService:
                 horizon_hours=self._horizon,
                 nws_forecast=nws,
                 station_timezone=self._station_timezone,
+                radar_enabled=self._radar_enabled,
             )
 
             if not data.station.has_data:
@@ -217,6 +220,7 @@ class NowcastService:
             "current_vs_model": result.current_vs_model,
             "data_quality": result.data_quality,
             "sources_used": self._sources_list(result),
+            "radar_analysis": result.radar_analysis,
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
         }
@@ -224,11 +228,10 @@ class NowcastService:
     def _sources_list(self, result: AnalystResult) -> list[str]:
         """Build list of data sources used."""
         sources = ["local_station"]
-        if result.data_quality and "model" in result.data_quality.lower():
-            sources.append("open_meteo_hrrr")
-        else:
-            sources.append("open_meteo_hrrr")  # Always attempted
+        sources.append("open_meteo_hrrr")
         sources.append("nws_forecast")
+        if result.radar_analysis:
+            sources.append("nexrad_radar")
         return sources
 
     def _store_proposed_knowledge(self, db: Session, proposed: dict[str, str]) -> None:

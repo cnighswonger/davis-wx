@@ -1,16 +1,18 @@
 """GET/PUT/POST /api/nowcast — AI nowcast endpoints."""
 
-import asyncio
+import base64
 import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
 from ..models.nowcast import NowcastHistory, NowcastKnowledge
 from ..services.nowcast_service import nowcast_service
+from ..services.nowcast_collector import get_cached_radar
 
 router = APIRouter()
 
@@ -49,6 +51,20 @@ async def generate_now():
     if result is None:
         raise HTTPException(status_code=500, detail="Generation produced no result")
     return result
+
+
+@router.get("/nowcast/radar")
+def get_radar_image():
+    """Return the cached NEXRAD radar image as PNG binary."""
+    img = get_cached_radar()
+    if img is None:
+        raise HTTPException(status_code=404, detail="No cached radar image available")
+    png_bytes = base64.b64decode(img.png_base64)
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/nowcast/history")
@@ -122,6 +138,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
     farming_impact = None
     current_vs_model = ""
     data_quality = ""
+    radar_analysis = None
     if record.raw_response:
         try:
             raw = json.loads(record.raw_response)
@@ -129,6 +146,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
                 farming_impact = raw.get("farming_impact")
                 current_vs_model = raw.get("current_vs_model", "")
                 data_quality = raw.get("data_quality", "")
+                radar_analysis = raw.get("radar_analysis")
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -142,6 +160,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
         "elements": elements,
         "farming_impact": farming_impact,
         "current_vs_model": current_vs_model,
+        "radar_analysis": radar_analysis,
         "data_quality": data_quality,
         "sources_used": sources,
         "input_tokens": record.input_tokens or 0,

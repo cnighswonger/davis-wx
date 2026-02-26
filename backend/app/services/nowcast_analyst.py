@@ -41,6 +41,21 @@ ANALYTICAL METHOD:
    temperature extremes, and wind changes.
 6. Assess confidence for each forecast element based on data agreement.
 
+RADAR ANALYSIS (when radar imagery is provided):
+- The image is NEXRAD composite reflectivity centered on the station.
+- Reflectivity color scale: green = light rain (~15-30 dBZ),
+  yellow = moderate-heavy (~35-45 dBZ), orange/red = very heavy (~45-60 dBZ),
+  purple/white = severe (60+ dBZ). Blues may indicate snow.
+- Analyze: precipitation coverage near station, echo movement direction
+  (compare with model wind fields), approaching or departing precipitation,
+  convective vs stratiform character, line segments or mesoscale structures.
+- Use radar to refine precipitation timing: if echoes are 50 miles away
+  moving at 30 mph, onset is approximately 1.5-2 hours out.
+- If no significant echoes near the station, note radar is clear and state
+  confidence in the dry forecast.
+- Do NOT describe image colors/pixels — translate what you see into weather
+  terms (e.g., "A band of moderate rain approaching from the southwest").
+
 TIME REFERENCES:
 - Express ALL times in the station's local timezone as specified in the
   request. Use 12-hour format with AM/PM (e.g., "2:30 PM", "around 10 PM").
@@ -50,6 +65,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object (no markdown, no commentary):
 {
   "summary": "2-3 sentence natural language nowcast for general audience",
   "current_vs_model": "Where and how observations diverge from model guidance",
+  "radar_analysis": null or "Brief description of what radar shows and timing implications",
   "elements": {
     "temperature": {"forecast": "...", "confidence": "HIGH|MEDIUM|LOW"},
     "precipitation": {"forecast": "...", "confidence": "...", "timing": "..."},
@@ -154,6 +170,46 @@ class AnalystResult:
     raw_response: str
     input_tokens: int
     output_tokens: int
+    radar_analysis: Optional[str] = None
+
+
+def _build_user_content(
+    data: CollectedData, horizon_hours: int,
+) -> str | list[dict]:
+    """Build user message content, with optional radar image blocks.
+
+    Returns a plain string when no radar images are available (no overhead),
+    or a list of multimodal content blocks (text + images) when radar is present.
+    """
+    text_message = _build_user_message(data, horizon_hours)
+
+    if not data.radar_images:
+        return text_message
+
+    blocks: list[dict] = [{"type": "text", "text": text_message}]
+
+    for img in data.radar_images:
+        blocks.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": img.png_base64,
+            },
+        })
+        bbox = img.bbox
+        miles_ns = (bbox[3] - bbox[1]) * 69
+        blocks.append({
+            "type": "text",
+            "text": (
+                f"Above: {img.label} centered on station location. "
+                f"Covers {bbox[1]:.2f}N to {bbox[3]:.2f}N, "
+                f"{abs(bbox[0]):.2f}W to {abs(bbox[2]):.2f}W "
+                f"(~{miles_ns:.0f} miles N-S). Station is at center."
+            ),
+        })
+
+    return blocks
 
 
 async def generate_nowcast(
@@ -178,7 +234,7 @@ async def generate_nowcast(
         logger.warning("Nowcast skipped: no Anthropic API key configured")
         return None
 
-    user_message = _build_user_message(data, horizon_hours)
+    user_content = _build_user_content(data, horizon_hours)
 
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
@@ -186,7 +242,7 @@ async def generate_nowcast(
             model=model,
             max_tokens=1500,
             system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
+            messages=[{"role": "user", "content": user_content}],
         )
     except anthropic.AuthenticationError:
         logger.error("Nowcast failed: invalid Anthropic API key")
@@ -240,4 +296,5 @@ async def generate_nowcast(
         raw_response=raw_text,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        radar_analysis=parsed.get("radar_analysis"),
     )
