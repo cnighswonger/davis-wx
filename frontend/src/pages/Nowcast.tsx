@@ -124,7 +124,7 @@ function ElementCard({
 }
 
 export default function Nowcast() {
-  const { nowcast, refreshNowcast } = useWeatherData();
+  const { nowcast, triggerNowcast } = useWeatherData();
   const isMobile = useIsMobile();
 
   if (!nowcast) {
@@ -203,7 +203,7 @@ export default function Nowcast() {
               : `Updated ${timeAgo(nowcast.created_at)}`}
           </span>
           <button
-            onClick={refreshNowcast}
+            onClick={triggerNowcast}
             style={{
               fontFamily: "var(--font-body)",
               fontSize: "13px",

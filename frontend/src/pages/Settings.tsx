@@ -299,7 +299,12 @@ export default function Settings() {
     setSaveSuccess(false);
     setReconnectMsg(null);
     try {
-      const updated = await updateConfig(configItems);
+      let items = configItems;
+      const tzVal = getConfigValue(items, "station_timezone");
+      if (!tzVal) {
+        items = setConfigValue(items, "station_timezone", resolveTimezone());
+      }
+      const updated = await updateConfig(items);
       setConfigItems(updated);
       const result = await reconnectStation();
       if (result.success) {

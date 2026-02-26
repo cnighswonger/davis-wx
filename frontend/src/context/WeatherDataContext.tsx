@@ -44,8 +44,10 @@ interface WeatherDataContextValue {
   wsConnected: boolean;
   /** Manually refresh forecast data. */
   refreshForecast: () => void;
-  /** Manually refresh nowcast data. */
+  /** Manually refresh nowcast data (fetches cached). */
   refreshNowcast: () => void;
+  /** Trigger a new nowcast generation via Claude API. */
+  triggerNowcast: () => void;
   /** WebSocket manager for alert subscriptions (null until connected). */
   ws: WebSocketManager | null;
 }
@@ -81,13 +83,18 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       });
   }, []);
 
-  // Refresh nowcast data. When called explicitly (e.g. Refresh button),
-  // triggers a new generation via POST then updates state with the result.
+  // Fetch cached nowcast (fast — used on page load and periodic refresh).
   const refreshNowcast = useCallback(() => {
+    fetchNowcast()
+      .then(setNowcast)
+      .catch(() => {});
+  }, []);
+
+  // Trigger a brand-new nowcast generation via Claude API (slow — Refresh button only).
+  const triggerNowcast = useCallback(() => {
     generateNowcast()
       .then(setNowcast)
       .catch(() => {
-        // Generation failed or disabled — fall back to fetching latest.
         fetchNowcast().then(setNowcast).catch(() => {});
       });
   }, []);
@@ -172,6 +179,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     wsConnected,
     refreshForecast,
     refreshNowcast,
+    triggerNowcast,
     ws,
   };
 
