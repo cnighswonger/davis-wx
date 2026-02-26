@@ -41,6 +41,11 @@ ANALYTICAL METHOD:
    temperature extremes, and wind changes.
 6. Assess confidence for each forecast element based on data agreement.
 
+TIME REFERENCES:
+- Express ALL times in the station's local timezone as specified in the
+  request. Use 12-hour format with AM/PM (e.g., "2:30 PM", "around 10 PM").
+- Never use UTC in user-facing text unless the request specifies UTC.
+
 OUTPUT FORMAT — respond with ONLY a JSON object (no markdown, no commentary):
 {
   "summary": "2-3 sentence natural language nowcast for general audience",
@@ -73,10 +78,13 @@ def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
     """Assemble the collected data into a structured user message for Claude."""
     parts = []
 
+    tz_label = data.station_timezone or "UTC"
     parts.append(f"=== NOWCAST REQUEST ===")
     parts.append(f"Location: {data.location.get('latitude')}, {data.location.get('longitude')}")
+    parts.append(f"Station timezone: {tz_label}")
     parts.append(f"Generated: {data.collected_at}")
     parts.append(f"Forecast horizon: next {horizon_hours} hours")
+    parts.append(f"Express all times in {tz_label} local time using 12-hour AM/PM format.")
     parts.append("")
 
     # Station observations

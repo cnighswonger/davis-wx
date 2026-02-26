@@ -4,6 +4,7 @@
  */
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
+import { resolveTimezone } from "../utils/timezone.ts";
 
 const cardStyle: React.CSSProperties = {
   background: "var(--color-bg-card)",
@@ -62,6 +63,16 @@ function timeAgo(isoString: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function formatLocalTime(isoString: string): string {
+  const tz = resolveTimezone();
+  return new Date(isoString).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: tz,
+  });
 }
 
 function ElementCard({
@@ -187,7 +198,9 @@ export default function Nowcast() {
               color: "var(--color-text-muted)",
             }}
           >
-            Updated {timeAgo(nowcast.created_at)}
+            {nowcast.valid_from && nowcast.valid_until
+              ? `${formatLocalTime(nowcast.valid_from)} – ${formatLocalTime(nowcast.valid_until)}`
+              : `Updated ${timeAgo(nowcast.created_at)}`}
           </span>
           <button
             onClick={refreshNowcast}

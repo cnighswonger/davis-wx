@@ -852,6 +852,11 @@ export default function Settings() {
               const tz = e.target.value;
               setTimezoneState(tz);
               storeTimezone(tz);
+              // Also save resolved IANA name to backend for nowcast service
+              const resolved = tz === "auto"
+                ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                : tz;
+              updateField("station_timezone", resolved);
             }}
           >
             <option value="auto">Auto ({resolveTimezone()})</option>
@@ -1350,23 +1355,28 @@ export default function Settings() {
           </label>
         </div>
 
-        <div style={gridTwoCol(isMobile)}>
-          <div style={fieldGroup}>
-            <label style={labelStyle}>
-              Anthropic API Key
-              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
-                Or set ANTHROPIC_API_KEY environment variable
-              </span>
-            </label>
-            <input
-              style={inputStyle}
-              type="password"
-              placeholder="sk-ant-..."
-              value={String(val("nowcast_api_key") || "")}
-              onChange={(e) => updateField("nowcast_api_key", e.target.value)}
-            />
-          </div>
+        {/* API Key — full width */}
+        <div style={fieldGroup}>
+          <label style={labelStyle}>
+            Anthropic API Key
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
+              Or set ANTHROPIC_API_KEY environment variable
+            </span>
+          </label>
+          <input
+            style={{ ...inputStyle, maxWidth: "480px" }}
+            type="password"
+            placeholder="sk-ant-..."
+            value={String(val("nowcast_api_key") || "")}
+            onChange={(e) => updateField("nowcast_api_key", e.target.value)}
+          />
+        </div>
 
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: isMobile ? "12px" : "16px",
+        }}>
           <div style={fieldGroup}>
             <label style={labelStyle}>Model</label>
             <select

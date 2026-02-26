@@ -61,6 +61,7 @@ class CollectedData:
     knowledge_entries: list[str] = field(default_factory=list)
     collected_at: str = ""
     location: dict[str, float] = field(default_factory=dict)
+    station_timezone: str = ""
 
 
 def _reading_to_dict(r: SensorReadingModel) -> dict[str, Any]:
@@ -174,6 +175,7 @@ async def collect_all(
     lon: float,
     horizon_hours: int = 12,
     nws_forecast=None,
+    station_timezone: str = "",
 ) -> CollectedData:
     """Gather all data sources into a single snapshot for the analyst."""
     station = gather_station_data(db)
@@ -188,4 +190,5 @@ async def collect_all(
         knowledge_entries=knowledge,
         collected_at=datetime.now(timezone.utc).isoformat(),
         location={"latitude": lat, "longitude": lon},
+        station_timezone=station_timezone,
     )

@@ -38,6 +38,7 @@ class NowcastService:
         self._latitude: float = 0.0
         self._longitude: float = 0.0
         self._auto_accept_hours: int = 48
+        self._station_timezone: str = ""
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
 
@@ -49,6 +50,7 @@ class NowcastService:
                 "nowcast_enabled", "nowcast_api_key", "nowcast_model",
                 "nowcast_interval", "nowcast_horizon", "latitude",
                 "longitude", "nowcast_knowledge_auto_accept_hours",
+                "station_timezone",
             ]
             rows = db.query(StationConfigModel).filter(
                 StationConfigModel.key.in_(keys)
@@ -78,6 +80,7 @@ class NowcastService:
                 self._auto_accept_hours = int(cfg.get("nowcast_knowledge_auto_accept_hours", "48"))
             except ValueError:
                 self._auto_accept_hours = 48
+            self._station_timezone = cfg.get("station_timezone", "")
         finally:
             db.close()
 
@@ -129,6 +132,7 @@ class NowcastService:
                 lon=self._longitude,
                 horizon_hours=self._horizon,
                 nws_forecast=nws,
+                station_timezone=self._station_timezone,
             )
 
             if not data.station.has_data:
