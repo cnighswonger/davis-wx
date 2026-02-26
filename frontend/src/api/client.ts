@@ -170,7 +170,7 @@ export function forceArchive(): Promise<{ success: boolean }> {
 
 // --- Nowcast ---
 
-import type { NowcastData, NowcastKnowledgeEntry } from "./types.ts";
+import type { NowcastData, NowcastKnowledgeEntry, NowcastVerification } from "./types.ts";
 
 export function fetchNowcast(): Promise<NowcastData | null> {
   return request<NowcastData | null>("/api/nowcast");
@@ -198,6 +198,12 @@ export function updateNowcastKnowledge(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
   });
+}
+
+export function fetchNowcastVerifications(
+  limit: number = 20,
+): Promise<NowcastVerification[]> {
+  return request<NowcastVerification[]>(`/api/nowcast/verifications?limit=${limit}`);
 }
 
 export function generateNowcast(): Promise<NowcastData> {

@@ -18,6 +18,7 @@ from ..models.station_config import StationConfigModel
 from ..models.nowcast import NowcastHistory, NowcastKnowledge
 from .nowcast_collector import collect_all
 from .nowcast_analyst import generate_nowcast, AnalystResult
+from .nowcast_verifier import verify_expired_nowcasts
 from .forecast_nws import fetch_nws_forecast
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ class NowcastService:
         self._last_run = now
         await self._generate()
         self._auto_accept_knowledge()
+        self._verify_expired()
 
     async def _generate(self) -> None:
         """Gather data and call Claude to generate a nowcast."""
@@ -249,6 +251,18 @@ class NowcastService:
         )
         db.add(entry)
         logger.info("Knowledge entry proposed: [%s] %s", entry.category, entry.content[:80])
+
+    def _verify_expired(self) -> None:
+        """Check for expired nowcasts that need verification."""
+        db = SessionLocal()
+        try:
+            count = verify_expired_nowcasts(db, self._auto_accept_hours)
+            if count > 0:
+                logger.info("Verified %d expired nowcast(s)", count)
+        except Exception:
+            logger.exception("Verification check failed")
+        finally:
+            db.close()
 
     def _auto_accept_knowledge(self) -> None:
         """Auto-accept pending knowledge entries past their deadline."""

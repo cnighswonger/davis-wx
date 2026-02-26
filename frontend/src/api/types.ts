@@ -252,6 +252,17 @@ export interface NowcastKnowledgeEntry {
   reviewed_at: string | null;
 }
 
+export interface NowcastVerification {
+  id: number;
+  nowcast_id: number;
+  verified_at: string;
+  element: string;
+  predicted: string;
+  actual: string;
+  accuracy_score: number | null;
+  notes: string | null;
+}
+
 // --- WebSocket Messages ---
 
 export interface WSSensorUpdate {

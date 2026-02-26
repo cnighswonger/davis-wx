@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
-from ..models.nowcast import NowcastHistory, NowcastKnowledge
+from ..models.nowcast import NowcastHistory, NowcastKnowledge, NowcastVerification
 from ..services.nowcast_service import nowcast_service
 from ..services.nowcast_collector import get_cached_radar
 
@@ -120,6 +120,35 @@ def update_knowledge(
     db.commit()
 
     return _knowledge_to_dict(entry)
+
+
+@router.get("/nowcast/verifications")
+def get_verifications(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    """Return recent verification results, newest first."""
+    records = (
+        db.query(NowcastVerification)
+        .order_by(NowcastVerification.verified_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_verification_to_dict(r) for r in records]
+
+
+def _verification_to_dict(record: NowcastVerification) -> dict:
+    """Convert a NowcastVerification ORM object to an API response dict."""
+    return {
+        "id": record.id,
+        "nowcast_id": record.nowcast_id,
+        "verified_at": record.verified_at.isoformat() if record.verified_at else None,
+        "element": record.element,
+        "predicted": record.predicted,
+        "actual": record.actual,
+        "accuracy_score": record.accuracy_score,
+        "notes": record.notes,
+    }
 
 
 def _history_to_dict(record: NowcastHistory) -> dict:
