@@ -250,6 +250,7 @@ export interface NowcastKnowledgeEntry {
   status: "pending" | "accepted" | "rejected";
   auto_accept_at: string | null;
   reviewed_at: string | null;
+  recommendation: string;
 }
 
 export interface NowcastVerification {

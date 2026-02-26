@@ -208,4 +208,48 @@ def _knowledge_to_dict(entry: NowcastKnowledge) -> dict:
         "status": entry.status,
         "auto_accept_at": entry.auto_accept_at.isoformat() if entry.auto_accept_at else None,
         "reviewed_at": entry.reviewed_at.isoformat() if entry.reviewed_at else None,
+        "recommendation": _knowledge_recommendation(entry),
     }
+
+
+_AI_RECOMMENDATIONS: dict[str, str] = {
+    "bias": (
+        "Accept — the AI detected a systematic measurement bias at this "
+        "station. Including this helps compensate in future forecasts."
+    ),
+    "timing": (
+        "Accept — the AI noticed a recurring timing pattern for weather "
+        "events at this location. Including this refines precipitation "
+        "and temperature change timing."
+    ),
+    "terrain": (
+        "Accept — the AI identified a terrain-influenced weather effect. "
+        "Including this helps account for local geography in forecasts."
+    ),
+    "seasonal": (
+        "Accept — the AI detected a seasonal pattern specific to this "
+        "location. Including this improves forecasts during similar "
+        "conditions."
+    ),
+}
+
+
+def _knowledge_recommendation(entry: NowcastKnowledge) -> str:
+    """Generate a contextual recommendation for a knowledge entry."""
+    if entry.source == "verification":
+        return (
+            "Accept — this was identified from a verified prediction miss. "
+            "Including this helps the AI learn from its errors and "
+            "calibrate future forecasts."
+        )
+    if entry.source == "ai_proposed":
+        return _AI_RECOMMENDATIONS.get(
+            entry.category,
+            "Accept if this matches your understanding of local weather "
+            "patterns. The AI will use accepted entries to improve future "
+            "forecasts.",
+        )
+    return (
+        "Review and accept if this reflects accurate local knowledge. "
+        "Accepted entries are included as context in future nowcasts."
+    )

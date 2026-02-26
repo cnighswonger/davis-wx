@@ -702,6 +702,20 @@ export default function Nowcast() {
                   >
                     {entry.content}
                   </p>
+                  {entry.recommendation && (
+                    <p
+                      style={{
+                        margin: "0 0 8px 0",
+                        fontSize: "12px",
+                        fontFamily: "var(--font-body)",
+                        fontStyle: "italic",
+                        color: "var(--color-text-secondary)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {entry.recommendation}
+                    </p>
+                  )}
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button
                       onClick={() =>
