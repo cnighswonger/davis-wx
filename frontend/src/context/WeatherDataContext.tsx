@@ -17,6 +17,7 @@ import type {
   ForecastResponse,
   AstronomyResponse,
   StationStatus,
+  NowcastData,
 } from "../api/types.ts";
 import { WebSocketManager } from "../api/websocket.ts";
 import {
@@ -24,6 +25,7 @@ import {
   fetchForecast,
   fetchAstronomy,
   fetchStationStatus,
+  fetchNowcast,
 } from "../api/client.ts";
 import { ASTRONOMY_REFRESH_INTERVAL, FORECAST_REFRESH_INTERVAL } from "../utils/constants.ts";
 
@@ -34,12 +36,15 @@ interface WeatherDataContextValue {
   forecast: ForecastResponse | null;
   astronomy: AstronomyResponse | null;
   stationStatus: StationStatus | null;
+  nowcast: NowcastData | null;
   /** Whether the backend reports the serial connection to the station is up. */
   connected: boolean;
   /** Whether our browser WebSocket to the backend is open. */
   wsConnected: boolean;
   /** Manually refresh forecast data. */
   refreshForecast: () => void;
+  /** Manually refresh nowcast data. */
+  refreshNowcast: () => void;
   /** WebSocket manager for alert subscriptions (null until connected). */
   ws: WebSocketManager | null;
 }
@@ -60,6 +65,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
   const [stationStatus, setStationStatus] = useState<StationStatus | null>(
     null,
   );
+  const [nowcast, setNowcast] = useState<NowcastData | null>(null);
   const [connected, setConnected] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
 
@@ -74,7 +80,16 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       });
   }, []);
 
-  // Fetch slow-changing data (astronomy + station status).
+  // Refresh nowcast data.
+  const refreshNowcast = useCallback(() => {
+    fetchNowcast()
+      .then(setNowcast)
+      .catch(() => {
+        /* ignore -- will retry on next interval */
+      });
+  }, []);
+
+  // Fetch slow-changing data (astronomy + station status + nowcast).
   const refreshSlowData = useCallback(() => {
     fetchAstronomy()
       .then(setAstronomy)
@@ -86,7 +101,8 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       .catch(() => {
         /* ignore */
       });
-  }, []);
+    refreshNowcast();
+  }, [refreshNowcast]);
 
   useEffect(() => {
     // --- Initial REST fetches ---
@@ -148,9 +164,11 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     forecast,
     astronomy,
     stationStatus,
+    nowcast,
     connected,
     wsConnected,
     refreshForecast,
+    refreshNowcast,
     ws,
   };
 

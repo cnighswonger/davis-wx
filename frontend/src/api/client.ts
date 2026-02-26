@@ -168,4 +168,36 @@ export function forceArchive(): Promise<{ success: boolean }> {
   return request("/api/weatherlink/force-archive", { method: "POST" });
 }
 
+// --- Nowcast ---
+
+import type { NowcastData, NowcastKnowledgeEntry } from "./types.ts";
+
+export function fetchNowcast(): Promise<NowcastData | null> {
+  return request<NowcastData | null>("/api/nowcast");
+}
+
+export function fetchNowcastHistory(
+  limit: number = 20,
+): Promise<NowcastData[]> {
+  return request<NowcastData[]>(`/api/nowcast/history?limit=${limit}`);
+}
+
+export function fetchNowcastKnowledge(
+  status?: string,
+): Promise<NowcastKnowledgeEntry[]> {
+  const params = status ? `?status=${status}` : "";
+  return request<NowcastKnowledgeEntry[]>(`/api/nowcast/knowledge${params}`);
+}
+
+export function updateNowcastKnowledge(
+  id: number,
+  status: "accepted" | "rejected",
+): Promise<NowcastKnowledgeEntry> {
+  return request<NowcastKnowledgeEntry>(`/api/nowcast/knowledge/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
 export { ApiError };

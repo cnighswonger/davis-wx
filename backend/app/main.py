@@ -5,6 +5,7 @@ commands to the logger daemon via IPC.  All serial/polling logic lives
 in logger_main.py.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,6 +22,7 @@ from .ipc.dependencies import set_ipc_client
 from .api.router import api_router
 from .api import backgrounds as backgrounds_api
 from .ws.handler import websocket_endpoint
+from .services.nowcast_service import nowcast_service
 
 # Configure logging for our app (uvicorn only configures its own loggers)
 logging.basicConfig(
@@ -57,8 +59,12 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Logger daemon not reachable — running in degraded mode")
 
+    # Start nowcast background service
+    nowcast_task = asyncio.create_task(nowcast_service.start())
+
     yield
 
+    nowcast_task.cancel()
     await client.close()
     logger.info("Application shutdown complete")
 

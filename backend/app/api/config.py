@@ -38,6 +38,13 @@ _DEFAULTS: dict[str, object] = {
     "cwop_callsign": "",
     "cwop_passcode": "-1",
     "cwop_upload_interval": 300,
+    "nowcast_enabled": False,
+    "nowcast_api_key": "",
+    "nowcast_model": "claude-haiku-4-5-20251001",
+    "nowcast_interval": 900,
+    "nowcast_horizon": 2,
+    "nowcast_radius": 25,
+    "nowcast_knowledge_auto_accept_hours": 48,
 }
 
 

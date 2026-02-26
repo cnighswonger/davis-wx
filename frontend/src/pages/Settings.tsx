@@ -157,7 +157,7 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts">("station");
+  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast">("station");
 
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
@@ -467,6 +467,7 @@ export default function Settings() {
           ["display", "Display"],
           ["services", "Services"],
           ["alerts", "Alerts"],
+          ["nowcast", "Nowcast"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -1329,6 +1330,115 @@ export default function Settings() {
               Alerts saved.
             </span>
           )}
+        </div>
+      </div>
+      </>)}
+
+      {activeTab === "nowcast" && (<>
+      {/* AI Nowcast section */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>AI Nowcast</h3>
+
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("nowcast_enabled") === true}
+              onChange={(e) => updateField("nowcast_enabled", e.target.checked)}
+            />
+            Enable AI Nowcast
+          </label>
+        </div>
+
+        <div style={gridTwoCol(isMobile)}>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Anthropic API Key
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
+                Or set ANTHROPIC_API_KEY environment variable
+              </span>
+            </label>
+            <input
+              style={inputStyle}
+              type="password"
+              placeholder="sk-ant-..."
+              value={String(val("nowcast_api_key") || "")}
+              onChange={(e) => updateField("nowcast_api_key", e.target.value)}
+            />
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Model</label>
+            <select
+              style={selectStyle}
+              value={String(val("nowcast_model") || "claude-haiku-4-5-20251001")}
+              onChange={(e) => updateField("nowcast_model", e.target.value)}
+            >
+              <option value="claude-haiku-4-5-20251001">Haiku 4.5 (fastest, lowest cost)</option>
+              <option value="claude-sonnet-4-5-20250929">Sonnet 4.5 (better reasoning)</option>
+            </select>
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Update Interval</label>
+            <select
+              style={selectStyle}
+              value={String(val("nowcast_interval") || "900")}
+              onChange={(e) => updateField("nowcast_interval", parseInt(e.target.value))}
+            >
+              <option value="300">5 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="900">15 minutes</option>
+              <option value="1800">30 minutes</option>
+              <option value="3600">1 hour</option>
+            </select>
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Forecast Horizon</label>
+            <select
+              style={selectStyle}
+              value={String(val("nowcast_horizon") || "2")}
+              onChange={(e) => updateField("nowcast_horizon", parseInt(e.target.value))}
+            >
+              <option value="2">2 hours</option>
+              <option value="4">4 hours</option>
+              <option value="6">6 hours</option>
+              <option value="8">8 hours</option>
+              <option value="12">12 hours</option>
+            </select>
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Nearby Station Radius (miles)</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min="5"
+              max="100"
+              step="5"
+              value={String(val("nowcast_radius") || "25")}
+              onChange={(e) => updateField("nowcast_radius", parseInt(e.target.value) || 25)}
+            />
+          </div>
+
+          <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Knowledge Auto-Accept (hours)
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
+                0 = manual approval only
+              </span>
+            </label>
+            <input
+              style={inputStyle}
+              type="number"
+              min="0"
+              max="720"
+              step="1"
+              value={String(val("nowcast_knowledge_auto_accept_hours") || "48")}
+              onChange={(e) => updateField("nowcast_knowledge_auto_accept_hours", parseInt(e.target.value) || 0)}
+            />
+          </div>
         </div>
       </div>
       </>)}

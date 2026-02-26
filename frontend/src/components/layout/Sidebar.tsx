@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { to: '/history', label: 'History', icon: '\u25F7' },
   { to: '/forecast', label: 'Forecast', icon: '\u2601' },
   { to: '/astronomy', label: 'Astronomy', icon: '\u263D' },
+  { to: '/nowcast', label: 'Nowcast', icon: '\u26C5' },
   { to: '/settings', label: 'Settings', icon: '\u2699' },
 ];
 

@@ -210,6 +210,47 @@ export interface AlertEvent {
   operator: string;
 }
 
+// --- Nowcast ---
+
+export interface NowcastElement {
+  forecast: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW" | string;
+  timing?: string;
+}
+
+export interface NowcastData {
+  id: number;
+  created_at: string;
+  valid_from: string;
+  valid_until: string;
+  model_used: string;
+  summary: string;
+  elements: {
+    temperature?: NowcastElement;
+    precipitation?: NowcastElement;
+    wind?: NowcastElement;
+    sky?: NowcastElement;
+    special?: string | null;
+  };
+  farming_impact: string | null;
+  current_vs_model: string;
+  data_quality: string;
+  sources_used: string[];
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface NowcastKnowledgeEntry {
+  id: number;
+  created_at: string;
+  source: string;
+  category: string;
+  content: string;
+  status: "pending" | "accepted" | "rejected";
+  auto_accept_at: string | null;
+  reviewed_at: string | null;
+}
+
 // --- WebSocket Messages ---
 
 export interface WSSensorUpdate {

@@ -129,6 +129,13 @@ export const TILE_REGISTRY: Record<string, TileDefinition> = {
     minColSpan: 4,
     hasFlipTile: false,
   },
+  nowcast: {
+    id: "nowcast",
+    label: "AI Nowcast",
+    category: "status",
+    minColSpan: 3,
+    hasFlipTile: false,
+  },
 };
 
 // --- Default layout (matches the current hardcoded Dashboard.tsx) ---
@@ -147,6 +154,7 @@ export const DEFAULT_LAYOUT: DashboardLayout = {
     { tileId: "rain" },
     { tileId: "solar-uv" },
     { tileId: "current-conditions" },
+    { tileId: "nowcast", colSpan: 4 },
     { tileId: "station-status", colSpan: 12 },
   ],
 };
