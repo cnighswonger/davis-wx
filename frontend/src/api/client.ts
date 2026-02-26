@@ -200,4 +200,8 @@ export function updateNowcastKnowledge(
   });
 }
 
+export function generateNowcast(): Promise<NowcastData> {
+  return request<NowcastData>("/api/nowcast/generate", { method: "POST" });
+}
+
 export { ApiError };

@@ -84,9 +84,17 @@ class NowcastService:
         finally:
             db.close()
 
+    def is_enabled(self) -> bool:
+        """Check if the nowcast service is enabled."""
+        return self._enabled
+
     def get_latest(self) -> Optional[dict]:
         """Return the most recent nowcast (cached in memory for fast API response)."""
         return self._latest
+
+    async def generate_once(self) -> None:
+        """Trigger a single nowcast generation (called from API)."""
+        await self._generate()
 
     async def start(self) -> None:
         """Main loop — runs forever as a background task."""

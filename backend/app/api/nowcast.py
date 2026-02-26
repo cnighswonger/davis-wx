@@ -1,5 +1,6 @@
-"""GET/PUT /api/nowcast — AI nowcast endpoints."""
+"""GET/PUT/POST /api/nowcast — AI nowcast endpoints."""
 
+import asyncio
 import json
 from datetime import datetime, timezone
 
@@ -32,6 +33,22 @@ def get_nowcast(db: Session = Depends(get_db)):
         return None
 
     return _history_to_dict(record)
+
+
+@router.post("/nowcast/generate")
+async def generate_now():
+    """Trigger an immediate nowcast generation and return the result."""
+    nowcast_service.reload_config()
+    if not nowcast_service.is_enabled():
+        raise HTTPException(status_code=400, detail="Nowcast is not enabled")
+    try:
+        await nowcast_service.generate_once()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    result = nowcast_service.get_latest()
+    if result is None:
+        raise HTTPException(status_code=500, detail="Generation produced no result")
+    return result
 
 
 @router.get("/nowcast/history")
@@ -101,6 +118,20 @@ def _history_to_dict(record: NowcastHistory) -> dict:
     except (json.JSONDecodeError, TypeError):
         sources = []
 
+    # Extract top-level fields from raw_response (full Claude JSON output).
+    farming_impact = None
+    current_vs_model = ""
+    data_quality = ""
+    if record.raw_response:
+        try:
+            raw = json.loads(record.raw_response)
+            if isinstance(raw, dict):
+                farming_impact = raw.get("farming_impact")
+                current_vs_model = raw.get("current_vs_model", "")
+                data_quality = raw.get("data_quality", "")
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "id": record.id,
         "created_at": record.created_at.isoformat() if record.created_at else None,
@@ -109,9 +140,9 @@ def _history_to_dict(record: NowcastHistory) -> dict:
         "model_used": record.model_used,
         "summary": record.summary,
         "elements": elements,
-        "farming_impact": elements.get("farming_impact") if isinstance(elements, dict) else None,
-        "current_vs_model": record.raw_response[:200] if not elements else "",
-        "data_quality": "",
+        "farming_impact": farming_impact,
+        "current_vs_model": current_vs_model,
+        "data_quality": data_quality,
         "sources_used": sources,
         "input_tokens": record.input_tokens or 0,
         "output_tokens": record.output_tokens or 0,

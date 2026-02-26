@@ -276,7 +276,13 @@ export default function Settings() {
     setError(null);
     setSaveSuccess(false);
     try {
-      const updated = await updateConfig(configItems);
+      // Ensure station_timezone is always populated for backend services.
+      let items = configItems;
+      const tzVal = getConfigValue(items, "station_timezone");
+      if (!tzVal) {
+        items = setConfigValue(items, "station_timezone", resolveTimezone());
+      }
+      const updated = await updateConfig(items);
       setConfigItems(updated);
       setSaveSuccess(true);
     } catch (err: unknown) {

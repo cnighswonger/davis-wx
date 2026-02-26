@@ -26,6 +26,7 @@ import {
   fetchAstronomy,
   fetchStationStatus,
   fetchNowcast,
+  generateNowcast,
 } from "../api/client.ts";
 import { ASTRONOMY_REFRESH_INTERVAL, FORECAST_REFRESH_INTERVAL } from "../utils/constants.ts";
 
@@ -80,12 +81,14 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       });
   }, []);
 
-  // Refresh nowcast data.
+  // Refresh nowcast data. When called explicitly (e.g. Refresh button),
+  // triggers a new generation via POST then updates state with the result.
   const refreshNowcast = useCallback(() => {
-    fetchNowcast()
+    generateNowcast()
       .then(setNowcast)
       .catch(() => {
-        /* ignore -- will retry on next interval */
+        // Generation failed or disabled — fall back to fetching latest.
+        fetchNowcast().then(setNowcast).catch(() => {});
       });
   }, []);
 
