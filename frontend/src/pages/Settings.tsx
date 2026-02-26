@@ -1470,7 +1470,7 @@ export default function Settings() {
               min="0"
               max="720"
               step="1"
-              value={String(val("nowcast_knowledge_auto_accept_hours") || "48")}
+              value={val("nowcast_knowledge_auto_accept_hours") !== "" ? String(val("nowcast_knowledge_auto_accept_hours")) : "48"}
               onChange={(e) => updateField("nowcast_knowledge_auto_accept_hours", parseInt(e.target.value) || 0)}
             />
           </div>
