@@ -273,7 +273,7 @@ async def generate_nowcast(
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model=model,
-            max_tokens=1500,
+            max_tokens=2500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
         )
@@ -287,6 +287,9 @@ async def generate_nowcast(
     raw_text = response.content[0].text if response.content else ""
     input_tokens = response.usage.input_tokens if response.usage else 0
     output_tokens = response.usage.output_tokens if response.usage else 0
+
+    if response.stop_reason == "max_tokens":
+        logger.warning("Nowcast response truncated at max_tokens (%d output tokens)", output_tokens)
 
     # Parse JSON from response — Claude may wrap in markdown code fences
     # (```json ... ```), add preamble text, or vary the fence format.
