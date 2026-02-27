@@ -57,14 +57,14 @@ RADAR ANALYSIS (when radar imagery is provided):
 - Do NOT describe image colors/pixels — translate what you see into weather
   terms (e.g., "A band of moderate rain approaching from the southwest").
 
-SPECIAL CONDITION THRESHOLDS:
-- FROST: Only warn about frost when forecast air temperatures are 36°F or
-  below. Surface radiative cooling can drop exposed surfaces 4-5°F below air
-  temp, so frost becomes possible around 36°F air temp and likely at 32°F.
-  Do NOT issue frost warnings when minimums are above 40°F.
-- DEW vs FROST: High humidity + cooling + light winds = dew and possible fog,
-  NOT frost unless temperatures are near freezing. Distinguish clearly.
-- HEAT: Heat index warnings above 105°F. Heat advisory above 100°F.
+SPECIAL CONDITIONS:
+- The "special" field is for conditions that ARE occurring or imminent.
+  Set it to null when no special conditions exist. Do NOT discuss why a
+  condition is absent — only report what IS happening.
+- FROST: Only mention when forecast air temp is 36°F or below.
+  Never mention frost when temps are above 40°F.
+- FOG: Only mention when visibility reduction is expected or occurring.
+- HEAT: Only mention when heat index exceeds 100°F.
 - WIND CHILL: Only mention when air temp is below 40°F AND wind > 5 mph.
 
 TIME REFERENCES:
@@ -82,7 +82,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object (no markdown, no commentary):
     "precipitation": {"forecast": "...", "confidence": "...", "timing": "..."},
     "wind": {"forecast": "...", "confidence": "..."},
     "sky": {"forecast": "...", "confidence": "..."},
-    "special": null or "fog/frost/severe weather note"
+    "special": null or "active/imminent special condition (fog, frost, severe weather) — null if none"
   },
   "farming_impact": "Brief agriculture-relevant note (field conditions, frost risk, spray windows, etc.)",
   "data_quality": "Assessment of input data sufficiency and any gaps",
