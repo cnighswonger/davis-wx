@@ -31,8 +31,16 @@ const sectionTitle: React.CSSProperties = {
   color: "var(--color-text)",
 };
 
+function normalizeConfidence(c: string): string {
+  const upper = (c ?? "").toUpperCase();
+  if (upper.startsWith("HIGH")) return "HIGH";
+  if (upper.startsWith("MEDIUM")) return "MEDIUM";
+  if (upper.startsWith("LOW")) return "LOW";
+  return upper;
+}
+
 function confidenceColor(c: string): string {
-  switch (c?.toUpperCase()) {
+  switch (normalizeConfidence(c)) {
     case "HIGH":
       return "var(--color-success)";
     case "MEDIUM":
@@ -45,6 +53,7 @@ function confidenceColor(c: string): string {
 }
 
 function ConfidenceBadge({ level }: { level: string }) {
+  const label = normalizeConfidence(level);
   return (
     <span
       style={{
@@ -60,7 +69,7 @@ function ConfidenceBadge({ level }: { level: string }) {
         letterSpacing: "0.5px",
       }}
     >
-      {level}
+      {label}
     </span>
   );
 }
