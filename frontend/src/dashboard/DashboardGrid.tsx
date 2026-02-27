@@ -31,6 +31,7 @@ import SortableTile from "./SortableTile.tsx";
 import TileCatalogModal from "./TileCatalogModal.tsx";
 import FlipTile from "../components/common/FlipTile.tsx";
 import TrendModal from "../components/common/TrendModal.tsx";
+import NowcastBanner from "../components/panels/NowcastBanner.tsx";
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
 
@@ -234,6 +235,8 @@ export default function DashboardGrid() {
           </button>
         </h2>
 
+        <NowcastBanner />
+
         <div ref={gridRef} className="dashboard-grid" style={gridStyle}>
           {layout.tiles.map((placement) => {
             const def = TILE_REGISTRY[placement.tileId];
@@ -297,6 +300,8 @@ export default function DashboardGrid() {
       >
         Current Conditions
       </h2>
+
+      <NowcastBanner />
 
       {/* Edit toolbar */}
       <div className="dashboard-toolbar" style={toolbarStyle}>

@@ -12,7 +12,6 @@ import RainGauge from "../components/gauges/RainGauge.tsx";
 import SolarUVGauge from "../components/gauges/SolarUVGauge.tsx";
 import CurrentConditions from "../components/panels/CurrentConditions.tsx";
 import StationStatus from "../components/panels/StationStatus.tsx";
-import NowcastPanel from "../components/panels/NowcastPanel.tsx";
 
 interface TileRendererProps {
   tileId: string;
@@ -122,9 +121,6 @@ export default function TileRenderer({ tileId }: TileRendererProps) {
 
     case "station-status":
       return <StationStatus />;
-
-    case "nowcast":
-      return <NowcastPanel />;
 
     default:
       return null;
