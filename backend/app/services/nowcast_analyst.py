@@ -295,27 +295,29 @@ async def generate_nowcast(
         logger.warning("Nowcast response truncated at max_tokens=%d (%d output tokens)", max_tokens, output_tokens)
 
     # Parse JSON from response — Claude may wrap in markdown code fences,
-    # include trailing commas, or add preamble/postamble text.
+    # include trailing commas, or add commentary after the JSON object.
     json_text = raw_text.strip()
 
-    # Strategy 1: extract content between code fences if present.
+    # Strip code fences if present.
     fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", json_text, re.DOTALL)
     if fence_match:
         json_text = fence_match.group(1).strip()
 
-    # Strategy 2: extract outermost JSON object by brace matching.
+    # Find the start of the JSON object.
     brace_start = json_text.find("{")
-    brace_end = json_text.rfind("}")
-    if brace_start != -1 and brace_end > brace_start:
-        json_text = json_text[brace_start:brace_end + 1]
+    if brace_start != -1:
+        json_text = json_text[brace_start:]
 
     # Fix trailing commas (common LLM JSON error).
     json_text = re.sub(r",\s*}", "}", json_text)
     json_text = re.sub(r",\s*]", "]", json_text)
 
+    # Use raw_decode to parse just the first JSON object, ignoring any
+    # trailing commentary Claude may have added after the JSON.
     try:
-        parsed = json.loads(json_text)
-    except json.JSONDecodeError as exc:
+        decoder = json.JSONDecoder()
+        parsed, _ = decoder.raw_decode(json_text)
+    except (json.JSONDecodeError, ValueError) as exc:
         logger.error("Nowcast JSON parse failed: %s | raw[:300]: %s", exc, raw_text[:300])
         # Store raw response as a minimal result so it's not lost.
         return AnalystResult(
