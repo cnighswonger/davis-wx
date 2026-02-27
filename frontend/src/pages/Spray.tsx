@@ -280,6 +280,7 @@ function ScheduleCard({
   onComplete,
   onCancel,
   onDelete,
+  onReactivate,
   onLogOutcome,
 }: {
   schedule: SpraySchedule;
@@ -287,6 +288,7 @@ function ScheduleCard({
   onComplete: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onReactivate?: () => void;
   onLogOutcome?: (data: Parameters<typeof createSprayOutcome>[1]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -437,14 +439,29 @@ function ScheduleCard({
           >
             Complete
           </button>
-          <button style={btnStyle} onClick={onCancel}>
+          <button
+            style={btnStyle}
+            onClick={() => {
+              if (window.confirm("Cancel this scheduled spray?")) onCancel();
+            }}
+          >
             Cancel
           </button>
           <button
             style={{ ...btnStyle, color: "var(--color-danger)" }}
-            onClick={onDelete}
+            onClick={() => {
+              if (window.confirm("Delete this spray schedule? This cannot be undone.")) onDelete();
+            }}
           >
             Delete
+          </button>
+        </div>
+      )}
+
+      {isPast && schedule.status === "cancelled" && onReactivate && (
+        <div style={{ marginTop: 10 }}>
+          <button style={btnStyle} onClick={onReactivate}>
+            Reactivate
           </button>
         </div>
       )}
@@ -1189,7 +1206,7 @@ export default function Spray() {
     }
   };
 
-  const handleStatusChange = async (id: number, status: "completed" | "cancelled") => {
+  const handleStatusChange = async (id: number, status: "completed" | "cancelled" | "pending") => {
     try {
       const updated = await updateSprayScheduleStatus(id, status);
       setSchedules((prev) => prev.map((s) => (s.id === id ? updated : s)));
@@ -1393,6 +1410,11 @@ export default function Spray() {
                 onComplete={() => {}}
                 onCancel={() => {}}
                 onDelete={() => handleDeleteSchedule(s.id)}
+                onReactivate={
+                  s.status === "cancelled"
+                    ? () => handleStatusChange(s.id, "pending")
+                    : undefined
+                }
               />
             ))}
           </details>

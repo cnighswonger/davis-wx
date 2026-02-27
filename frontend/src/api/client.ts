@@ -268,7 +268,7 @@ export function deleteSpraySchedule(id: number): Promise<void> {
 
 export function updateSprayScheduleStatus(
   id: number,
-  status: "completed" | "cancelled",
+  status: "completed" | "cancelled" | "pending",
 ): Promise<SpraySchedule> {
   return request<SpraySchedule>(`/api/spray/schedules/${id}/status`, {
     method: "PUT",

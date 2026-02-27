@@ -74,7 +74,7 @@ class ScheduleUpdate(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    status: str  # "completed" or "cancelled"
+    status: str  # "completed", "cancelled", or "pending" (reactivate)
 
 
 class OutcomeCreate(BaseModel):
@@ -395,6 +395,7 @@ async def list_schedules(db: Session = Depends(get_db)):
     rows = (
         db.query(SpraySchedule, SprayProduct)
         .join(SprayProduct, SpraySchedule.product_id == SprayProduct.id)
+        .filter(SpraySchedule.status != "deleted")
         .order_by(SpraySchedule.planned_date.desc(), SpraySchedule.planned_start.desc())
         .limit(50)
         .all()
@@ -499,11 +500,11 @@ def update_schedule(
 
 @router.delete("/schedules/{schedule_id}")
 def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
-    """Delete a spray schedule."""
+    """Soft-delete a spray schedule (sets status to 'deleted')."""
     schedule = db.query(SpraySchedule).filter_by(id=schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    db.delete(schedule)
+    schedule.status = "deleted"
     db.commit()
     return {"ok": True}
 
@@ -512,9 +513,9 @@ def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
 def update_schedule_status(
     schedule_id: int, body: StatusUpdate, db: Session = Depends(get_db),
 ):
-    """Mark a schedule as completed or cancelled."""
-    if body.status not in ("completed", "cancelled"):
-        raise HTTPException(status_code=400, detail="Status must be 'completed' or 'cancelled'")
+    """Mark a schedule as completed, cancelled, or reactivate to pending."""
+    if body.status not in ("completed", "cancelled", "pending"):
+        raise HTTPException(status_code=400, detail="Status must be 'completed', 'cancelled', or 'pending'")
     schedule = db.query(SpraySchedule).filter_by(id=schedule_id).first()
     if schedule is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
