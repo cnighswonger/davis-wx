@@ -367,6 +367,39 @@ export interface SprayConditions {
   overall_spray_ok: boolean;
 }
 
+export interface SprayOutcome {
+  id: number;
+  schedule_id: number;
+  product_name: string;
+  logged_at: string;
+  effectiveness: number;
+  actual_rain_hours: number | null;
+  actual_wind_mph: number | null;
+  actual_temp_f: number | null;
+  drift_observed: boolean;
+  product_efficacy: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SprayProductStats {
+  product_id: number;
+  product_name: string;
+  total_applications: number;
+  avg_effectiveness: number | null;
+  success_rate: number | null;
+  drift_rate: number | null;
+  avg_wind_mph: number | null;
+  avg_temp_f: number | null;
+  tuned_thresholds: Array<{
+    name: string;
+    preset_value: number;
+    tuned_value: number;
+    outcome_count: number;
+    annotation: string;
+  }>;
+}
+
 // --- Setup Wizard ---
 
 export interface SetupStatus {

@@ -116,6 +116,7 @@ class CollectedData:
     radar_images: list[RadarImage] = field(default_factory=list)
     nearby_stations: Any = None  # Optional[NearbyStationsResult] — avoid circular import
     spray_schedules: list[dict[str, Any]] = field(default_factory=list)
+    spray_outcomes: list[dict[str, Any]] = field(default_factory=list)
     collected_at: str = ""
     location: dict[str, float] = field(default_factory=dict)
     station_timezone: str = ""
@@ -385,6 +386,35 @@ def gather_spray_schedules(db: Session) -> list[dict[str, Any]]:
     return results
 
 
+def gather_spray_outcomes(db: Session) -> list[dict[str, Any]]:
+    """Load recent spray outcomes with product info for AI context."""
+    from ..models.spray import SprayOutcome, SpraySchedule, SprayProduct
+
+    rows = (
+        db.query(SprayOutcome, SprayProduct.name, SprayProduct.category)
+        .join(SpraySchedule, SprayOutcome.schedule_id == SpraySchedule.id)
+        .join(SprayProduct, SpraySchedule.product_id == SprayProduct.id)
+        .order_by(SprayOutcome.logged_at.desc())
+        .limit(20)
+        .all()
+    )
+    results = []
+    for o, product_name, category in rows:
+        results.append({
+            "product_name": product_name,
+            "category": category,
+            "effectiveness": o.effectiveness,
+            "actual_wind_mph": o.actual_wind_mph,
+            "actual_temp_f": o.actual_temp_f,
+            "actual_rain_hours": o.actual_rain_hours,
+            "drift_observed": bool(o.drift_observed),
+            "product_efficacy": o.product_efficacy,
+            "notes": o.notes,
+            "logged_at": o.logged_at.isoformat() if o.logged_at else None,
+        })
+    return results
+
+
 async def collect_all(
     db: Session,
     lat: float,
@@ -423,8 +453,9 @@ async def collect_all(
             wu_enabled=nearby_wu_enabled,
         )
 
-    # Gather spray schedules when AI spray advisory is enabled.
+    # Gather spray schedules and outcome history when AI spray advisory is enabled.
     spray = gather_spray_schedules(db) if spray_ai_enabled else []
+    spray_history = gather_spray_outcomes(db) if spray_ai_enabled else []
 
     return CollectedData(
         station=station,
@@ -434,6 +465,7 @@ async def collect_all(
         radar_images=radar_images,
         nearby_stations=nearby,
         spray_schedules=spray,
+        spray_outcomes=spray_history,
         collected_at=_local_now_iso(station_timezone),
         location={"latitude": lat, "longitude": lon},
         station_timezone=station_timezone,

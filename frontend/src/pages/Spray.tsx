@@ -18,12 +18,15 @@ import {
   evaluateSpraySchedule,
   quickCheckSpray,
   fetchSprayConditions,
+  createSprayOutcome,
+  fetchProductStats,
 } from "../api/client.ts";
 import type {
   SprayProduct,
   SpraySchedule,
   SprayEvaluation,
   SprayConditions,
+  SprayProductStats,
   ConstraintCheck,
 } from "../api/types.ts";
 
@@ -277,14 +280,17 @@ function ScheduleCard({
   onComplete,
   onCancel,
   onDelete,
+  onLogOutcome,
 }: {
   schedule: SpraySchedule;
   onReEvaluate: () => void;
   onComplete: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onLogOutcome?: (data: Parameters<typeof createSprayOutcome>[1]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showOutcomeForm, setShowOutcomeForm] = useState(false);
   const ev = schedule.evaluation;
   const isPast = schedule.status === "completed" || schedule.status === "cancelled";
 
@@ -425,7 +431,10 @@ function ScheduleCard({
           <button style={btnStyle} onClick={onReEvaluate}>
             Re-evaluate
           </button>
-          <button style={btnStyle} onClick={onComplete}>
+          <button
+            style={btnStyle}
+            onClick={() => setShowOutcomeForm(true)}
+          >
             Complete
           </button>
           <button style={btnStyle} onClick={onCancel}>
@@ -438,6 +447,19 @@ function ScheduleCard({
             Delete
           </button>
         </div>
+      )}
+
+      {showOutcomeForm && onLogOutcome && (
+        <OutcomeForm
+          onSubmit={(data) => {
+            onLogOutcome(data);
+            setShowOutcomeForm(false);
+          }}
+          onCancel={() => {
+            onComplete();
+            setShowOutcomeForm(false);
+          }}
+        />
       )}
     </div>
   );
@@ -454,6 +476,253 @@ function formatWindow(w: { start: string; end: string; duration_hours?: number }
   };
   const dur = w.duration_hours ? ` (${w.duration_hours}h)` : "";
   return `${fmt(w.start)} \u2013 ${fmt(w.end)}${dur}`;
+}
+
+// ---------------------------------------------------------------------------
+// Outcome form (shown when completing a spray)
+// ---------------------------------------------------------------------------
+
+const EFFECTIVENESS_LABELS = ["", "Ineffective", "Poor", "Fair", "Good", "Excellent"];
+
+function OutcomeForm({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (data: {
+    effectiveness: number;
+    actual_rain_hours?: number | null;
+    actual_wind_mph?: number | null;
+    actual_temp_f?: number | null;
+    drift_observed?: boolean;
+    product_efficacy?: string | null;
+    notes?: string | null;
+  }) => void;
+  onCancel: () => void;
+}) {
+  const [effectiveness, setEffectiveness] = useState(3);
+  const [rainHours, setRainHours] = useState("");
+  const [wind, setWind] = useState("");
+  const [temp, setTemp] = useState("");
+  const [drift, setDrift] = useState(false);
+  const [efficacy, setEfficacy] = useState("effective");
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = () => {
+    onSubmit({
+      effectiveness,
+      actual_rain_hours: rainHours ? parseFloat(rainHours) : null,
+      actual_wind_mph: wind ? parseFloat(wind) : null,
+      actual_temp_f: temp ? parseFloat(temp) : null,
+      drift_observed: drift,
+      product_efficacy: efficacy,
+      notes: notes || null,
+    });
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontFamily: "var(--font-body)",
+    color: "var(--color-text-secondary)",
+    display: "block",
+    marginBottom: 2,
+  };
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "4px 8px",
+    fontSize: 13,
+    fontFamily: "var(--font-mono)",
+    background: "var(--color-bg-card)",
+    color: "var(--color-text)",
+    border: "1px solid var(--color-border)",
+    borderRadius: 4,
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div
+      style={{
+        background: "var(--color-bg-card)",
+        borderRadius: 8,
+        border: "1px solid var(--color-accent)",
+        padding: 16,
+        marginTop: 8,
+      }}
+    >
+      <strong style={{ fontSize: 13, fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
+        Log Outcome
+      </strong>
+
+      {/* Effectiveness slider */}
+      <div style={{ marginTop: 10 }}>
+        <label style={labelStyle}>
+          Effectiveness: {effectiveness}/5 {'\u2014'} {EFFECTIVENESS_LABELS[effectiveness]}
+        </label>
+        <input
+          type="range"
+          min={1}
+          max={5}
+          value={effectiveness}
+          onChange={(e) => setEffectiveness(parseInt(e.target.value))}
+          style={{ width: "100%", accentColor: "var(--color-accent)" }}
+        />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 10,
+            fontFamily: "var(--font-body)",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          <span>Ineffective</span>
+          <span>Excellent</span>
+        </div>
+      </div>
+
+      {/* Structured fields */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 10,
+          marginTop: 10,
+        }}
+      >
+        <div>
+          <label style={labelStyle}>Rain after (hrs)</label>
+          <input
+            type="number"
+            step="0.5"
+            placeholder="N/A"
+            value={rainHours}
+            onChange={(e) => setRainHours(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Wind (mph)</label>
+          <input
+            type="number"
+            step="1"
+            placeholder="N/A"
+            value={wind}
+            onChange={(e) => setWind(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Temp ({'\u00b0'}F)</label>
+          <input
+            type="number"
+            step="1"
+            placeholder="N/A"
+            value={temp}
+            onChange={(e) => setTemp(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 16, marginTop: 10, alignItems: "center" }}>
+        <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6, marginBottom: 0 }}>
+          <input
+            type="checkbox"
+            checked={drift}
+            onChange={(e) => setDrift(e.target.checked)}
+            style={{ accentColor: "var(--color-accent)" }}
+          />
+          Drift observed
+        </label>
+        <div>
+          <label style={labelStyle}>Efficacy</label>
+          <select
+            value={efficacy}
+            onChange={(e) => setEfficacy(e.target.value)}
+            style={{ ...inputStyle, width: "auto" }}
+          >
+            <option value="effective">Effective</option>
+            <option value="partial">Partial</option>
+            <option value="ineffective">Ineffective</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <label style={labelStyle}>Notes</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Observations during application..."
+          style={{ ...inputStyle, minHeight: 50, resize: "vertical" }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button style={accentBtn} onClick={handleSubmit}>
+          Save Outcome
+        </button>
+        <button style={btnStyle} onClick={onCancel}>
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Product stats badge
+// ---------------------------------------------------------------------------
+
+function ProductStatsBadge({ productId }: { productId: number }) {
+  const [stats, setStats] = useState<SprayProductStats | null>(null);
+
+  useEffect(() => {
+    fetchProductStats(productId).then(setStats).catch(() => {});
+  }, [productId]);
+
+  if (!stats || stats.total_applications === 0) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        padding: "8px 12px",
+        background: "var(--color-bg-card)",
+        borderRadius: 6,
+        fontSize: 12,
+        fontFamily: "var(--font-mono)",
+        color: "var(--color-text-secondary)",
+      }}
+    >
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <span>{stats.total_applications} applications</span>
+        {stats.avg_effectiveness != null && (
+          <span>Avg: {stats.avg_effectiveness}/5</span>
+        )}
+        {stats.success_rate != null && (
+          <span
+            style={{
+              color: stats.success_rate >= 80 ? "var(--color-ok)" : stats.success_rate >= 50 ? "var(--color-warning)" : "var(--color-danger)",
+            }}
+          >
+            {stats.success_rate}% success
+          </span>
+        )}
+        {stats.drift_rate != null && stats.drift_rate > 0 && (
+          <span style={{ color: "var(--color-warning)" }}>
+            {stats.drift_rate}% drift
+          </span>
+        )}
+      </div>
+      {stats.tuned_thresholds.length > 0 && (
+        <div style={{ marginTop: 6, fontSize: 11, color: "var(--color-text-muted)" }}>
+          {stats.tuned_thresholds.map((t) => (
+            <div key={t.name}>{t.annotation}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +812,7 @@ function ProductCard({
           {product.notes}
         </p>
       )}
+      <ProductStatsBadge productId={product.id} />
     </div>
   );
 }
@@ -928,6 +1198,18 @@ export default function Spray() {
     }
   };
 
+  const handleLogOutcome = async (
+    scheduleId: number,
+    data: Parameters<typeof createSprayOutcome>[1],
+  ) => {
+    try {
+      await createSprayOutcome(scheduleId, data);
+      await handleStatusChange(scheduleId, "completed");
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleReEvaluate = async (id: number) => {
     try {
       const ev = await evaluateSpraySchedule(id);
@@ -1086,6 +1368,7 @@ export default function Spray() {
             onComplete={() => handleStatusChange(s.id, "completed")}
             onCancel={() => handleStatusChange(s.id, "cancelled")}
             onDelete={() => handleDeleteSchedule(s.id)}
+            onLogOutcome={(data) => handleLogOutcome(s.id, data)}
           />
         ))}
 

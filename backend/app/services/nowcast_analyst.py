@@ -110,6 +110,11 @@ SPRAY APPLICATION ADVISORY (when spray schedules are provided):
 - Consider the rain-free requirement carefully — a product needing 4h rain-free at 3 PM
   with rain forecast at 6 PM is a NO-GO even if all other conditions are met.
 - If no spray schedules are provided, set spray_advisory to null.
+- When spray outcome history is provided, use it to calibrate your recommendations:
+  * Note patterns where a product was effective despite marginal conditions.
+  * Flag conditions that consistently led to poor outcomes.
+  * Reference specific outcome counts: "This product has been effective in
+    similar conditions 4 of 5 times at this station."
 """
 
 
@@ -208,6 +213,33 @@ def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
             )
             if sched.get("notes"):
                 parts.append(f"    Notes: {sched['notes']}")
+        parts.append("")
+
+    # Spray outcome history
+    if data.spray_outcomes:
+        parts.append("=== SPRAY OUTCOME HISTORY (farmer-reported effectiveness) ===")
+        # Aggregate by product for a compact summary.
+        by_product: dict[str, list[dict]] = {}
+        for o in data.spray_outcomes:
+            by_product.setdefault(o["product_name"], []).append(o)
+        for product_name, outcomes in by_product.items():
+            total = len(outcomes)
+            avg_eff = sum(o["effectiveness"] for o in outcomes) / total
+            successes = sum(1 for o in outcomes if o["effectiveness"] >= 4)
+            drift_count = sum(1 for o in outcomes if o.get("drift_observed"))
+            parts.append(f"  {product_name}: {total} applications logged")
+            parts.append(
+                f"    Avg effectiveness: {avg_eff:.1f}/5, "
+                f"Success rate: {round(successes / total * 100)}%"
+            )
+            winds = [o["actual_wind_mph"] for o in outcomes if o.get("actual_wind_mph") is not None]
+            if winds:
+                parts.append(f"    Effective at wind up to {max(winds):.0f} mph ({len(winds)} outcomes)")
+            if drift_count:
+                parts.append(f"    Drift observed in {drift_count}/{total} applications")
+            notes = [o["notes"] for o in outcomes if o.get("notes")]
+            if notes:
+                parts.append(f"    Recent notes: {notes[0][:100]}")
         parts.append("")
 
     # Nearby station observations

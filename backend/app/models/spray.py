@@ -62,3 +62,30 @@ class SpraySchedule(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+
+class SprayOutcome(Base):
+    """Farmer-reported outcome for a completed spray application."""
+
+    __tablename__ = "spray_outcomes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    schedule_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("spray_schedules.id"), nullable=False, index=True
+    )
+    logged_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    # Rating: 1=ineffective, 2=poor, 3=fair, 4=good, 5=excellent
+    effectiveness: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Structured observations
+    actual_rain_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_wind_mph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_temp_f: Mapped[float | None] = mapped_column(Float, nullable=True)
+    drift_observed: Mapped[int] = mapped_column(Integer, default=0)  # bool-as-int
+    product_efficacy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "effective", "partial", "ineffective"
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )

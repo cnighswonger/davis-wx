@@ -171,7 +171,7 @@ export function forceArchive(): Promise<{ success: boolean }> {
 // --- Nowcast ---
 
 import type { NowcastData, NowcastKnowledgeEntry, NowcastVerification } from "./types.ts";
-import type { SprayProduct, SpraySchedule, SprayEvaluation, SprayConditions } from "./types.ts";
+import type { SprayProduct, SpraySchedule, SprayEvaluation, SprayConditions, SprayOutcome, SprayProductStats } from "./types.ts";
 
 export function fetchNowcast(): Promise<NowcastData | null> {
   return request<NowcastData | null>("/api/nowcast");
@@ -293,6 +293,37 @@ export function quickCheckSpray(productId: number): Promise<SprayEvaluation> {
 
 export function fetchSprayConditions(): Promise<SprayConditions> {
   return request<SprayConditions>("/api/spray/conditions");
+}
+
+export function createSprayOutcome(
+  scheduleId: number,
+  outcome: {
+    effectiveness: number;
+    actual_rain_hours?: number | null;
+    actual_wind_mph?: number | null;
+    actual_temp_f?: number | null;
+    drift_observed?: boolean;
+    product_efficacy?: string | null;
+    notes?: string | null;
+  },
+): Promise<SprayOutcome> {
+  return request<SprayOutcome>(`/api/spray/schedules/${scheduleId}/outcome`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(outcome),
+  });
+}
+
+export function fetchSprayOutcomes(limit = 20): Promise<SprayOutcome[]> {
+  return request<SprayOutcome[]>(`/api/spray/outcomes?limit=${limit}`);
+}
+
+export function fetchProductOutcomes(productId: number): Promise<SprayOutcome[]> {
+  return request<SprayOutcome[]>(`/api/spray/products/${productId}/outcomes`);
+}
+
+export function fetchProductStats(productId: number): Promise<SprayProductStats> {
+  return request<SprayProductStats>(`/api/spray/products/${productId}/stats`);
 }
 
 export { ApiError };

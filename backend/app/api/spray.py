@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..models.database import get_db
 from ..models.sensor_reading import SensorReadingModel
 from ..models.station_config import StationConfigModel
-from ..models.spray import SprayProduct, SpraySchedule
+from ..models.spray import SprayOutcome, SprayProduct, SpraySchedule
 from ..services.spray_engine import (
     ProductConstraints,
     SprayEvaluation,
@@ -21,6 +21,7 @@ from ..services.spray_engine import (
     evaluate_current,
     fetch_hourly_forecast,
     find_optimal_window,
+    get_tuned_constraints,
     seed_presets,
 )
 
@@ -74,6 +75,16 @@ class ScheduleUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str  # "completed" or "cancelled"
+
+
+class OutcomeCreate(BaseModel):
+    effectiveness: int  # 1-5
+    actual_rain_hours: Optional[float] = None
+    actual_wind_mph: Optional[float] = None
+    actual_temp_f: Optional[float] = None
+    drift_observed: bool = False
+    product_efficacy: Optional[str] = None  # "effective", "partial", "ineffective"
+    notes: Optional[str] = None
 
 
 class QuickCheckRequest(BaseModel):
@@ -646,4 +657,157 @@ async def get_spray_conditions(db: Session = Depends(get_db)):
         "rain_daily": rain_daily,
         "next_rain_hours": next_rain_hours,
         "overall_spray_ok": overall_ok,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Outcomes
+# ---------------------------------------------------------------------------
+
+def _outcome_to_dict(o: SprayOutcome, product_name: str = "") -> dict:
+    return {
+        "id": o.id,
+        "schedule_id": o.schedule_id,
+        "product_name": product_name,
+        "logged_at": o.logged_at.isoformat() if o.logged_at else None,
+        "effectiveness": o.effectiveness,
+        "actual_rain_hours": o.actual_rain_hours,
+        "actual_wind_mph": o.actual_wind_mph,
+        "actual_temp_f": o.actual_temp_f,
+        "drift_observed": bool(o.drift_observed),
+        "product_efficacy": o.product_efficacy,
+        "notes": o.notes,
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+    }
+
+
+@router.post("/schedules/{schedule_id}/outcome")
+def create_outcome(
+    schedule_id: int, body: OutcomeCreate, db: Session = Depends(get_db),
+):
+    """Log an outcome for a completed spray schedule."""
+    schedule = db.query(SpraySchedule).filter_by(id=schedule_id).first()
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    if body.effectiveness < 1 or body.effectiveness > 5:
+        raise HTTPException(status_code=400, detail="Effectiveness must be 1-5")
+
+    outcome = SprayOutcome(
+        schedule_id=schedule_id,
+        effectiveness=body.effectiveness,
+        actual_rain_hours=body.actual_rain_hours,
+        actual_wind_mph=body.actual_wind_mph,
+        actual_temp_f=body.actual_temp_f,
+        drift_observed=int(body.drift_observed),
+        product_efficacy=body.product_efficacy,
+        notes=body.notes,
+    )
+    db.add(outcome)
+    db.commit()
+    db.refresh(outcome)
+
+    product = db.query(SprayProduct).filter_by(id=schedule.product_id).first()
+    return _outcome_to_dict(outcome, product.name if product else "")
+
+
+@router.get("/outcomes")
+def list_outcomes(limit: int = 20, db: Session = Depends(get_db)):
+    """List recent outcomes with product info, newest first."""
+    rows = (
+        db.query(SprayOutcome, SprayProduct.name)
+        .join(SpraySchedule, SprayOutcome.schedule_id == SpraySchedule.id)
+        .join(SprayProduct, SpraySchedule.product_id == SprayProduct.id)
+        .order_by(SprayOutcome.logged_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_outcome_to_dict(o, name) for o, name in rows]
+
+
+@router.get("/products/{product_id}/outcomes")
+def product_outcomes(product_id: int, db: Session = Depends(get_db)):
+    """List outcomes for a specific product."""
+    product = db.query(SprayProduct).filter_by(id=product_id).first()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    rows = (
+        db.query(SprayOutcome)
+        .join(SpraySchedule, SprayOutcome.schedule_id == SpraySchedule.id)
+        .filter(SpraySchedule.product_id == product_id)
+        .order_by(SprayOutcome.logged_at.desc())
+        .limit(50)
+        .all()
+    )
+    return [_outcome_to_dict(o, product.name) for o in rows]
+
+
+@router.get("/products/{product_id}/stats")
+def product_stats(product_id: int, db: Session = Depends(get_db)):
+    """Aggregated outcome stats for a product."""
+    product = db.query(SprayProduct).filter_by(id=product_id).first()
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    outcomes = (
+        db.query(SprayOutcome)
+        .join(SpraySchedule, SprayOutcome.schedule_id == SpraySchedule.id)
+        .filter(SpraySchedule.product_id == product_id)
+        .all()
+    )
+
+    if not outcomes:
+        return {
+            "product_id": product_id,
+            "product_name": product.name,
+            "total_applications": 0,
+            "avg_effectiveness": None,
+            "success_rate": None,
+            "drift_rate": None,
+            "avg_wind_mph": None,
+            "avg_temp_f": None,
+        }
+
+    total = len(outcomes)
+    avg_eff = sum(o.effectiveness for o in outcomes) / total
+    successes = sum(1 for o in outcomes if o.effectiveness >= 4)
+    drift_count = sum(1 for o in outcomes if o.drift_observed)
+
+    winds = [o.actual_wind_mph for o in outcomes if o.actual_wind_mph is not None]
+    temps = [o.actual_temp_f for o in outcomes if o.actual_temp_f is not None]
+
+    # Compute tuned thresholds from outcome history.
+    constraints = _product_constraints(product)
+    outcome_dicts = [
+        {
+            "effectiveness": o.effectiveness,
+            "actual_wind_mph": o.actual_wind_mph,
+            "actual_temp_f": o.actual_temp_f,
+            "drift_observed": bool(o.drift_observed),
+        }
+        for o in outcomes
+    ]
+    tuned = get_tuned_constraints(constraints, outcome_dicts)
+    tuned_list = [
+        {
+            "name": t.name,
+            "preset_value": t.preset_value,
+            "tuned_value": t.tuned_value,
+            "outcome_count": t.outcome_count,
+            "annotation": t.annotation,
+        }
+        for t in tuned.tuned
+        if t.tuned_value is not None
+    ]
+
+    return {
+        "product_id": product_id,
+        "product_name": product.name,
+        "total_applications": total,
+        "avg_effectiveness": round(avg_eff, 1),
+        "success_rate": round(successes / total * 100),
+        "drift_rate": round(drift_count / total * 100),
+        "avg_wind_mph": round(sum(winds) / len(winds), 1) if winds else None,
+        "avg_temp_f": round(sum(temps) / len(temps), 1) if temps else None,
+        "tuned_thresholds": tuned_list,
     }

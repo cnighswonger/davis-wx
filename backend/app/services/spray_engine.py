@@ -612,3 +612,158 @@ def find_optimal_window(
         "end": end_iso,
         "duration_hours": best_len,
     }
+
+
+# ---------------------------------------------------------------------------
+# Threshold tuning from outcome history
+# ---------------------------------------------------------------------------
+
+# Minimum positive outcomes required beyond a preset threshold before
+# we consider relaxing that threshold.
+_MIN_POSITIVE_OUTCOMES = 3
+_MIN_EFFECTIVENESS = 4  # 4+ = "good" or "excellent"
+
+
+@dataclass
+class TunedConstraint:
+    """A constraint threshold that may have been adjusted from outcomes."""
+    name: str
+    preset_value: float
+    tuned_value: float | None  # None if unchanged
+    outcome_count: int  # outcomes backing the tuned value
+    annotation: str  # human-readable explanation
+
+
+@dataclass
+class TunedConstraints:
+    """Product constraints with optional tuning from outcome history."""
+    constraints: ProductConstraints  # original presets
+    tuned: list[TunedConstraint]
+
+    def effective_max_wind(self) -> float:
+        for t in self.tuned:
+            if t.name == "max_wind_mph" and t.tuned_value is not None:
+                return t.tuned_value
+        return self.constraints.max_wind_mph
+
+    def effective_min_temp(self) -> float:
+        for t in self.tuned:
+            if t.name == "min_temp_f" and t.tuned_value is not None:
+                return t.tuned_value
+        return self.constraints.min_temp_f
+
+    def effective_max_temp(self) -> float:
+        for t in self.tuned:
+            if t.name == "max_temp_f" and t.tuned_value is not None:
+                return t.tuned_value
+        return self.constraints.max_temp_f
+
+
+def get_tuned_constraints(
+    constraints: ProductConstraints,
+    outcomes: list[dict],
+) -> TunedConstraints:
+    """Analyze past outcomes to compute effective thresholds.
+
+    Only widens thresholds when there are 3+ positive outcomes (effectiveness
+    >= 4) beyond the preset threshold.
+
+    Args:
+        constraints: Original product constraints.
+        outcomes: List of outcome dicts with keys: effectiveness,
+                  actual_wind_mph, actual_temp_f, drift_observed.
+
+    Returns:
+        TunedConstraints with adjusted limits and annotations.
+    """
+    tuned: list[TunedConstraint] = []
+
+    # --- Wind threshold ---
+    good_winds = [
+        o["actual_wind_mph"] for o in outcomes
+        if o.get("actual_wind_mph") is not None
+        and o.get("effectiveness", 0) >= _MIN_EFFECTIVENESS
+        and o["actual_wind_mph"] > constraints.max_wind_mph
+    ]
+    if len(good_winds) >= _MIN_POSITIVE_OUTCOMES:
+        # Relax to the max observed wind with good results, rounded up.
+        new_max = round(max(good_winds), 1)
+        tuned.append(TunedConstraint(
+            name="max_wind_mph",
+            preset_value=constraints.max_wind_mph,
+            tuned_value=new_max,
+            outcome_count=len(good_winds),
+            annotation=(
+                f"Relaxed from {constraints.max_wind_mph} mph based on "
+                f"{len(good_winds)} successful applications at up to "
+                f"{new_max} mph"
+            ),
+        ))
+    else:
+        tuned.append(TunedConstraint(
+            name="max_wind_mph",
+            preset_value=constraints.max_wind_mph,
+            tuned_value=None,
+            outcome_count=0,
+            annotation="",
+        ))
+
+    # --- Min temperature threshold ---
+    good_low_temps = [
+        o["actual_temp_f"] for o in outcomes
+        if o.get("actual_temp_f") is not None
+        and o.get("effectiveness", 0) >= _MIN_EFFECTIVENESS
+        and o["actual_temp_f"] < constraints.min_temp_f
+    ]
+    if len(good_low_temps) >= _MIN_POSITIVE_OUTCOMES:
+        new_min = round(min(good_low_temps), 1)
+        tuned.append(TunedConstraint(
+            name="min_temp_f",
+            preset_value=constraints.min_temp_f,
+            tuned_value=new_min,
+            outcome_count=len(good_low_temps),
+            annotation=(
+                f"Lowered from {constraints.min_temp_f}\u00b0F based on "
+                f"{len(good_low_temps)} successful applications down to "
+                f"{new_min}\u00b0F"
+            ),
+        ))
+    else:
+        tuned.append(TunedConstraint(
+            name="min_temp_f",
+            preset_value=constraints.min_temp_f,
+            tuned_value=None,
+            outcome_count=0,
+            annotation="",
+        ))
+
+    # --- Max temperature threshold ---
+    good_high_temps = [
+        o["actual_temp_f"] for o in outcomes
+        if o.get("actual_temp_f") is not None
+        and o.get("effectiveness", 0) >= _MIN_EFFECTIVENESS
+        and o["actual_temp_f"] > constraints.max_temp_f
+    ]
+    if len(good_high_temps) >= _MIN_POSITIVE_OUTCOMES:
+        new_max = round(max(good_high_temps), 1)
+        tuned.append(TunedConstraint(
+            name="max_temp_f",
+            preset_value=constraints.max_temp_f,
+            tuned_value=new_max,
+            outcome_count=len(good_high_temps),
+            annotation=(
+                f"Raised from {constraints.max_temp_f}\u00b0F based on "
+                f"{len(good_high_temps)} successful applications up to "
+                f"{new_max}\u00b0F"
+            ),
+        ))
+    else:
+        tuned.append(TunedConstraint(
+            name="max_temp_f",
+            preset_value=constraints.max_temp_f,
+            tuned_value=None,
+            outcome_count=0,
+            annotation="",
+        ))
+
+    return TunedConstraints(constraints=constraints, tuned=tuned)
