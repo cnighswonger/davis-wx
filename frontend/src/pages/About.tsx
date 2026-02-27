@@ -151,7 +151,7 @@ export default function About() {
           margin: "0 0 4px 0",
         }}
       >
-        Davis Weather Station
+        Kanfei
       </h2>
       <p
         style={{
@@ -161,11 +161,47 @@ export default function About() {
           marginBottom: "20px",
         }}
       >
-        Web Dashboard & Logger
+        Weather Station Dashboard & Logger
       </p>
 
-      {/* Description */}
+      {/* Name + Description */}
       <div style={{ ...cardStyle, padding: isMobile ? "14px" : "20px" }}>
+        <div style={{
+          display: "flex",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: isMobile ? "12px" : "20px",
+          flexDirection: isMobile ? "column" : "row",
+          marginBottom: "14px",
+        }}>
+          <div style={{
+            fontSize: "42px",
+            fontFamily: "serif",
+            lineHeight: 1,
+            color: "var(--color-text)",
+            direction: "rtl",
+            letterSpacing: "2px",
+          }}>
+            {'\u05DB\u05B7\u05BC\u05E0\u05B0\u05E4\u05B5\u05D9'}
+          </div>
+          <div>
+            <div style={{
+              fontSize: "14px",
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text-secondary)",
+              fontStyle: "italic",
+              marginBottom: "4px",
+            }}>
+              kanfei ruach {'\u2014'} "wings of the wind"
+            </div>
+            <div style={{
+              fontSize: "12px",
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text-muted)",
+            }}>
+              Psalm 104:3 {'\u2014'} "He makes the clouds his chariot and rides on the wings of the wind."
+            </div>
+          </div>
+        </div>
         <p style={bodyText}>
           A self-hosted web dashboard and data logger for Davis weather
           stations (Vantage Pro 2, Weather Monitor II, and compatible models).

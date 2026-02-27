@@ -154,7 +154,7 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
             letterSpacing: '-0.01em',
           }}
         >
-          Davis Weather Station
+          Kanfei
         </h1>
         {local && (() => {
           const { icon, color } = mapForecastIcon(local.text);

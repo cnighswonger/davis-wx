@@ -26,7 +26,7 @@ export default function Footer({ lastUpdate }: FooterProps) {
         flexShrink: 0,
       }}
     >
-      <span>Davis Weather Station v0.1.0</span>
+      <span>Kanfei v0.1.0</span>
       <span>
         {lastUpdate ? `Last update: ${formatTime(lastUpdate)}` : 'No data received'}
       </span>
