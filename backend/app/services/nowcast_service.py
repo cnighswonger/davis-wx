@@ -156,7 +156,8 @@ class NowcastService:
             # If the nowcast is still within the update interval, set
             # _last_run so we don't regenerate immediately.
             if record.created_at:
-                age_seconds = (datetime.now(timezone.utc) - record.created_at).total_seconds()
+                created = record.created_at.replace(tzinfo=timezone.utc) if record.created_at.tzinfo is None else record.created_at
+                age_seconds = (datetime.now(timezone.utc) - created).total_seconds()
                 if age_seconds < self._interval:
                     self._last_run = time.monotonic() - age_seconds
                     logger.info(
