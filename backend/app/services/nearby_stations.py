@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 IEM_CURRENTS_URL = "https://mesonet.agron.iastate.edu/api/1/currents.json"
 NWS_POINTS_URL = "https://api.weather.gov/points"
-WU_PWS_URL = "https://api.weather.com/v2/pws/observations/all/1day"
+WU_NEARBY_URL = "https://api.weather.com/v3/location/near"
+WU_OBS_URL = "https://api.weather.com/v2/pws/observations/current"
 HTTP_TIMEOUT = 15.0
 NEARBY_CACHE_TTL = 900  # 15 minutes
 KNOTS_TO_MPH = 1.15078
@@ -214,52 +215,98 @@ async def _fetch_wu_nearby(
     radius_miles: int,
     max_stations: int,
 ) -> list[NearbyObservation]:
-    """Fetch current observations from nearby WU personal weather stations."""
+    """Fetch current observations from nearby WU personal weather stations.
+
+    Two-step process:
+      1. v3/location/near — discover nearby station IDs (with distance).
+      2. v2/pws/observations/current per station — fetch actual observations.
+    Observations are fetched concurrently to minimise latency.
+    """
     if not api_key:
         return []
 
+    # Step 1: discover nearby stations.
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             resp = await client.get(
-                WU_PWS_URL,
+                WU_NEARBY_URL,
                 params={
                     "geocode": f"{lat},{lon}",
+                    "product": "pws",
                     "format": "json",
-                    "units": "e",
                     "apiKey": api_key,
                 },
             )
             resp.raise_for_status()
-            data = resp.json()
+            nearby_data = resp.json()
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
-            logger.warning("WU PWS fetch failed: invalid API key")
+            logger.warning("WU PWS nearby lookup failed: invalid API key")
         else:
-            logger.warning("WU PWS fetch failed: HTTP %d", exc.response.status_code)
+            logger.warning("WU PWS nearby lookup failed: HTTP %d", exc.response.status_code)
         return []
     except Exception as exc:
-        logger.warning("WU PWS fetch failed: %s", exc)
+        logger.warning("WU PWS nearby lookup failed: %s", exc)
         return []
 
-    observations = data.get("observations", [])
-    results: list[NearbyObservation] = []
+    loc = nearby_data.get("location", {})
+    station_ids = loc.get("stationId", [])
+    distances = loc.get("distanceMi", [])
+    names = loc.get("stationName", [])
+    lats = loc.get("latitude", [])
+    lons = loc.get("longitude", [])
+    qc_statuses = loc.get("qcStatus", [])
 
-    for obs in observations:
-        slat = obs.get("lat")
-        slon = obs.get("lon")
+    if not station_ids:
+        return []
+
+    # Filter to within radius and take only stations with good QC, up to max.
+    candidates: list[tuple[int, str]] = []
+    for i, sid in enumerate(station_ids):
+        dist = distances[i] if i < len(distances) else 999
+        qc = qc_statuses[i] if i < len(qc_statuses) else -1
+        if dist <= radius_miles and dist > 0.1 and qc >= 0:
+            candidates.append((i, sid))
+        if len(candidates) >= max_stations:
+            break
+
+    if not candidates:
+        return []
+
+    # Step 2: fetch current observations concurrently.
+    async def _fetch_one(session: httpx.AsyncClient, idx: int, sid: str) -> Optional[NearbyObservation]:
+        try:
+            r = await session.get(
+                WU_OBS_URL,
+                params={
+                    "stationId": sid,
+                    "format": "json",
+                    "units": "e",
+                    "numericPrecision": "decimal",
+                    "apiKey": api_key,
+                },
+            )
+            r.raise_for_status()
+            obs_list = r.json().get("observations", [])
+            if not obs_list:
+                return None
+            obs = obs_list[0]
+        except Exception:
+            return None
+
+        slat = obs.get("lat", lats[idx] if idx < len(lats) else None)
+        slon = obs.get("lon", lons[idx] if idx < len(lons) else None)
         if slat is None or slon is None:
-            continue
+            return None
 
-        dist = _haversine_miles(lat, lon, slat, slon)
-        if dist > radius_miles or dist < 0.1:
-            continue
-
+        dist = distances[idx] if idx < len(distances) else _haversine_miles(lat, lon, slat, slon)
         imp: dict[str, Any] = obs.get("imperial", {})
+        hum = obs.get("humidity")
 
-        results.append(NearbyObservation(
+        return NearbyObservation(
             source="wu_pws",
-            station_id=obs.get("stationID", "?"),
-            station_name=obs.get("neighborhood", obs.get("stationID", "?")),
+            station_id=obs.get("stationID", sid),
+            station_name=obs.get("neighborhood", names[idx] if idx < len(names) else sid),
             latitude=slat,
             longitude=slon,
             distance_miles=round(dist, 1),
@@ -267,18 +314,25 @@ async def _fetch_wu_nearby(
             timestamp=obs.get("obsTimeUtc", ""),
             temp_f=imp.get("temp"),
             dew_point_f=imp.get("dewpt"),
-            humidity_pct=imp.get("humidity"),
+            humidity_pct=round(hum) if hum is not None else None,
             wind_speed_mph=imp.get("windSpeed"),
-            wind_dir_deg=imp.get("winddir"),
+            wind_dir_deg=obs.get("winddir"),
             wind_gust_mph=imp.get("windGust"),
             pressure_inhg=imp.get("pressure"),
             precip_in=imp.get("precipTotal"),
-            sky_cover=None,  # WU PWS doesn't report sky cover
+            sky_cover=None,
             raw_metar=None,
-        ))
+        )
+
+    results: list[NearbyObservation] = []
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        tasks = [_fetch_one(client, idx, sid) for idx, sid in candidates]
+        fetched = await asyncio.gather(*tasks, return_exceptions=True)
+        for item in fetched:
+            if isinstance(item, NearbyObservation):
+                results.append(item)
 
     results.sort(key=lambda o: o.distance_miles)
-    results = results[:max_stations]
 
     if results:
         logger.info(
