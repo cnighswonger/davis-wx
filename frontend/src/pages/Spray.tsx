@@ -386,6 +386,33 @@ function ScheduleCard({
         </div>
       )}
 
+      {schedule.ai_commentary != null && (() => {
+        const ai = typeof schedule.ai_commentary === "string"
+          ? (() => { try { return JSON.parse(schedule.ai_commentary as string); } catch { return null; } })()
+          : schedule.ai_commentary;
+        if (!ai || !ai.detail) return null;
+        return (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "8px 12px",
+              background: "var(--color-bg-secondary)",
+              borderRadius: 6,
+              borderLeft: "3px solid var(--color-accent)",
+              fontSize: 13,
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text)",
+              lineHeight: 1.5,
+            }}
+          >
+            <span style={{ fontWeight: 600, fontSize: 11, color: "var(--color-accent)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              AI Advisory
+            </span>
+            <p style={{ margin: "4px 0 0" }}>{ai.detail}</p>
+          </div>
+        );
+      })()}
+
       {!isPast && (
         <div
           style={{
@@ -998,12 +1025,16 @@ export default function Spray() {
       {/* Current conditions */}
       <ConditionsStrip conditions={conditions} />
 
-      {/* AI commentary from nowcast (Phase 2 placeholder) */}
-      {nowcast && !!(nowcast as unknown as Record<string, unknown>).spray_advisory && (
+      {/* AI spray advisory from nowcast */}
+      {nowcast?.spray_advisory && (
         <div style={{ ...cardStyle, borderLeft: "4px solid var(--color-accent)" }}>
-          <h4 style={sectionTitle}>AI Spray Analysis</h4>
-          <p style={{ margin: 0, fontSize: 13, fontFamily: "var(--font-body)", color: "var(--color-text)" }}>
-            {String(((nowcast as unknown as Record<string, unknown>).spray_advisory as Record<string, string>)?.summary ?? "")}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 11, color: "var(--color-accent)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              AI Spray Analysis
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, fontFamily: "var(--font-body)", color: "var(--color-text)", lineHeight: 1.5 }}>
+            {nowcast.spray_advisory.summary}
           </p>
         </div>
       )}

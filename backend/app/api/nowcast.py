@@ -168,6 +168,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
     current_vs_model = ""
     data_quality = ""
     radar_analysis = None
+    spray_advisory = None
     if record.raw_response:
         try:
             raw_text = record.raw_response.strip()
@@ -181,6 +182,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
                 current_vs_model = raw.get("current_vs_model", "")
                 data_quality = raw.get("data_quality", "")
                 radar_analysis = raw.get("radar_analysis")
+                spray_advisory = raw.get("spray_advisory")
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -195,6 +197,7 @@ def _history_to_dict(record: NowcastHistory) -> dict:
         "farming_impact": farming_impact,
         "current_vs_model": current_vs_model,
         "radar_analysis": radar_analysis,
+        "spray_advisory": spray_advisory,
         "data_quality": data_quality,
         "sources_used": sources,
         "input_tokens": record.input_tokens or 0,

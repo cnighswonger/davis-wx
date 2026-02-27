@@ -48,6 +48,7 @@ class NowcastService:
         self._nearby_max_wu: int = 5
         self._wu_api_key: str = ""
         self._nearby_radius: int = 25
+        self._spray_ai_enabled: bool = False
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
 
@@ -63,6 +64,7 @@ class NowcastService:
                 "nowcast_nearby_iem_enabled", "nowcast_nearby_wu_enabled",
                 "nowcast_wu_api_key", "nowcast_nearby_max_iem",
                 "nowcast_nearby_max_wu", "nowcast_radius",
+                "spray_ai_enabled",
             ]
             rows = db.query(StationConfigModel).filter(
                 StationConfigModel.key.in_(keys)
@@ -117,6 +119,7 @@ class NowcastService:
                 self._nearby_radius = int(cfg.get("nowcast_radius", "25"))
             except ValueError:
                 self._nearby_radius = 25
+            self._spray_ai_enabled = cfg.get("spray_ai_enabled", "false").lower() == "true"
         finally:
             db.close()
 
@@ -226,6 +229,7 @@ class NowcastService:
                 nearby_max_iem=self._nearby_max_iem,
                 nearby_max_wu=self._nearby_max_wu,
                 wu_api_key=self._wu_api_key,
+                spray_ai_enabled=self._spray_ai_enabled,
             )
 
             if not data.station.has_data:
@@ -251,6 +255,10 @@ class NowcastService:
             # Handle proposed knowledge entry.
             if result.proposed_knowledge:
                 self._store_proposed_knowledge(db, result.proposed_knowledge)
+
+            # Write AI spray commentary back to individual schedule records.
+            if result.spray_advisory:
+                self._update_spray_schedules(db, result.spray_advisory)
 
             db.commit()
             logger.info(
@@ -307,6 +315,7 @@ class NowcastService:
             "data_quality": result.data_quality,
             "sources_used": self._sources_list(result),
             "radar_analysis": result.radar_analysis,
+            "spray_advisory": result.spray_advisory,
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
         }
@@ -352,6 +361,28 @@ class NowcastService:
         )
         db.add(entry)
         logger.info("Knowledge entry proposed: [%s] %s", entry.category, entry.content[:80])
+
+    def _update_spray_schedules(self, db: Session, advisory: dict) -> None:
+        """Write AI commentary from spray_advisory back to SpraySchedule records."""
+        from ..models.spray import SpraySchedule
+
+        recommendations = advisory.get("recommendations", [])
+        if not recommendations:
+            return
+
+        for rec in recommendations:
+            schedule_id = rec.get("schedule_id")
+            if schedule_id is None:
+                continue
+            schedule = db.query(SpraySchedule).filter_by(id=schedule_id).first()
+            if schedule is None:
+                continue
+            schedule.ai_commentary = json.dumps({
+                "go": rec.get("go"),
+                "detail": rec.get("detail", ""),
+                "summary": advisory.get("summary", ""),
+            })
+            logger.info("Spray AI commentary written for schedule #%d", schedule_id)
 
     def _verify_expired(self) -> None:
         """Check for expired nowcasts that need verification."""

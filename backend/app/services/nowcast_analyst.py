@@ -86,8 +86,30 @@ OUTPUT FORMAT — respond with ONLY a JSON object (no markdown, no commentary):
   },
   "farming_impact": "Brief agriculture-relevant note (field conditions, frost risk, spray windows, etc.)",
   "data_quality": "Assessment of input data sufficiency and any gaps",
-  "proposed_knowledge": null or {"category": "bias|timing|terrain|seasonal", "content": "Learned insight for future reference"}
+  "proposed_knowledge": null or {"category": "bias|timing|terrain|seasonal", "content": "Learned insight for future reference"},
+  "spray_advisory": null or {
+    "summary": "Overall spray conditions assessment for the next several hours",
+    "recommendations": [
+      {
+        "schedule_id": 123,
+        "product_name": "...",
+        "go": true or false,
+        "detail": "Specific recommendation with timing, e.g. 'Wind drops below 8 mph by 2 PM — spray window 2-5 PM looks good. Rain not expected until after 10 PM, giving 8+ hours rain-free.'"
+      }
+    ]
+  }
 }
+
+SPRAY APPLICATION ADVISORY (when spray schedules are provided):
+- Evaluate each scheduled spray against forecast conditions for its planned window.
+- For each product, check ALL constraints: wind (including gusts), temperature range,
+  rain-free hours after application, and humidity if applicable.
+- Be specific about timing: "Wind at 12 mph now but forecast to drop to 6 mph by 2 PM"
+  is much more useful than "wind is marginal."
+- If the planned window is not ideal, suggest the best alternative window within 24 hours.
+- Consider the rain-free requirement carefully — a product needing 4h rain-free at 3 PM
+  with rain forecast at 6 PM is a NO-GO even if all other conditions are met.
+- If no spray schedules are provided, set spray_advisory to null.
 """
 
 
@@ -166,6 +188,28 @@ def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
             parts.append(f"  - {entry}")
         parts.append("")
 
+    # Spray schedules
+    if data.spray_schedules:
+        parts.append("=== UPCOMING SPRAY SCHEDULES (evaluate each against forecast) ===")
+        for sched in data.spray_schedules:
+            c = sched["constraints"]
+            parts.append(
+                f"  Schedule #{sched['schedule_id']}: {sched['product_name']} ({sched['category']})"
+            )
+            parts.append(
+                f"    Planned: {sched['planned_date']} {sched['planned_start']}-{sched['planned_end']}"
+            )
+            parts.append(
+                f"    Constraints: wind <{c['max_wind_mph']} mph, "
+                f"temp {c['min_temp_f']}-{c['max_temp_f']}F, "
+                f"rain-free {c['rain_free_hours']}h"
+                + (f", humidity {c['min_humidity_pct']}-{c['max_humidity_pct']}%"
+                   if c.get('min_humidity_pct') is not None else "")
+            )
+            if sched.get("notes"):
+                parts.append(f"    Notes: {sched['notes']}")
+        parts.append("")
+
     # Nearby station observations
     if data.nearby_stations and data.nearby_stations.stations:
         parts.append("=== NEARBY STATION OBSERVATIONS (spatial context) ===")
@@ -215,6 +259,7 @@ class AnalystResult:
     input_tokens: int
     output_tokens: int
     radar_analysis: Optional[str] = None
+    spray_advisory: Optional[dict[str, Any]] = None
 
 
 def _build_user_content(
@@ -348,6 +393,11 @@ async def generate_nowcast(
         if not (proposed_knowledge.get("category") and proposed_knowledge.get("content")):
             proposed_knowledge = None
 
+    # Extract spray advisory if present.
+    spray_advisory = parsed.get("spray_advisory")
+    if spray_advisory is not None and not isinstance(spray_advisory, dict):
+        spray_advisory = None
+
     return AnalystResult(
         summary=parsed.get("summary", ""),
         current_vs_model=parsed.get("current_vs_model", ""),
@@ -359,4 +409,5 @@ async def generate_nowcast(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         radar_analysis=parsed.get("radar_analysis"),
+        spray_advisory=spray_advisory,
     )

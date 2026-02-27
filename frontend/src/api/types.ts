@@ -235,6 +235,15 @@ export interface NowcastData {
   farming_impact: string | null;
   current_vs_model: string;
   radar_analysis: string | null;
+  spray_advisory: {
+    summary: string;
+    recommendations: Array<{
+      schedule_id: number;
+      product_name: string;
+      go: boolean;
+      detail: string;
+    }>;
+  } | null;
   data_quality: string;
   sources_used: string[];
   input_tokens: number;

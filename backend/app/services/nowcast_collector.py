@@ -115,6 +115,7 @@ class CollectedData:
     knowledge_entries: list[str] = field(default_factory=list)
     radar_images: list[RadarImage] = field(default_factory=list)
     nearby_stations: Any = None  # Optional[NearbyStationsResult] — avoid circular import
+    spray_schedules: list[dict[str, Any]] = field(default_factory=list)
     collected_at: str = ""
     location: dict[str, float] = field(default_factory=dict)
     station_timezone: str = ""
@@ -347,6 +348,43 @@ def get_cached_radar(product_id: str = "nexrad_composite") -> Optional[RadarImag
     return None
 
 
+def gather_spray_schedules(db: Session) -> list[dict[str, Any]]:
+    """Load upcoming spray schedules with product constraints for AI analysis."""
+    from ..models.spray import SpraySchedule, SprayProduct
+
+    schedules = (
+        db.query(SpraySchedule)
+        .filter(SpraySchedule.status.in_(["pending", "go", "no_go"]))
+        .order_by(SpraySchedule.planned_date.asc())
+        .limit(10)
+        .all()
+    )
+    results = []
+    for s in schedules:
+        product = db.query(SprayProduct).filter_by(id=s.product_id).first()
+        if product is None:
+            continue
+        results.append({
+            "schedule_id": s.id,
+            "product_name": product.name,
+            "category": product.category,
+            "planned_date": s.planned_date,
+            "planned_start": s.planned_start,
+            "planned_end": s.planned_end,
+            "status": s.status,
+            "constraints": {
+                "rain_free_hours": product.rain_free_hours,
+                "max_wind_mph": product.max_wind_mph,
+                "min_temp_f": product.min_temp_f,
+                "max_temp_f": product.max_temp_f,
+                "min_humidity_pct": product.min_humidity_pct,
+                "max_humidity_pct": product.max_humidity_pct,
+            },
+            "notes": s.notes,
+        })
+    return results
+
+
 async def collect_all(
     db: Session,
     lat: float,
@@ -361,6 +399,7 @@ async def collect_all(
     nearby_max_iem: int = 5,
     nearby_max_wu: int = 5,
     wu_api_key: str = "",
+    spray_ai_enabled: bool = False,
 ) -> CollectedData:
     """Gather all data sources into a single snapshot for the analyst."""
     station = gather_station_data(db, station_timezone)
@@ -384,6 +423,9 @@ async def collect_all(
             wu_enabled=nearby_wu_enabled,
         )
 
+    # Gather spray schedules when AI spray advisory is enabled.
+    spray = gather_spray_schedules(db) if spray_ai_enabled else []
+
     return CollectedData(
         station=station,
         model_guidance=model,
@@ -391,6 +433,7 @@ async def collect_all(
         knowledge_entries=knowledge,
         radar_images=radar_images,
         nearby_stations=nearby,
+        spray_schedules=spray,
         collected_at=_local_now_iso(station_timezone),
         location={"latitude": lat, "longitude": lon},
         station_timezone=station_timezone,
