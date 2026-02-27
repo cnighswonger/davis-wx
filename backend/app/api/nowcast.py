@@ -170,7 +170,12 @@ def _history_to_dict(record: NowcastHistory) -> dict:
     radar_analysis = None
     if record.raw_response:
         try:
-            raw = json.loads(record.raw_response)
+            raw_text = record.raw_response.strip()
+            brace_start = raw_text.find("{")
+            brace_end = raw_text.rfind("}")
+            if brace_start != -1 and brace_end > brace_start:
+                raw_text = raw_text[brace_start:brace_end + 1]
+            raw = json.loads(raw_text)
             if isinstance(raw, dict):
                 farming_impact = raw.get("farming_impact")
                 current_vs_model = raw.get("current_vs_model", "")

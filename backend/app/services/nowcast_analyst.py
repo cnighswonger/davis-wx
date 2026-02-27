@@ -288,13 +288,14 @@ async def generate_nowcast(
     input_tokens = response.usage.input_tokens if response.usage else 0
     output_tokens = response.usage.output_tokens if response.usage else 0
 
-    # Parse JSON from response (Claude may wrap in markdown code block).
+    # Parse JSON from response — Claude may wrap in markdown code fences
+    # (```json ... ```), add preamble text, or vary the fence format.
+    # Robust approach: extract the JSON object directly by brace matching.
     json_text = raw_text.strip()
-    if json_text.startswith("```"):
-        # Strip markdown code fences.
-        lines = json_text.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        json_text = "\n".join(lines)
+    brace_start = json_text.find("{")
+    brace_end = json_text.rfind("}")
+    if brace_start != -1 and brace_end > brace_start:
+        json_text = json_text[brace_start:brace_end + 1]
 
     try:
         parsed = json.loads(json_text)
