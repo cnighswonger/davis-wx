@@ -30,6 +30,9 @@ Thumbs.db
 # Local screenshots
 pics/
 
+# Untracked working docs
+notrack/
+
 # Testing
 .pytest_cache/
 .coverage
