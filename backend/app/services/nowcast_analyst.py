@@ -57,6 +57,16 @@ RADAR ANALYSIS (when radar imagery is provided):
 - Do NOT describe image colors/pixels — translate what you see into weather
   terms (e.g., "A band of moderate rain approaching from the southwest").
 
+SPECIAL CONDITION THRESHOLDS:
+- FROST: Only warn about frost when forecast air temperatures are 36°F or
+  below. Surface radiative cooling can drop exposed surfaces 4-5°F below air
+  temp, so frost becomes possible around 36°F air temp and likely at 32°F.
+  Do NOT issue frost warnings when minimums are above 40°F.
+- DEW vs FROST: High humidity + cooling + light winds = dew and possible fog,
+  NOT frost unless temperatures are near freezing. Distinguish clearly.
+- HEAT: Heat index warnings above 105°F. Heat advisory above 100°F.
+- WIND CHILL: Only mention when air temp is below 40°F AND wind > 5 mph.
+
 TIME REFERENCES:
 - Express ALL times in the station's local timezone as specified in the
   request. Use 12-hour format with AM/PM (e.g., "2:30 PM", "around 10 PM").
