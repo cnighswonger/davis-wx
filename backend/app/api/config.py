@@ -53,6 +53,7 @@ _DEFAULTS: dict[str, object] = {
     "nowcast_wu_api_key": "",
     "nowcast_nearby_max_iem": 5,
     "nowcast_nearby_max_wu": 5,
+    "spray_ai_enabled": False,
 }
 
 

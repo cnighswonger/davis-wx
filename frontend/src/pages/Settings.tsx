@@ -157,7 +157,7 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast">("station");
+  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray">("station");
 
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
@@ -479,6 +479,7 @@ export default function Settings() {
           ["services", "Services"],
           ["alerts", "Alerts"],
           ["nowcast", "Nowcast"],
+          ["spray", "Spray"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -1582,6 +1583,27 @@ export default function Settings() {
               onChange={(e) => updateField("nowcast_knowledge_auto_accept_hours", parseInt(e.target.value) || 0)}
             />
           </div>
+        </div>
+      </div>
+      </>)}
+
+      {activeTab === "spray" && (<>
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Spray Advisor</h3>
+
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("spray_ai_enabled") === true}
+              onChange={(e) => updateField("spray_ai_enabled", e.target.checked)}
+            />
+            Enable AI-enhanced spray recommendations
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px" }}>
+              Uses the Nowcast AI to provide detailed commentary on spray windows, beyond rule-based go/no-go checks.
+              Requires AI Nowcast to be enabled with a valid API key.
+            </span>
+          </label>
         </div>
       </div>
       </>)}

@@ -298,6 +298,66 @@ export interface WSConnectionStatus {
 
 export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
 
+// --- Spray Advisor ---
+
+export interface SprayProduct {
+  id: number;
+  name: string;
+  category: string;
+  is_preset: boolean;
+  rain_free_hours: number;
+  max_wind_mph: number;
+  min_temp_f: number;
+  max_temp_f: number;
+  min_humidity_pct: number | null;
+  max_humidity_pct: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpraySchedule {
+  id: number;
+  product_id: number;
+  product_name: string;
+  planned_date: string;
+  planned_start: string;
+  planned_end: string;
+  status: "pending" | "go" | "no_go" | "completed" | "cancelled";
+  evaluation: SprayEvaluation | null;
+  ai_commentary: unknown;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConstraintCheck {
+  name: string;
+  passed: boolean;
+  current_value: string;
+  threshold: string;
+  detail: string;
+}
+
+export interface SprayEvaluation {
+  go: boolean;
+  constraints: ConstraintCheck[];
+  overall_detail: string;
+  optimal_window: { start: string; end: string; duration_hours: number } | null;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+}
+
+export interface SprayConditions {
+  wind_speed_mph: number | null;
+  wind_gust_mph: number | null;
+  temperature_f: number | null;
+  humidity_pct: number | null;
+  rain_rate: number | null;
+  rain_daily: number | null;
+  next_rain_hours: number | null;
+  overall_spray_ok: boolean;
+}
+
 // --- Setup Wizard ---
 
 export interface SetupStatus {

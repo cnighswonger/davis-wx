@@ -37,6 +37,7 @@ def init_database() -> None:
     from . import station_config  # noqa: F401
     from . import archive_record  # noqa: F401
     from . import nowcast  # noqa: F401
+    from . import spray  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
     # Enable WAL mode so the logger and web app can access the DB concurrently

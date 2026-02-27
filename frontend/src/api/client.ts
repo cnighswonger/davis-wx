@@ -171,6 +171,7 @@ export function forceArchive(): Promise<{ success: boolean }> {
 // --- Nowcast ---
 
 import type { NowcastData, NowcastKnowledgeEntry, NowcastVerification } from "./types.ts";
+import type { SprayProduct, SpraySchedule, SprayEvaluation, SprayConditions } from "./types.ts";
 
 export function fetchNowcast(): Promise<NowcastData | null> {
   return request<NowcastData | null>("/api/nowcast");
@@ -208,6 +209,90 @@ export function fetchNowcastVerifications(
 
 export function generateNowcast(): Promise<NowcastData> {
   return request<NowcastData>("/api/nowcast/generate", { method: "POST" });
+}
+
+// --- Spray Advisor ---
+
+export function fetchSprayProducts(): Promise<SprayProduct[]> {
+  return request<SprayProduct[]>("/api/spray/products");
+}
+
+export function createSprayProduct(
+  product: Omit<SprayProduct, "id" | "is_preset" | "created_at" | "updated_at">,
+): Promise<SprayProduct> {
+  return request<SprayProduct>("/api/spray/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(product),
+  });
+}
+
+export function updateSprayProduct(
+  id: number,
+  product: Partial<SprayProduct>,
+): Promise<SprayProduct> {
+  return request<SprayProduct>(`/api/spray/products/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(product),
+  });
+}
+
+export function deleteSprayProduct(id: number): Promise<void> {
+  return request<void>(`/api/spray/products/${id}`, { method: "DELETE" });
+}
+
+export function resetSprayPresets(): Promise<SprayProduct[]> {
+  return request<SprayProduct[]>("/api/spray/products/reset-presets", {
+    method: "POST",
+  });
+}
+
+export function fetchSpraySchedules(): Promise<SpraySchedule[]> {
+  return request<SpraySchedule[]>("/api/spray/schedules");
+}
+
+export function createSpraySchedule(
+  schedule: { product_id: number; planned_date: string; planned_start: string; planned_end: string; notes?: string },
+): Promise<SpraySchedule> {
+  return request<SpraySchedule>("/api/spray/schedules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(schedule),
+  });
+}
+
+export function deleteSpraySchedule(id: number): Promise<void> {
+  return request<void>(`/api/spray/schedules/${id}`, { method: "DELETE" });
+}
+
+export function updateSprayScheduleStatus(
+  id: number,
+  status: "completed" | "cancelled",
+): Promise<SpraySchedule> {
+  return request<SpraySchedule>(`/api/spray/schedules/${id}/status`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function evaluateSpraySchedule(id: number): Promise<SprayEvaluation> {
+  return request<SprayEvaluation>(`/api/spray/schedules/${id}/evaluate`, {
+    method: "POST",
+  });
+}
+
+export function quickCheckSpray(productId: number): Promise<SprayEvaluation> {
+  return request<SprayEvaluation>("/api/spray/evaluate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_id: productId }),
+  });
+}
+
+export function fetchSprayConditions(): Promise<SprayConditions> {
+  return request<SprayConditions>("/api/spray/conditions");
 }
 
 export { ApiError };
