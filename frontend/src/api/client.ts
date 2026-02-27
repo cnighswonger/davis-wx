@@ -346,4 +346,50 @@ export function fetchAnthropicCost(period: string = "30d"): Promise<unknown> {
   return request(`/api/usage/anthropic/cost?period=${period}`);
 }
 
+// --- Database Admin ---
+
+import type { DbStats, PurgeResult, CompactResult } from "./types.ts";
+
+export function fetchDbStats(): Promise<DbStats> {
+  return request<DbStats>("/api/db-admin/stats");
+}
+
+export function purgeTable(
+  table: string,
+  opts: { confirm?: string; before?: string },
+): Promise<PurgeResult> {
+  return request<PurgeResult>(`/api/db-admin/purge/${table}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+}
+
+export function purgeAll(confirm: string): Promise<Record<string, number>> {
+  return request<Record<string, number>>("/api/db-admin/purge-all", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm }),
+  });
+}
+
+export function compactReadings(
+  before: string,
+  confirm: string,
+): Promise<CompactResult> {
+  return request<CompactResult>("/api/db-admin/compact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ before, confirm }),
+  });
+}
+
+export function getDbBackupUrl(): string {
+  return `${API_BASE}/api/db-admin/export/backup`;
+}
+
+export function getDbExportUrl(table: string): string {
+  return `${API_BASE}/api/db-admin/export/json/${table}`;
+}
+
 export { ApiError };

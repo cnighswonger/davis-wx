@@ -427,6 +427,31 @@ export interface UsageStatus {
   };
 }
 
+// --- Database Admin ---
+
+export interface DbTableStats {
+  table: string;
+  row_count: number;
+  oldest: string | null;
+  newest: string | null;
+}
+
+export interface DbStats {
+  tables: DbTableStats[];
+  db_size_bytes: number;
+}
+
+export interface PurgeResult {
+  deleted: number;
+  remaining: number;
+}
+
+export interface CompactResult {
+  original_rows: number;
+  compacted_rows: number;
+  deleted: number;
+}
+
 // --- Setup Wizard ---
 
 export interface SetupStatus {
