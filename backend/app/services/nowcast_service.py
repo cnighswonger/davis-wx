@@ -132,9 +132,49 @@ class NowcastService:
         """Trigger a single nowcast generation (called from API)."""
         await self._generate()
 
+    def _seed_from_db(self) -> None:
+        """Load the latest nowcast from DB into memory on startup.
+
+        Populates ``_latest`` for immediate API responses and sets
+        ``_last_run`` so the service respects the existing interval
+        instead of immediately triggering a new API call.
+        """
+        db = SessionLocal()
+        try:
+            record = (
+                db.query(NowcastHistory)
+                .order_by(NowcastHistory.created_at.desc())
+                .first()
+            )
+            if record is None:
+                return
+
+            # Populate the in-memory cache using the same logic as the API.
+            from ..api.nowcast import _history_to_dict
+            self._latest = _history_to_dict(record)
+
+            # If the nowcast is still within the update interval, set
+            # _last_run so we don't regenerate immediately.
+            if record.created_at:
+                age_seconds = (datetime.now(timezone.utc) - record.created_at).total_seconds()
+                if age_seconds < self._interval:
+                    self._last_run = time.monotonic() - age_seconds
+                    logger.info(
+                        "Nowcast seeded from DB (age %.0fs, next in %.0fs)",
+                        age_seconds, self._interval - age_seconds,
+                    )
+                else:
+                    logger.info("Nowcast seeded from DB (age %.0fs, due for refresh)", age_seconds)
+        except Exception:
+            logger.exception("Failed to seed nowcast from DB")
+        finally:
+            db.close()
+
     async def start(self) -> None:
         """Main loop — runs forever as a background task."""
         logger.info("Nowcast service started")
+        self.reload_config()
+        self._seed_from_db()
         while True:
             try:
                 await self._tick()
