@@ -391,35 +391,35 @@ function ScheduleCard({
           {ev.constraints.map((c, i) => (
             <ConstraintRow key={i} check={c} />
           ))}
+
+          {schedule.ai_commentary != null && (() => {
+            const ai = typeof schedule.ai_commentary === "string"
+              ? (() => { try { return JSON.parse(schedule.ai_commentary as string); } catch { return null; } })()
+              : schedule.ai_commentary;
+            if (!ai || !ai.detail) return null;
+            return (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "8px 12px",
+                  background: "var(--color-bg-secondary)",
+                  borderRadius: 6,
+                  borderLeft: "3px solid var(--color-accent)",
+                  fontSize: 13,
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <span style={{ fontWeight: 600, fontSize: 11, color: "var(--color-accent)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  AI Advisory
+                </span>
+                <p style={{ margin: "4px 0 0" }}>{ai.detail}</p>
+              </div>
+            );
+          })()}
         </div>
       )}
-
-      {schedule.ai_commentary != null && (() => {
-        const ai = typeof schedule.ai_commentary === "string"
-          ? (() => { try { return JSON.parse(schedule.ai_commentary as string); } catch { return null; } })()
-          : schedule.ai_commentary;
-        if (!ai || !ai.detail) return null;
-        return (
-          <div
-            style={{
-              marginTop: 10,
-              padding: "8px 12px",
-              background: "var(--color-bg-secondary)",
-              borderRadius: 6,
-              borderLeft: "3px solid var(--color-accent)",
-              fontSize: 13,
-              fontFamily: "var(--font-body)",
-              color: "var(--color-text)",
-              lineHeight: 1.5,
-            }}
-          >
-            <span style={{ fontWeight: 600, fontSize: 11, color: "var(--color-accent)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              AI Advisory
-            </span>
-            <p style={{ margin: "4px 0 0" }}>{ai.detail}</p>
-          </div>
-        );
-      })()}
 
       {!isPast && (
         <div
