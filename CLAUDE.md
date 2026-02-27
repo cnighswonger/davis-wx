@@ -30,7 +30,8 @@ Web dashboard and logger daemon for Davis weather stations (Vantage Pro, Weather
 
 - Frontend: `cd frontend && npm run build`
 - Backend: Python 3.11+, dependencies in `backend/requirements.txt`
-- Debian package: `dpkg-buildpackage -us -uc -b` from repo root
+- Debian package: `dpkg-buildpackage -us -uc -b` from repo root (on `deb` branch)
+- **GitHub release filenames**: GitHub silently converts `~` to `.` in uploaded asset filenames. Debian uses `~` in pre-release versions (e.g., `0.1.0~alpha4`) but the download will be `0.1.0.alpha4`. Use the actual GitHub filename in install instructions, not the local `.deb` filename.
 
 ## Key Patterns
 
