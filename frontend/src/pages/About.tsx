@@ -185,7 +185,7 @@ export default function About() {
               gap: "4px 24px",
             }}
           >
-            <InfoRow label="Model" value={station.type_name} />
+            <InfoRow label="Model" value={station.type_name || "Unknown"} />
             <InfoRow
               label="Status"
               value={station.connected ? "Connected" : "Disconnected"}
@@ -194,14 +194,14 @@ export default function About() {
               label="Firmware"
               value={station.link_revision || "Unknown"}
             />
-            <InfoRow label="Uptime" value={formatUptime(station.uptime_seconds)} />
+            <InfoRow label="Uptime" value={formatUptime(station.uptime_seconds ?? 0)} />
             <InfoRow
               label="Archive Records"
-              value={station.archive_records.toLocaleString()}
+              value={(station.archive_records ?? 0).toLocaleString()}
             />
             <InfoRow
               label="Poll Interval"
-              value={`${station.poll_interval}s`}
+              value={`${station.poll_interval ?? 0}s`}
             />
           </div>
         </div>
