@@ -66,7 +66,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 // --- Buy me a Coffee ---
 
-const BMAC_URL = "https://buymeacoffee.com/placeholder";
+const BMAC_URL = "https://buymeacoffee.com/vsits";
 
 function SupportCard({ isMobile }: { isMobile: boolean }) {
   return (
