@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive, fetchLocalUsage, fetchUsageStatus, fetchAnthropicCost } from "../api/client.ts";
-import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold, LocalUsageResponse, UsageStatus } from "../api/types.ts";
+import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive, fetchLocalUsage, fetchUsageStatus, fetchAnthropicCost, fetchDbStats, purgeTable, purgeAll, compactReadings, getDbBackupUrl, getDbExportUrl } from "../api/client.ts";
+import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold, LocalUsageResponse, UsageStatus, DbStats } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
 import { useWeatherBackground } from "../context/WeatherBackgroundContext.tsx";
 import { themes } from "../themes/index.ts";
@@ -542,6 +542,565 @@ function UsageTab({
   );
 }
 
+// --- Database Tab ---
+
+const TABLE_LABELS: Record<string, string> = {
+  sensor_readings: "Sensor Readings",
+  archive_records: "Archive Records",
+  nowcast_history: "Nowcast History",
+  nowcast_verification: "Nowcast Verifications",
+  nowcast_knowledge: "Knowledge Base",
+  spray_schedules: "Spray Schedules",
+  spray_outcomes: "Spray Outcomes",
+  spray_products: "Spray Products",
+  station_config: "Station Config",
+};
+
+const EXPORTABLE_TABLES = new Set([
+  "sensor_readings", "archive_records", "nowcast_history",
+  "nowcast_knowledge", "spray_schedules", "spray_outcomes",
+]);
+
+const PURGEABLE_TABLES = new Set([
+  "sensor_readings", "archive_records", "nowcast_history",
+  "nowcast_verification", "nowcast_knowledge", "spray_schedules", "spray_outcomes",
+]);
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDateShort(iso: string | null): string {
+  if (!iso) return "\u2014";
+  try {
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return iso;
+  }
+}
+
+function DatabaseTab({ isMobile }: { isMobile: boolean }) {
+  const [stats, setStats] = useState<DbStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Purge dialog state
+  const [purgeTarget, setPurgeTarget] = useState<string | null>(null);
+  const [purgeMode, setPurgeMode] = useState<"date" | "full">("date");
+  const [purgeBefore, setPurgeBefore] = useState("");
+  const [purgeConfirm, setPurgeConfirm] = useState("");
+  const [purgeLoading, setPurgeLoading] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
+
+  // Purge-all dialog
+  const [showPurgeAll, setShowPurgeAll] = useState(false);
+  const [purgeAllConfirm, setPurgeAllConfirm] = useState("");
+  const [purgeAllLoading, setPurgeAllLoading] = useState(false);
+
+  // Compact dialog
+  const [showCompact, setShowCompact] = useState(false);
+  const [compactBefore, setCompactBefore] = useState("");
+  const [compactConfirm, setCompactConfirm] = useState("");
+  const [compactLoading, setCompactLoading] = useState(false);
+  const [compactResult, setCompactResult] = useState<string | null>(null);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await fetchDbStats();
+      setStats(data);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const totalRows = stats?.tables.reduce((s, t) => s + t.row_count, 0) ?? 0;
+
+  const handlePurge = useCallback(async () => {
+    if (!purgeTarget) return;
+    setPurgeLoading(true);
+    setPurgeResult(null);
+    try {
+      if (purgeMode === "date") {
+        if (!purgeBefore) { setPurgeLoading(false); return; }
+        const res = await purgeTable(purgeTarget, { before: purgeBefore });
+        setPurgeResult(`Deleted ${res.deleted.toLocaleString()} records. ${res.remaining.toLocaleString()} remaining.`);
+      } else {
+        if (purgeConfirm !== "PURGE") { setPurgeLoading(false); return; }
+        const res = await purgeTable(purgeTarget, { confirm: "PURGE" });
+        setPurgeResult(`Deleted ${res.deleted.toLocaleString()} records. ${res.remaining.toLocaleString()} remaining.`);
+      }
+      loadStats();
+    } catch (e) {
+      setPurgeResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPurgeLoading(false);
+    }
+  }, [purgeTarget, purgeMode, purgeBefore, purgeConfirm, loadStats]);
+
+  const handlePurgeAll = useCallback(async () => {
+    if (purgeAllConfirm !== "DELETE DATABASE") return;
+    setPurgeAllLoading(true);
+    setPurgeResult(null);
+    try {
+      const res = await purgeAll("DELETE DATABASE");
+      const total = Object.values(res).reduce((s, n) => s + n, 0);
+      setPurgeResult(`Purged ${total.toLocaleString()} records across all tables.`);
+      setShowPurgeAll(false);
+      setPurgeAllConfirm("");
+      loadStats();
+    } catch (e) {
+      setPurgeResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPurgeAllLoading(false);
+    }
+  }, [purgeAllConfirm, loadStats]);
+
+  const handleCompact = useCallback(async () => {
+    if (compactConfirm !== "COMPACT" || !compactBefore) return;
+    setCompactLoading(true);
+    setCompactResult(null);
+    try {
+      const res = await compactReadings(compactBefore, "COMPACT");
+      setCompactResult(
+        `Compacted ${res.original_rows.toLocaleString()} rows into ${res.compacted_rows.toLocaleString()} (removed ${res.deleted.toLocaleString()}).`
+      );
+      setShowCompact(false);
+      setCompactConfirm("");
+      setCompactBefore("");
+      loadStats();
+    } catch (e) {
+      setCompactResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCompactLoading(false);
+    }
+  }, [compactBefore, compactConfirm, loadStats]);
+
+  if (loading) {
+    return (
+      <div style={{ ...cardStyle, padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
+        Loading database stats...
+      </div>
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <div style={{ ...cardStyle, padding: "20px", color: "var(--color-danger)" }}>
+        Failed to load database stats: {error}
+      </div>
+    );
+  }
+
+  const sensorReadingsStats = stats?.tables.find(t => t.table === "sensor_readings");
+  const sensorRowCount = sensorReadingsStats?.row_count ?? 0;
+  const estimatedCompacted = Math.ceil(sensorRowCount / 30);
+
+  return (
+    <>
+      {/* Status messages */}
+      {purgeResult && (
+        <div style={{
+          ...cardStyle,
+          padding: "12px 20px",
+          border: purgeResult.startsWith("Error") ? "1px solid var(--color-danger)" : "1px solid var(--color-success)",
+          color: purgeResult.startsWith("Error") ? "var(--color-danger)" : "var(--color-success)",
+          fontSize: "14px",
+          fontFamily: "var(--font-body)",
+        }}>
+          {purgeResult}
+        </div>
+      )}
+
+      {compactResult && (
+        <div style={{
+          ...cardStyle,
+          padding: "12px 20px",
+          border: compactResult.startsWith("Error") ? "1px solid var(--color-danger)" : "1px solid var(--color-success)",
+          color: compactResult.startsWith("Error") ? "var(--color-danger)" : "var(--color-success)",
+          fontSize: "14px",
+          fontFamily: "var(--font-body)",
+        }}>
+          {compactResult}
+        </div>
+      )}
+
+      {/* Overview */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Database Overview</h3>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginBottom: "2px" }}>
+              File Size
+            </div>
+            <div style={{ fontSize: "20px", fontWeight: 700, fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+              {formatBytes(stats?.db_size_bytes ?? 0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginBottom: "2px" }}>
+              Total Rows
+            </div>
+            <div style={{ fontSize: "20px", fontWeight: 700, fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+              {totalRows.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Stats */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Tables</h3>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontFamily: "var(--font-body)",
+            fontSize: "13px",
+          }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                <th style={{ textAlign: "left", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Table</th>
+                <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Rows</th>
+                {!isMobile && (
+                  <>
+                    <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Oldest</th>
+                    <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Newest</th>
+                  </>
+                )}
+                <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats?.tables.map((t) => (
+                <tr key={t.table} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                  <td style={{ padding: "8px 12px", color: "var(--color-text)" }}>
+                    {TABLE_LABELS[t.table] ?? t.table}
+                  </td>
+                  <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>
+                    {t.row_count.toLocaleString()}
+                  </td>
+                  {!isMobile && (
+                    <>
+                      <td style={{ padding: "8px 12px", color: "var(--color-text-muted)", textAlign: "right", fontSize: "12px" }}>
+                        {formatDateShort(t.oldest)}
+                      </td>
+                      <td style={{ padding: "8px 12px", color: "var(--color-text-muted)", textAlign: "right", fontSize: "12px" }}>
+                        {formatDateShort(t.newest)}
+                      </td>
+                    </>
+                  )}
+                  <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                      {EXPORTABLE_TABLES.has(t.table) && (
+                        <a
+                          href={getDbExportUrl(t.table)}
+                          download
+                          style={{
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--color-border)",
+                            background: "var(--color-bg-secondary)",
+                            color: "var(--color-text-secondary)",
+                            textDecoration: "none",
+                            fontFamily: "var(--font-body)",
+                          }}
+                        >
+                          Export
+                        </a>
+                      )}
+                      {PURGEABLE_TABLES.has(t.table) && t.row_count > 0 && (
+                        <button
+                          onClick={() => {
+                            setPurgeTarget(t.table);
+                            setPurgeMode("date");
+                            setPurgeBefore("");
+                            setPurgeConfirm("");
+                            setPurgeResult(null);
+                          }}
+                          style={{
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            borderRadius: "4px",
+                            border: "1px solid var(--color-border)",
+                            background: "var(--color-bg-secondary)",
+                            color: "var(--color-danger)",
+                            cursor: "pointer",
+                            fontFamily: "var(--font-body)",
+                          }}
+                        >
+                          Purge
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Purge Dialog */}
+      {purgeTarget && (
+        <div style={{
+          ...cardStyle,
+          padding: isMobile ? "14px" : "20px",
+          border: "2px solid var(--color-warning)",
+        }}>
+          <h3 style={{ ...sectionTitle, fontSize: "16px", marginBottom: "12px" }}>
+            Purge: {TABLE_LABELS[purgeTarget] ?? purgeTarget}
+          </h3>
+
+          <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+            <label style={{ ...radioLabel, fontSize: "13px" }}>
+              <input
+                type="radio"
+                checked={purgeMode === "date"}
+                onChange={() => setPurgeMode("date")}
+              />
+              By date range
+            </label>
+            <label style={{ ...radioLabel, fontSize: "13px" }}>
+              <input
+                type="radio"
+                checked={purgeMode === "full"}
+                onChange={() => setPurgeMode("full")}
+              />
+              All records
+            </label>
+          </div>
+
+          {purgeMode === "date" ? (
+            <div style={fieldGroup}>
+              <label style={labelStyle}>Delete records before:</label>
+              <input
+                type="date"
+                style={{ ...inputStyle, maxWidth: "200px" }}
+                value={purgeBefore}
+                onChange={(e) => setPurgeBefore(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div style={fieldGroup}>
+              <div style={{
+                fontSize: "13px",
+                color: "var(--color-danger)",
+                fontFamily: "var(--font-body)",
+                marginBottom: "8px",
+                fontWeight: 600,
+              }}>
+                This will permanently delete ALL records from {TABLE_LABELS[purgeTarget] ?? purgeTarget}.
+              </div>
+              <label style={labelStyle}>Type PURGE to confirm:</label>
+              <input
+                type="text"
+                style={{ ...inputStyle, maxWidth: "200px" }}
+                value={purgeConfirm}
+                onChange={(e) => setPurgeConfirm(e.target.value)}
+                placeholder="PURGE"
+              />
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            <button
+              style={{
+                ...btnPrimary,
+                background: "var(--color-danger)",
+                opacity: purgeLoading || (purgeMode === "full" && purgeConfirm !== "PURGE") || (purgeMode === "date" && !purgeBefore) ? 0.5 : 1,
+                cursor: purgeLoading ? "wait" : "pointer",
+              }}
+              onClick={handlePurge}
+              disabled={purgeLoading || (purgeMode === "full" && purgeConfirm !== "PURGE") || (purgeMode === "date" && !purgeBefore)}
+            >
+              {purgeLoading ? "Deleting..." : "Delete Records"}
+            </button>
+            <button
+              style={{ ...btnPrimary, background: "var(--color-bg-secondary)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+              onClick={() => setPurgeTarget(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Compact Card */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Compact Sensor Readings</h3>
+        <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontFamily: "var(--font-body)", margin: "0 0 12px 0", lineHeight: "1.5" }}>
+          Reduce storage by replacing raw sensor readings (every ~10s) with 5-minute averages.
+          Charts and exports work identically on compacted data.
+          {sensorRowCount > 0 && (
+            <span style={{ display: "block", marginTop: "4px", color: "var(--color-text-muted)", fontSize: "12px" }}>
+              Current: {sensorRowCount.toLocaleString()} readings. After full compaction: ~{estimatedCompacted.toLocaleString()} rows.
+            </span>
+          )}
+        </p>
+
+        {!showCompact ? (
+          <button
+            style={btnPrimary}
+            onClick={() => setShowCompact(true)}
+            disabled={sensorRowCount === 0}
+          >
+            Compact Readings...
+          </button>
+        ) : (
+          <div style={{
+            padding: "14px",
+            border: "1px solid var(--color-warning)",
+            borderRadius: "6px",
+            background: "var(--color-bg-secondary)",
+          }}>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>Compact readings older than:</label>
+              <input
+                type="date"
+                style={{ ...inputStyle, maxWidth: "200px" }}
+                value={compactBefore}
+                onChange={(e) => setCompactBefore(e.target.value)}
+              />
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>Type COMPACT to confirm:</label>
+              <input
+                type="text"
+                style={{ ...inputStyle, maxWidth: "200px" }}
+                value={compactConfirm}
+                onChange={(e) => setCompactConfirm(e.target.value)}
+                placeholder="COMPACT"
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background: "var(--color-warning)",
+                  color: "#000",
+                  opacity: compactLoading || compactConfirm !== "COMPACT" || !compactBefore ? 0.5 : 1,
+                  cursor: compactLoading ? "wait" : "pointer",
+                }}
+                onClick={handleCompact}
+                disabled={compactLoading || compactConfirm !== "COMPACT" || !compactBefore}
+              >
+                {compactLoading ? "Compacting..." : "Compact"}
+              </button>
+              <button
+                style={{ ...btnPrimary, background: "var(--color-bg-card)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+                onClick={() => { setShowCompact(false); setCompactConfirm(""); setCompactBefore(""); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Backup Card */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Backup</h3>
+        <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontFamily: "var(--font-body)", margin: "0 0 12px 0" }}>
+          Complete SQLite database snapshot. Can be restored by replacing the database file.
+        </p>
+        <a
+          href={getDbBackupUrl()}
+          download
+          style={{
+            ...btnPrimary,
+            display: "inline-block",
+            textDecoration: "none",
+          }}
+        >
+          Download Backup
+        </a>
+      </div>
+
+      {/* Purge All (Nuclear) */}
+      <div style={{
+        ...cardStyle,
+        padding: isMobile ? "12px" : "20px",
+        border: showPurgeAll ? "2px solid var(--color-danger)" : "1px solid var(--color-border)",
+      }}>
+        <h3 style={{ ...sectionTitle, color: "var(--color-danger)" }}>Danger Zone</h3>
+
+        {!showPurgeAll ? (
+          <>
+            <p style={{ fontSize: "13px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", margin: "0 0 12px 0" }}>
+              Permanently delete all sensor readings, archives, nowcasts, knowledge base entries, and spray history.
+              Configuration and product definitions are preserved.
+            </p>
+            <button
+              style={{
+                ...btnPrimary,
+                background: "transparent",
+                color: "var(--color-danger)",
+                border: "1px solid var(--color-danger)",
+              }}
+              onClick={() => setShowPurgeAll(true)}
+            >
+              Purge All Data...
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{
+              fontSize: "14px",
+              color: "var(--color-danger)",
+              fontFamily: "var(--font-body)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              lineHeight: "1.5",
+            }}>
+              This will permanently delete ALL data from all tables except configuration and spray product definitions. This cannot be undone.
+            </div>
+            <div style={fieldGroup}>
+              <label style={labelStyle}>Type DELETE DATABASE to confirm:</label>
+              <input
+                type="text"
+                style={{ ...inputStyle, maxWidth: "250px" }}
+                value={purgeAllConfirm}
+                onChange={(e) => setPurgeAllConfirm(e.target.value)}
+                placeholder="DELETE DATABASE"
+              />
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                style={{
+                  ...btnPrimary,
+                  background: "var(--color-danger)",
+                  opacity: purgeAllLoading || purgeAllConfirm !== "DELETE DATABASE" ? 0.5 : 1,
+                  cursor: purgeAllLoading ? "wait" : "pointer",
+                }}
+                onClick={handlePurgeAll}
+                disabled={purgeAllLoading || purgeAllConfirm !== "DELETE DATABASE"}
+              >
+                {purgeAllLoading ? "Deleting..." : "Delete All Data"}
+              </button>
+              <button
+                style={{ ...btnPrimary, background: "var(--color-bg-secondary)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+                onClick={() => { setShowPurgeAll(false); setPurgeAllConfirm(""); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 // --- Component ---
 
 export default function Settings() {
@@ -554,7 +1113,7 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray" | "usage">("station");
+  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray" | "usage" | "database">("station");
 
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
@@ -878,6 +1437,7 @@ export default function Settings() {
           ["nowcast", "Nowcast"],
           ["spray", "Spray"],
           ["usage", "Usage"],
+          ["database", "Database"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -2017,6 +2577,8 @@ export default function Settings() {
         inputStyle={inputStyle}
         fieldGroup={fieldGroup}
       />)}
+
+      {activeTab === "database" && (<DatabaseTab isMobile={isMobile} />)}
 
       {/* Save buttons and status */}
       <div style={{
