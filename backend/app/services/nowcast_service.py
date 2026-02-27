@@ -36,6 +36,7 @@ class NowcastService:
         self._model: str = "claude-haiku-4-5-20251001"
         self._interval: int = 900  # seconds
         self._horizon: int = 2  # hours
+        self._max_tokens: int = 2500
         self._latitude: float = 0.0
         self._longitude: float = 0.0
         self._auto_accept_hours: int = 48
@@ -56,7 +57,7 @@ class NowcastService:
         try:
             keys = [
                 "nowcast_enabled", "nowcast_api_key", "nowcast_model",
-                "nowcast_interval", "nowcast_horizon", "latitude",
+                "nowcast_interval", "nowcast_horizon", "nowcast_max_tokens", "latitude",
                 "longitude", "nowcast_knowledge_auto_accept_hours",
                 "station_timezone", "nowcast_radar_enabled",
                 "nowcast_nearby_iem_enabled", "nowcast_nearby_wu_enabled",
@@ -79,6 +80,10 @@ class NowcastService:
                 self._horizon = int(cfg.get("nowcast_horizon", "2"))
             except ValueError:
                 self._horizon = 2
+            try:
+                self._max_tokens = int(cfg.get("nowcast_max_tokens", "2500"))
+            except ValueError:
+                self._max_tokens = 2500
             try:
                 self._latitude = float(cfg.get("latitude", "0"))
             except ValueError:
@@ -192,6 +197,7 @@ class NowcastService:
                 model=self._model,
                 api_key_from_db=self._api_key,
                 horizon_hours=self._horizon,
+                max_tokens=self._max_tokens,
             )
 
             if result is None:

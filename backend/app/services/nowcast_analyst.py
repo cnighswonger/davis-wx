@@ -250,6 +250,7 @@ async def generate_nowcast(
     model: str,
     api_key_from_db: str,
     horizon_hours: int = 2,
+    max_tokens: int = 2500,
 ) -> Optional[AnalystResult]:
     """Call Claude API to generate a nowcast from collected data.
 
@@ -258,6 +259,7 @@ async def generate_nowcast(
         model: Claude model ID (e.g., "claude-haiku-4-5-20251001").
         api_key_from_db: API key from database config (env var checked first).
         horizon_hours: Forecast window in hours.
+        max_tokens: Maximum output tokens for the API call.
 
     Returns:
         AnalystResult on success, None if API unavailable or key missing.
@@ -273,7 +275,7 @@ async def generate_nowcast(
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
             model=model,
-            max_tokens=2500,
+            max_tokens=max_tokens,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
         )
@@ -289,7 +291,7 @@ async def generate_nowcast(
     output_tokens = response.usage.output_tokens if response.usage else 0
 
     if response.stop_reason == "max_tokens":
-        logger.warning("Nowcast response truncated at max_tokens (%d output tokens)", output_tokens)
+        logger.warning("Nowcast response truncated at max_tokens=%d (%d output tokens)", max_tokens, output_tokens)
 
     # Parse JSON from response — Claude may wrap in markdown code fences
     # (```json ... ```), add preamble text, or vary the fence format.

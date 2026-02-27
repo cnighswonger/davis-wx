@@ -1533,6 +1533,26 @@ export default function Settings() {
           </div>
 
           <div style={fieldGroup}>
+            <label style={labelStyle}>
+              Max Output Tokens
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
+                Increase if responses get truncated
+              </span>
+            </label>
+            <select
+              style={selectStyle}
+              value={String(val("nowcast_max_tokens") || "2500")}
+              onChange={(e) => updateField("nowcast_max_tokens", parseInt(e.target.value))}
+            >
+              <option value="1500">1500</option>
+              <option value="2000">2000</option>
+              <option value="2500">2500</option>
+              <option value="3000">3000</option>
+              <option value="4000">4000</option>
+            </select>
+          </div>
+
+          <div style={fieldGroup}>
             <label style={labelStyle}>Nearby Station Radius (miles)</label>
             <input
               style={inputStyle}
