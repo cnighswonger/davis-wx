@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive } from "../api/client.ts";
-import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold } from "../api/types.ts";
+import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive, fetchLocalUsage, fetchUsageStatus, fetchAnthropicCost } from "../api/client.ts";
+import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold, LocalUsageResponse, UsageStatus } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
 import { useWeatherBackground } from "../context/WeatherBackgroundContext.tsx";
 import { themes } from "../themes/index.ts";
@@ -145,6 +145,403 @@ function setConfigValue(
   return [...items, { key, value, label, description }];
 }
 
+// --- Usage Tab ---
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function UsageTab({
+  config: _config,
+  val,
+  updateField,
+  isMobile,
+  cardStyle,
+  sectionTitle,
+  labelStyle,
+  inputStyle,
+  fieldGroup,
+}: {
+  config: ConfigItem[];
+  val: (key: string) => string | number | boolean;
+  updateField: (key: string, value: string | number | boolean) => void;
+  isMobile: boolean;
+  cardStyle: React.CSSProperties;
+  sectionTitle: React.CSSProperties;
+  labelStyle: React.CSSProperties;
+  inputStyle: React.CSSProperties;
+  fieldGroup: React.CSSProperties;
+}) {
+  const [localUsage, setLocalUsage] = useState<LocalUsageResponse | null>(null);
+  const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
+  const [costData, setCostData] = useState<Array<{ date: string; cost_usd: number }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [resuming, setResuming] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [local, status] = await Promise.all([
+        fetchLocalUsage(),
+        fetchUsageStatus(),
+      ]);
+      setLocalUsage(local);
+      setUsageStatus(status);
+
+      // If Anthropic Admin API is available, fetch cost data
+      if (status.anthropic) {
+        try {
+          const costResp = await fetchAnthropicCost("30d");
+          // Extract daily costs from Anthropic response
+          const resp = costResp as { data?: Array<{ bucket_start_time: string; cost_cents: string }> };
+          if (resp.data && Array.isArray(resp.data)) {
+            const days: Array<{ date: string; cost_usd: number }> = resp.data.map(
+              (d: { bucket_start_time: string; cost_cents: string }) => ({
+                date: d.bucket_start_time?.substring(0, 10) ?? "",
+                cost_usd: parseFloat(d.cost_cents ?? "0") / 100,
+              }),
+            );
+            setCostData(days);
+          }
+        } catch {
+          // Admin API may fail — not critical
+        }
+      }
+    } catch {
+      // Failed to load usage data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleResume = useCallback(async () => {
+    setResuming(true);
+    try {
+      updateField("nowcast_enabled", true);
+      updateField("usage_budget_paused", false);
+    } finally {
+      setResuming(false);
+    }
+  }, [updateField]);
+
+  if (loading) {
+    return (
+      <div style={{ ...cardStyle, padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
+        Loading usage data...
+      </div>
+    );
+  }
+
+  const today = localUsage?.today;
+  const month = localUsage?.this_month;
+  const allTime = localUsage?.all_time;
+  const budget = usageStatus?.budget;
+  const hasAnthropicApi = usageStatus?.anthropic ?? false;
+
+  const statCardStyle: React.CSSProperties = {
+    background: "var(--color-bg-secondary)",
+    borderRadius: "var(--gauge-border-radius)",
+    border: "1px solid var(--color-border)",
+    padding: isMobile ? "12px" : "16px",
+    flex: 1,
+    minWidth: isMobile ? "100%" : "180px",
+  };
+
+  const statValueStyle: React.CSSProperties = {
+    fontSize: "22px",
+    fontWeight: 700,
+    fontFamily: "var(--font-heading)",
+    color: "var(--color-text)",
+    marginBottom: "2px",
+  };
+
+  const statLabelStyle: React.CSSProperties = {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    color: "var(--color-text-muted)",
+    fontFamily: "var(--font-body)",
+  };
+
+  const budgetPct = budget && budget.limit_usd > 0
+    ? Math.min(100, (budget.current_usd / budget.limit_usd) * 100)
+    : 0;
+
+  return (
+    <>
+      {/* Budget alert banner */}
+      {budget?.paused && (
+        <div style={{
+          ...cardStyle,
+          padding: "14px 20px",
+          border: "2px solid var(--color-warning)",
+          background: "var(--color-bg-card)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
+        }}>
+          <div>
+            <strong style={{ color: "var(--color-warning)", fontFamily: "var(--font-body)", fontSize: "14px" }}>
+              Nowcast Paused {'\u2014'} Budget Limit Reached
+            </strong>
+            <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+              Monthly budget of ${budget.limit_usd.toFixed(2)} reached (${budget.current_usd.toFixed(2)} used).
+              Nowcast generation has been automatically paused.
+            </div>
+          </div>
+          <button
+            onClick={handleResume}
+            disabled={resuming}
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "13px",
+              padding: "8px 16px",
+              borderRadius: "6px",
+              border: "1px solid var(--color-border)",
+              background: "var(--color-accent)",
+              color: "#fff",
+              cursor: resuming ? "wait" : "pointer",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Resume Nowcast
+          </button>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Usage Summary</h3>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          {/* Today */}
+          <div style={statCardStyle}>
+            <div style={statValueStyle}>${today?.estimated_cost_usd.toFixed(2) ?? "0.00"}</div>
+            <div style={statLabelStyle}>Today</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+              {today?.calls ?? 0} calls {'\u00B7'} {formatTokens((today?.input_tokens ?? 0) + (today?.output_tokens ?? 0))} tokens
+            </div>
+          </div>
+
+          {/* This Month */}
+          <div style={statCardStyle}>
+            <div style={statValueStyle}>${month?.estimated_cost_usd.toFixed(2) ?? "0.00"}</div>
+            <div style={statLabelStyle}>This Month</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+              {month?.calls ?? 0} calls {'\u00B7'} {formatTokens((month?.input_tokens ?? 0) + (month?.output_tokens ?? 0))} tokens
+            </div>
+            {/* Budget progress bar */}
+            {budget && budget.limit_usd > 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <div style={{
+                  height: "6px",
+                  borderRadius: "3px",
+                  background: "var(--color-border)",
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    width: `${budgetPct}%`,
+                    height: "100%",
+                    borderRadius: "3px",
+                    background: budgetPct >= 90 ? "var(--color-danger)" : budgetPct >= 70 ? "var(--color-warning)" : "var(--color-accent)",
+                    transition: "width 0.3s ease",
+                  }} />
+                </div>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginTop: "3px" }}>
+                  ${budget.current_usd.toFixed(2)} / ${budget.limit_usd.toFixed(2)} budget
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* All Time */}
+          <div style={statCardStyle}>
+            <div style={statValueStyle}>${allTime?.estimated_cost_usd.toFixed(2) ?? "0.00"}</div>
+            <div style={statLabelStyle}>All Time</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginTop: "4px" }}>
+              {allTime?.calls ?? 0} calls {'\u00B7'} {formatTokens((allTime?.input_tokens ?? 0) + (allTime?.output_tokens ?? 0))} tokens
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Model Breakdown */}
+      {localUsage?.model_breakdown && localUsage.model_breakdown.length > 0 && (
+        <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+          <h3 style={sectionTitle}>Model Breakdown (This Month)</h3>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontFamily: "var(--font-body)",
+              fontSize: "13px",
+            }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                  <th style={{ textAlign: "left", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Model</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Calls</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Input</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Output</th>
+                  <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Est. Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {localUsage.model_breakdown.map((row) => (
+                  <tr key={row.model} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                    <td style={{ padding: "8px 12px", color: "var(--color-text)" }}>{row.model}</td>
+                    <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>{row.calls}</td>
+                    <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>{formatTokens(row.input_tokens)}</td>
+                    <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>{formatTokens(row.output_tokens)}</td>
+                    <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>${row.estimated_cost_usd.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Cost Trend (Anthropic Admin API) */}
+      {hasAnthropicApi && costData.length > 0 && (
+        <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+          <h3 style={sectionTitle}>Daily Cost (Last 30 Days)</h3>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "80px" }}>
+            {(() => {
+              const maxCost = Math.max(...costData.map((d) => d.cost_usd), 0.01);
+              return costData.map((day) => (
+                <div
+                  key={day.date}
+                  title={`${day.date}: $${day.cost_usd.toFixed(2)}`}
+                  style={{
+                    flex: 1,
+                    minWidth: "4px",
+                    maxWidth: "20px",
+                    height: `${Math.max(2, (day.cost_usd / maxCost) * 100)}%`,
+                    background: "var(--color-accent)",
+                    borderRadius: "2px 2px 0 0",
+                    transition: "height 0.3s ease",
+                  }}
+                />
+              ));
+            })()}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)" }}>
+              {costData[0]?.date ?? ""}
+            </span>
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)" }}>
+              {costData[costData.length - 1]?.date ?? ""}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Usage Settings */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Usage Settings</h3>
+
+        <div style={fieldGroup}>
+          <label style={labelStyle}>
+            Anthropic Admin API Key
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px" }}>
+              Optional. Enables real-time cost data from your Anthropic account.
+              Requires an Admin API key (sk-ant-admin...) from the Claude Console.
+            </span>
+          </label>
+          <input
+            type="password"
+            style={inputStyle}
+            value={String(val("anthropic_admin_api_key") || "")}
+            onChange={(e) => updateField("anthropic_admin_api_key", e.target.value)}
+            placeholder="sk-ant-admin..."
+          />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "16px", marginTop: "12px" }}>
+          <div style={fieldGroup}>
+            <label style={labelStyle}>Monthly Budget (USD)</label>
+            <input
+              type="number"
+              style={inputStyle}
+              value={Number(val("usage_budget_monthly_usd")) || 0}
+              onChange={(e) => updateField("usage_budget_monthly_usd", parseFloat(e.target.value) || 0)}
+              min={0}
+              step={1}
+              placeholder="0 = unlimited"
+            />
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px", display: "block" }}>
+              Set to 0 for no limit
+            </span>
+          </div>
+
+          <div style={{ ...fieldGroup, display: "flex", alignItems: "center", paddingTop: isMobile ? "0" : "18px" }}>
+            <label style={{
+              fontSize: "13px",
+              fontFamily: "var(--font-body)",
+              color: "var(--color-text-secondary)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+            }}>
+              <input
+                type="checkbox"
+                checked={val("usage_budget_auto_pause") === true}
+                onChange={(e) => updateField("usage_budget_auto_pause", e.target.checked)}
+              />
+              Auto-pause nowcast when budget exceeded
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing Reference */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Model Pricing Reference</h3>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontFamily: "var(--font-body)",
+            fontSize: "13px",
+          }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                <th style={{ textAlign: "left", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Model</th>
+                <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Input / 1M</th>
+                <th style={{ textAlign: "right", padding: "8px 12px", color: "var(--color-text-muted)", fontWeight: 500 }}>Output / 1M</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Haiku 4.5", "$1.00", "$5.00"],
+                ["Sonnet 4.5", "$3.00", "$15.00"],
+                ["Opus 4.6", "$5.00", "$25.00"],
+              ].map(([name, inp, out]) => (
+                <tr key={name} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                  <td style={{ padding: "8px 12px", color: "var(--color-text)" }}>{name}</td>
+                  <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>{inp}</td>
+                  <td style={{ padding: "8px 12px", color: "var(--color-text)", textAlign: "right" }}>{out}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", marginTop: "8px" }}>
+          Local cost estimates are based on these rates. For actual billing, configure the Admin API key above.
+        </div>
+      </div>
+    </>
+  );
+}
+
 // --- Component ---
 
 export default function Settings() {
@@ -157,7 +554,7 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
   const [ports, setPorts] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray">("station");
+  const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray" | "usage">("station");
 
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
@@ -480,6 +877,7 @@ export default function Settings() {
           ["alerts", "Alerts"],
           ["nowcast", "Nowcast"],
           ["spray", "Spray"],
+          ["usage", "Usage"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -1607,6 +2005,18 @@ export default function Settings() {
         </div>
       </div>
       </>)}
+
+      {activeTab === "usage" && (<UsageTab
+        config={configItems}
+        val={val}
+        updateField={updateField}
+        isMobile={isMobile}
+        cardStyle={cardStyle}
+        sectionTitle={sectionTitle}
+        labelStyle={labelStyle}
+        inputStyle={inputStyle}
+        fieldGroup={fieldGroup}
+      />)}
 
       {/* Save buttons and status */}
       <div style={{

@@ -326,4 +326,24 @@ export function fetchProductStats(productId: number): Promise<SprayProductStats>
   return request<SprayProductStats>(`/api/spray/products/${productId}/stats`);
 }
 
+// --- Usage & Cost Tracking ---
+
+import type { LocalUsageResponse, UsageStatus } from "./types.ts";
+
+export function fetchLocalUsage(): Promise<LocalUsageResponse> {
+  return request<LocalUsageResponse>("/api/usage/local");
+}
+
+export function fetchUsageStatus(): Promise<UsageStatus> {
+  return request<UsageStatus>("/api/usage/status");
+}
+
+export function fetchAnthropicUsage(period: string = "7d"): Promise<unknown> {
+  return request(`/api/usage/anthropic?period=${period}`);
+}
+
+export function fetchAnthropicCost(period: string = "30d"): Promise<unknown> {
+  return request(`/api/usage/anthropic/cost?period=${period}`);
+}
+
 export { ApiError };

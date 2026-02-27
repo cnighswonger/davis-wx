@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from . import current, history, export, config, station, forecast, astronomy, output, setup, weatherlink, backgrounds, nowcast, spray
+from . import current, history, export, config, station, forecast, astronomy, output, setup, weatherlink, backgrounds, nowcast, spray, usage
 
 api_router = APIRouter(prefix="/api")
 
@@ -19,3 +19,4 @@ api_router.include_router(weatherlink.router)
 api_router.include_router(backgrounds.router)
 api_router.include_router(nowcast.router)
 api_router.include_router(spray.router)
+api_router.include_router(usage.router)

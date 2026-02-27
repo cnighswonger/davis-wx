@@ -120,6 +120,15 @@ class NowcastService:
             except ValueError:
                 self._nearby_radius = 25
             self._spray_ai_enabled = cfg.get("spray_ai_enabled", "false").lower() == "true"
+
+            # Budget check — may auto-pause nowcast
+            if self._enabled:
+                from ..api.usage import check_budget
+                if check_budget(db):
+                    # Re-read enabled flag since check_budget may have changed it
+                    row = db.query(StationConfigModel).filter_by(key="nowcast_enabled").first()
+                    if row and row.value.lower() != "true":
+                        self._enabled = False
         finally:
             db.close()
 

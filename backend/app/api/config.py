@@ -54,6 +54,10 @@ _DEFAULTS: dict[str, object] = {
     "nowcast_nearby_max_iem": 5,
     "nowcast_nearby_max_wu": 5,
     "spray_ai_enabled": False,
+    "anthropic_admin_api_key": "",
+    "usage_budget_monthly_usd": 0,
+    "usage_budget_auto_pause": False,
+    "usage_budget_paused": False,
 }
 
 

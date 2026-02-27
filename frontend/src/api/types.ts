@@ -400,6 +400,33 @@ export interface SprayProductStats {
   }>;
 }
 
+// --- Usage & Cost Tracking ---
+
+export interface UsagePeriodStats {
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost_usd: number;
+}
+
+export interface LocalUsageResponse {
+  today: UsagePeriodStats;
+  this_month: UsagePeriodStats;
+  all_time: UsagePeriodStats;
+  model_breakdown: Array<{ model: string } & UsagePeriodStats>;
+}
+
+export interface UsageStatus {
+  local: boolean;
+  anthropic: boolean;
+  budget: {
+    limit_usd: number;
+    current_usd: number;
+    paused: boolean;
+    auto_pause: boolean;
+  };
+}
+
 // --- Setup Wizard ---
 
 export interface SetupStatus {
