@@ -293,6 +293,10 @@ def _check_rain_free(
     total_precip = sum(p for p in window if p is not None)
     rain_hours = sum(1 for p in window if p is not None and p > 0)
     passed = total_precip < 0.01  # essentially zero
+    logger.info(
+        "Rain-free check: start_idx=%d, window=%s, total=%.3f\", passed=%s",
+        start_idx, window, total_precip, passed,
+    )
 
     if passed:
         detail = f"No rain forecast for {len(window)}h after application."
@@ -322,6 +326,10 @@ def _find_hour_index(
     if not times:
         return 0
     target_str = target.strftime("%Y-%m-%dT%H:00")
+    logger.info(
+        "Rain-free lookup: target=%s, forecast range=%s..%s",
+        target_str, times[0] if times else "?", times[-1] if times else "?",
+    )
     for i, t in enumerate(times):
         if t >= target_str:
             return i

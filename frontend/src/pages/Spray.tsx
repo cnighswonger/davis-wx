@@ -322,9 +322,9 @@ function ScheduleCard({
             color: "var(--color-text-secondary)",
           }}
         >
-          {schedule.planned_date} {schedule.planned_start}\u2013{schedule.planned_end}
+          {schedule.planned_date} {schedule.planned_start}{'\u2013'}{schedule.planned_end}
         </span>
-        {ev && <GoNoGoBadge go={ev.go} confidence={ev.confidence} />}
+        {ev && <GoNoGoBadge go={schedule.status === "go"} confidence={ev.confidence} />}
         {isPast && (
           <span
             style={{
@@ -521,11 +521,11 @@ function ProductCard({
         <span>Rain-free: {product.rain_free_hours}h</span>
         <span>Wind: &lt;{product.max_wind_mph} mph</span>
         <span>
-          Temp: {product.min_temp_f}\u2013{product.max_temp_f}&deg;F
+          Temp: {product.min_temp_f}{'\u2013'}{product.max_temp_f}&deg;F
         </span>
         {(product.min_humidity_pct != null || product.max_humidity_pct != null) && (
           <span>
-            Humidity: {product.min_humidity_pct ?? "any"}\u2013
+            Humidity: {product.min_humidity_pct ?? "any"}{'\u2013'}
             {product.max_humidity_pct ?? "any"}%
           </span>
         )}
@@ -1039,9 +1039,6 @@ export default function Spray() {
         </div>
       )}
 
-      {/* Quick Check */}
-      {products.length > 0 && <QuickCheck products={products} />}
-
       {/* Scheduled sprays */}
       <div style={{ marginTop: 8 }}>
         <div
@@ -1118,6 +1115,9 @@ export default function Spray() {
           </details>
         )}
       </div>
+
+      {/* Quick Check */}
+      {products.length > 0 && <QuickCheck products={products} />}
 
       {/* Products section (collapsible) */}
       <div style={{ marginTop: 20 }}>

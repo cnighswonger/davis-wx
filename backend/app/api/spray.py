@@ -225,6 +225,70 @@ def _get_latest_obs(db: Session) -> dict:
     }
 
 
+def _ai_says_go(ai_commentary_json: str | None) -> bool | None:
+    """Parse AI commentary JSON and return its go/no-go recommendation.
+
+    Returns True (go), False (no-go), or None (no AI commentary).
+    """
+    if not ai_commentary_json:
+        return None
+    try:
+        data = json.loads(ai_commentary_json)
+        if isinstance(data, dict) and "go" in data:
+            return bool(data["go"])
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return None
+
+
+def _merged_evaluation(
+    constraints: ProductConstraints,
+    obs: dict,
+    forecast_eval: SprayEvaluation | None,
+) -> SprayEvaluation:
+    """Build a merged evaluation: station actuals for wind/temp/humidity,
+    forecast for rain-free (which needs future data)."""
+    logger.info(
+        "Merged eval — station obs: wind=%s, gust=%s, temp=%s, hum=%s, rain_rate=%s",
+        obs.get("wind_speed_mph"), obs.get("wind_gust_mph"),
+        obs.get("outside_temp_f"), obs.get("outside_humidity_pct"),
+        obs.get("rain_rate_in_hr"),
+    )
+    current_eval = evaluate_current(constraints, obs)
+
+    # Use forecast rain-free check if available (needs future data).
+    rain_check = None
+    if forecast_eval is not None:
+        for c in forecast_eval.constraints:
+            if c.name == "rain_free":
+                rain_check = c
+                break
+
+    if rain_check is not None:
+        merged = [rain_check if c.name == "rain_free" else c for c in current_eval.constraints]
+    else:
+        merged = list(current_eval.constraints)
+
+    all_passed = all(c.passed for c in merged)
+    failed = [c for c in merged if not c.passed]
+    if all_passed:
+        overall = (
+            "Station constraints met — current wind, temperature, and humidity "
+            "are within limits. See AI advisory for forecast-based guidance."
+        )
+    elif len(failed) == 1:
+        overall = f"Constraint not met: {failed[0].name}."
+    else:
+        overall = f"Multiple constraints not met: {', '.join(c.name for c in failed)}."
+
+    return SprayEvaluation(
+        go=all_passed,
+        constraints=merged,
+        overall_detail=overall,
+        confidence="HIGH" if all_passed else ("MEDIUM" if len(failed) == 1 else "LOW"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Products CRUD
 # ---------------------------------------------------------------------------
@@ -311,16 +375,61 @@ def reset_presets(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.get("/schedules")
-def list_schedules(db: Session = Depends(get_db)):
-    """List spray schedules with product names, newest first."""
+async def list_schedules(db: Session = Depends(get_db)):
+    """List spray schedules with product names, newest first.
+
+    Active schedules (pending/go/no_go) are re-evaluated on every fetch
+    so constraint checks always reflect the latest station observations.
+    """
     rows = (
-        db.query(SpraySchedule, SprayProduct.name)
+        db.query(SpraySchedule, SprayProduct)
         .join(SprayProduct, SpraySchedule.product_id == SprayProduct.id)
         .order_by(SpraySchedule.planned_date.desc(), SpraySchedule.planned_start.desc())
         .limit(50)
         .all()
     )
-    return [_schedule_to_dict(s, name) for s, name in rows]
+
+    # Re-evaluate active schedules with current station data.
+    active_statuses = {"pending", "go", "no_go"}
+    needs_eval = [(s, p) for s, p in rows if s.status in active_statuses]
+    if needs_eval:
+        lat, lon, tz = _get_location(db)
+        obs = _get_latest_obs(db)
+        hourly = None
+        if lat != 0.0 or lon != 0.0:
+            try:
+                hourly = await fetch_hourly_forecast(lat, lon)
+            except Exception as exc:
+                logger.warning("Forecast fetch failed during schedule list: %s", exc)
+
+        for s, p in needs_eval:
+            try:
+                constraints = _product_constraints(p)
+                forecast_ev = None
+                if hourly:
+                    start_dt = _parse_schedule_datetime(s.planned_date, s.planned_start, tz)
+                    end_dt = _parse_schedule_datetime(s.planned_date, s.planned_end, tz)
+                    forecast_ev = evaluate_conditions(constraints, hourly, start_dt, end_dt)
+                ev = _merged_evaluation(constraints, obs, forecast_ev)
+                s.evaluation = json.dumps(_evaluation_to_dict(ev))
+                rule_go = ev.go
+
+                # AI override: if AI commentary says no-go, it has broader
+                # data sources (HRRR, NWS, radar) and should take precedence.
+                ai_go = _ai_says_go(s.ai_commentary)
+                if rule_go and ai_go is False:
+                    s.status = "no_go"
+                    logger.info(
+                        "Schedule #%d: rule engine says GO but AI says NO-GO — using AI",
+                        s.id,
+                    )
+                else:
+                    s.status = "go" if rule_go else "no_go"
+            except Exception as exc:
+                logger.warning("Re-evaluation failed for schedule #%d: %s", s.id, exc)
+        db.commit()
+
+    return [_schedule_to_dict(s, p.name) for s, p in rows]
 
 
 @router.post("/schedules")
@@ -340,16 +449,17 @@ async def create_schedule(body: ScheduleCreate, db: Session = Depends(get_db)):
     db.add(schedule)
     db.flush()
 
-    # Auto-evaluate.
+    # Auto-evaluate using station actuals + forecast rain-free.
     lat, lon, tz = _get_location(db)
+    obs = _get_latest_obs(db)
+    constraints = _product_constraints(product)
     if lat != 0.0 or lon != 0.0:
         try:
             hourly = await fetch_hourly_forecast(lat, lon)
             start_dt = _parse_schedule_datetime(body.planned_date, body.planned_start, tz)
             end_dt = _parse_schedule_datetime(body.planned_date, body.planned_end, tz)
-            ev = evaluate_conditions(
-                _product_constraints(product), hourly, start_dt, end_dt,
-            )
+            forecast_ev = evaluate_conditions(constraints, hourly, start_dt, end_dt)
+            ev = _merged_evaluation(constraints, obs, forecast_ev)
             schedule.evaluation = json.dumps(_evaluation_to_dict(ev))
             schedule.status = "go" if ev.go else "no_go"
         except Exception as exc:
@@ -416,56 +526,23 @@ async def quick_check(body: QuickCheckRequest, db: Session = Depends(get_db)):
 
     lat, lon, tz = _get_location(db)
     constraints = _product_constraints(product)
-
-    # Current conditions check (station actuals for wind/temp/humidity).
     obs = _get_latest_obs(db)
-    current_eval = evaluate_current(constraints, obs)
 
     # Forecast for rain-free window and optimal window.
     optimal_window = None
-    rain_check = None
+    forecast_eval = None
     if lat != 0.0 or lon != 0.0:
         hourly = await fetch_hourly_forecast(lat, lon)
         if hourly:
             optimal_window = find_optimal_window(
                 constraints, hourly, search_hours=24, station_tz=tz,
             )
-            # Use forecast only for rain-free check (needs future data).
             now = datetime.now(timezone.utc)
             forecast_eval = evaluate_conditions(
                 constraints, hourly, now, now + timedelta(hours=2),
             )
-            # Extract just the rain_free constraint from forecast.
-            for c in forecast_eval.constraints:
-                if c.name == "rain_free":
-                    rain_check = c
-                    break
 
-    # Build merged result: station actuals for wind/temp/humidity,
-    # forecast for rain-free (which needs future data).
-    if rain_check is not None:
-        # Replace the current eval's rain check with the forecast-based one.
-        merged_checks = [
-            rain_check if c.name == "rain_free" else c
-            for c in current_eval.constraints
-        ]
-    else:
-        merged_checks = list(current_eval.constraints)
-
-    all_passed = all(c.passed for c in merged_checks)
-    failed = [c for c in merged_checks if not c.passed]
-    if all_passed:
-        overall = "All constraints met — conditions are favorable for spraying."
-    else:
-        names = ", ".join(c.name for c in failed)
-        overall = f"Multiple constraints not met: {names}." if len(failed) > 1 else f"Constraint not met: {names}."
-
-    result = SprayEvaluation(
-        go=all_passed,
-        constraints=merged_checks,
-        overall_detail=overall,
-        confidence="HIGH" if all_passed else ("MEDIUM" if len(failed) == 1 else "LOW"),
-    )
+    result = _merged_evaluation(constraints, obs, forecast_eval)
     result_dict = _evaluation_to_dict(result)
     result_dict["optimal_window"] = optimal_window
     return result_dict
@@ -485,15 +562,18 @@ async def evaluate_schedule(schedule_id: int, db: Session = Depends(get_db)):
     if lat == 0.0 and lon == 0.0:
         raise HTTPException(status_code=400, detail="Station location not configured")
 
+    constraints = _product_constraints(product)
+    obs = _get_latest_obs(db)
     hourly = await fetch_hourly_forecast(lat, lon)
     start_dt = _parse_schedule_datetime(schedule.planned_date, schedule.planned_start, tz)
     end_dt = _parse_schedule_datetime(schedule.planned_date, schedule.planned_end, tz)
-    ev = evaluate_conditions(_product_constraints(product), hourly, start_dt, end_dt)
+    forecast_ev = evaluate_conditions(constraints, hourly, start_dt, end_dt)
+
+    # Merge station actuals with forecast rain-free.
+    ev = _merged_evaluation(constraints, obs, forecast_ev)
 
     # Find optimal window too.
-    window = find_optimal_window(
-        _product_constraints(product), hourly, search_hours=24, station_tz=tz,
-    )
+    window = find_optimal_window(constraints, hourly, search_hours=24, station_tz=tz)
 
     schedule.evaluation = json.dumps(_evaluation_to_dict(ev))
     schedule.status = "go" if ev.go else "no_go"
