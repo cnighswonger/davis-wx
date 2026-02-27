@@ -154,6 +154,10 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       setForecast(data as ForecastResponse);
     });
 
+    manager.onMessage("nowcast_update", (data) => {
+      setNowcast(data as NowcastData);
+    });
+
     manager.onMessage("connection_status", (data) => {
       setConnected(data as boolean);
     });

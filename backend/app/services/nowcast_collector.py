@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 from sqlalchemy.orm import Session
@@ -17,6 +18,18 @@ from ..models.sensor_reading import SensorReadingModel
 from ..models.nowcast import NowcastKnowledge
 
 logger = logging.getLogger(__name__)
+
+
+def _local_now_iso(station_timezone: str) -> str:
+    """Return current time as ISO string in station local tz, or UTC if unavailable."""
+    now_utc = datetime.now(timezone.utc)
+    if station_timezone:
+        try:
+            return now_utc.astimezone(ZoneInfo(station_timezone)).isoformat()
+        except (KeyError, Exception):
+            pass
+    return now_utc.isoformat()
+
 
 # Open-Meteo forecast API (free, no key required).
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
@@ -107,10 +120,23 @@ class CollectedData:
     station_timezone: str = ""
 
 
-def _reading_to_dict(r: SensorReadingModel) -> dict[str, Any]:
-    """Convert a SensorReadingModel to a human-readable dict with proper units."""
+def _reading_to_dict(
+    r: SensorReadingModel, tz: ZoneInfo | None = None,
+) -> dict[str, Any]:
+    """Convert a SensorReadingModel to a human-readable dict with proper units.
+
+    If *tz* is provided, timestamps are converted from UTC to that timezone
+    so Claude sees local times matching the station clock.
+    """
+    ts = None
+    if r.timestamp:
+        utc_dt = r.timestamp.replace(tzinfo=timezone.utc) if r.timestamp.tzinfo is None else r.timestamp
+        if tz is not None:
+            ts = utc_dt.astimezone(tz).isoformat()
+        else:
+            ts = utc_dt.isoformat()
     return {
-        "timestamp": r.timestamp.isoformat() if r.timestamp else None,
+        "timestamp": ts,
         "outside_temp_f": r.outside_temp / 10.0 if r.outside_temp is not None else None,
         "inside_temp_f": r.inside_temp / 10.0 if r.inside_temp is not None else None,
         "outside_humidity_pct": r.outside_humidity,
@@ -129,7 +155,9 @@ def _reading_to_dict(r: SensorReadingModel) -> dict[str, Any]:
     }
 
 
-def gather_station_data(db: Session) -> StationSnapshot:
+def gather_station_data(
+    db: Session, station_timezone: str = "",
+) -> StationSnapshot:
     """Query latest reading + 3-hour trend from sensor_readings table."""
     latest = (
         db.query(SensorReadingModel)
@@ -138,6 +166,14 @@ def gather_station_data(db: Session) -> StationSnapshot:
     )
     if latest is None:
         return StationSnapshot(latest={}, trend_3h=[], has_data=False)
+
+    # Resolve timezone for timestamp conversion (UTC → local).
+    tz: ZoneInfo | None = None
+    if station_timezone:
+        try:
+            tz = ZoneInfo(station_timezone)
+        except (KeyError, Exception):
+            logger.warning("Invalid station_timezone %r, timestamps stay UTC", station_timezone)
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=3)
     trend_rows = (
@@ -149,10 +185,10 @@ def gather_station_data(db: Session) -> StationSnapshot:
 
     # Subsample trend to ~12 points (one per ~15 min) to keep prompt compact.
     step = max(1, len(trend_rows) // 12)
-    trend_sampled = [_reading_to_dict(r) for r in trend_rows[::step]]
+    trend_sampled = [_reading_to_dict(r, tz) for r in trend_rows[::step]]
 
     return StationSnapshot(
-        latest=_reading_to_dict(latest),
+        latest=_reading_to_dict(latest, tz),
         trend_3h=trend_sampled,
     )
 
@@ -327,7 +363,7 @@ async def collect_all(
     wu_api_key: str = "",
 ) -> CollectedData:
     """Gather all data sources into a single snapshot for the analyst."""
-    station = gather_station_data(db)
+    station = gather_station_data(db, station_timezone)
     model = await fetch_model_guidance(lat, lon, horizon_hours)
     nws_summary = gather_nws_summary(nws_forecast)
     knowledge = gather_knowledge(db)
@@ -355,7 +391,7 @@ async def collect_all(
         knowledge_entries=knowledge,
         radar_images=radar_images,
         nearby_stations=nearby,
-        collected_at=datetime.now(timezone.utc).isoformat(),
+        collected_at=_local_now_iso(station_timezone),
         location={"latitude": lat, "longitude": lon},
         station_timezone=station_timezone,
     )

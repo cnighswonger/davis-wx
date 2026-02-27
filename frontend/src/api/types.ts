@@ -286,12 +286,17 @@ export interface WSAlertCleared {
   data: { id: string; label: string };
 }
 
+export interface WSNowcastUpdate {
+  type: "nowcast_update";
+  data: NowcastData;
+}
+
 export interface WSConnectionStatus {
   type: "connection_status";
   connected: boolean;
 }
 
-export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
+export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
 
 // --- Setup Wizard ---
 

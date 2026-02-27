@@ -257,6 +257,9 @@ class NowcastService:
                 "Nowcast generated: %d input tokens, %d output tokens",
                 result.input_tokens, result.output_tokens,
             )
+
+            # Push update to connected browser clients via WebSocket.
+            await self._broadcast_nowcast()
         except Exception:
             db.rollback()
             raise
@@ -307,6 +310,19 @@ class NowcastService:
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
         }
+
+    async def _broadcast_nowcast(self) -> None:
+        """Push the latest nowcast to all connected WebSocket clients."""
+        if self._latest is None:
+            return
+        try:
+            from ..ws.handler import ws_manager
+            await ws_manager.broadcast({
+                "type": "nowcast_update",
+                "data": self._latest,
+            })
+        except Exception as exc:
+            logger.debug("Nowcast WS broadcast failed: %s", exc)
 
     def _sources_list(self, result: AnalystResult) -> list[str]:
         """Build list of data sources used."""

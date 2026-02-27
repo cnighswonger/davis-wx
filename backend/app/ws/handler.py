@@ -56,7 +56,7 @@ class ConnectionManager:
                 async for msg in client.subscribe():
                     if not self.active_connections:
                         break
-                    await self._broadcast(msg)
+                    await self.broadcast(msg)
             except asyncio.CancelledError:
                 break
             except (ConnectionRefusedError, OSError):
@@ -66,7 +66,8 @@ class ConnectionManager:
                 logger.error("IPC relay error: %s", exc)
                 await asyncio.sleep(2.0)
 
-    async def _broadcast(self, message: dict[str, Any]) -> None:
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        """Send a message to all connected WebSocket clients."""
         disconnected: list[WebSocket] = []
         for conn in self.active_connections:
             try:
