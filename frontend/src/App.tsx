@@ -14,6 +14,7 @@ import Astronomy from './pages/Astronomy';
 import Settings from './pages/Settings';
 import Nowcast from './pages/Nowcast';
 import Spray from './pages/Spray';
+import About from './pages/About';
 import SetupWizard from './components/setup/SetupWizard';
 import { fetchSetupStatus } from './api/client';
 
@@ -34,6 +35,7 @@ function AppContent() {
         <Route path="/nowcast" element={<Nowcast />} />
         <Route path="/spray" element={<Spray />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/about" element={<About />} />
       </Routes>
     </AppShell>
   );

@@ -95,6 +95,36 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
           ))}
         </nav>
 
+        {/* About link — anchored at bottom */}
+        <div style={{ padding: '0 8px', marginTop: 'auto' }}>
+          <NavLink
+            to="/about"
+            onClick={onClose}
+            title={collapsed ? 'About' : undefined}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: collapsed ? '0' : '10px',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              padding: collapsed ? '10px 0' : '10px 12px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              background: isActive ? 'var(--color-accent-muted)' : 'transparent',
+              transition: 'background 0.15s ease, color 0.15s ease',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            })}
+          >
+            <span style={{ fontSize: '16px', width: '20px', textAlign: 'center', flexShrink: 0 }}>
+              {'\u24D8'}
+            </span>
+            {!collapsed && <span>About</span>}
+          </NavLink>
+        </div>
+
         {/* Collapse toggle (desktop only) */}
         {onToggleCollapse && (
           <div style={{ padding: '8px', borderTop: '1px solid var(--color-border)' }}>
