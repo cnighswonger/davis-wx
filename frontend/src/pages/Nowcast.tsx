@@ -289,17 +289,20 @@ export default function Nowcast() {
 
   if (!nowcast) {
     return (
-      <div>
-        <h2
-          style={{
-            margin: "0 0 16px 0",
-            fontSize: "24px",
-            fontFamily: "var(--font-heading)",
-            color: "var(--color-text)",
-          }}
-        >
-          AI Nowcast
-        </h2>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+          <h2
+            style={{
+              margin: "0 0 16px 0",
+              fontSize: "24px",
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-text)",
+            }}
+          >
+            AI Nowcast
+          </h2>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
         <div style={cardStyle}>
           <div
             style={{
@@ -315,6 +318,7 @@ export default function Nowcast() {
             and configure your Anthropic API key to get started.
           </div>
         </div>
+        </div>
       </div>
     );
   }
@@ -322,16 +326,18 @@ export default function Nowcast() {
   const elements = nowcast.elements || {};
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Header */}
       <div
         style={{
+          flexShrink: 0,
+          padding: "24px 24px 0",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "16px",
           flexWrap: "wrap",
           gap: "8px",
+          marginBottom: "16px",
         }}
       >
         <h2
@@ -379,6 +385,8 @@ export default function Nowcast() {
           </button>
         </div>
       </div>
+
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
 
       {/* Summary */}
       <div style={{ ...cardStyle, borderLeft: "4px solid var(--color-accent)" }}>
@@ -837,6 +845,7 @@ export default function Nowcast() {
           Model: {nowcast.model_used} | Tokens: {nowcast.input_tokens}
           /{nowcast.output_tokens}
         </span>
+      </div>
       </div>
     </div>
   );

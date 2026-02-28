@@ -219,9 +219,11 @@ export default function Forecast() {
   const nws = forecast?.nws ?? null;
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div
         style={{
+          flexShrink: 0,
+          padding: "24px 24px 0",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -256,6 +258,7 @@ export default function Forecast() {
         </button>
       </div>
 
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
       {/* Zambretti local forecast */}
       {local ? (
         <ZambrettiSection
@@ -316,6 +319,7 @@ export default function Forecast() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

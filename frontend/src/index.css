@@ -28,6 +28,15 @@ body {
   min-height: 100vh;
 }
 
+/* Settings page: suppress ancestor scrolling so only the tab content scrolls. */
+body.settings-scroll-lock {
+  overflow: hidden;
+}
+body.settings-scroll-lock .app-main-content {
+  overflow-y: hidden !important;
+  padding: 0 !important;
+}
+
 /* Smooth transitions for theme changes */
 header,
 aside,

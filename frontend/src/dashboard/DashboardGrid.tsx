@@ -215,28 +215,31 @@ export default function DashboardGrid() {
   // --- Normal mode: plain grid, no DnD ---
   if (!editMode) {
     return (
-      <div>
-        <h2
-          className="dashboard-heading"
-          style={{
-            margin: "0 0 16px 0",
-            fontSize: "24px",
-            fontFamily: "var(--font-heading)",
-            color: "var(--color-text)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Current Conditions
-          <button
-            style={editToggleStyle}
-            onClick={() => setEditMode(true)}
-            aria-label="Edit dashboard layout"
-            title="Edit dashboard layout"
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+          <h2
+            className="dashboard-heading"
+            style={{
+              margin: "0 0 16px 0",
+              fontSize: "24px",
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-text)",
+              whiteSpace: "nowrap",
+            }}
           >
-            {"\u270E"}
-          </button>
-        </h2>
+            Current Conditions
+            <button
+              style={editToggleStyle}
+              onClick={() => setEditMode(true)}
+              aria-label="Edit dashboard layout"
+              title="Edit dashboard layout"
+            >
+              {"\u270E"}
+            </button>
+          </h2>
+        </div>
 
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
         {flags.nowcastEnabled && <NowcastBanner />}
 
         <div ref={gridRef} className="dashboard-grid" style={gridStyle}>
@@ -285,24 +288,28 @@ export default function DashboardGrid() {
             );
           })}
         </div>
+        </div>
       </div>
     );
   }
 
   // --- Edit mode: DnD grid ---
   return (
-    <div>
-      <h2
-        style={{
-          margin: "0 0 16px 0",
-          fontSize: "24px",
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
-        }}
-      >
-        Current Conditions
-      </h2>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+        <h2
+          style={{
+            margin: "0 0 16px 0",
+            fontSize: "24px",
+            fontFamily: "var(--font-heading)",
+            color: "var(--color-text)",
+          }}
+        >
+          Current Conditions
+        </h2>
+      </div>
 
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
       <NowcastBanner />
 
       {/* Edit toolbar */}
@@ -412,6 +419,7 @@ export default function DashboardGrid() {
           onClose={() => setShowCatalog(false)}
         />
       )}
+      </div>
     </div>
   );
 }

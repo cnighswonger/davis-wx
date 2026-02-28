@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchConfig, updateConfig, fetchSerialPorts, reconnectStation, fetchWeatherLinkConfig, updateWeatherLinkConfig, clearRainDaily, clearRainYearly, forceArchive, fetchLocalUsage, fetchUsageStatus, fetchAnthropicCost, fetchDbStats, purgeTable, purgeAll, compactReadings, getDbBackupUrl, getDbExportUrl } from "../api/client.ts";
 import type { ConfigItem, WeatherLinkConfig, WeatherLinkCalibration, AlertThreshold, LocalUsageResponse, UsageStatus, DbStats } from "../api/types.ts";
 import { useTheme } from "../context/ThemeContext.tsx";
@@ -1228,6 +1228,30 @@ export default function Settings() {
     if (activeTab === "usage" && !flags.nowcastEnabled) setActiveTab("station");
   }, [flags.nowcastEnabled, flags.sprayEnabled, activeTab]);
 
+  // Take over the parent scroll container so the header stays fixed
+  // and only the tab content scrolls (single scrollbar).
+  // Uses dynamic measurement to set a definite height on Settings,
+  // bypassing the broken flex height chain (grid uses minHeight, not height).
+  // Suppress parent scroll via CSS class (immune to React re-renders)
+  // and dynamically measure height so the internal flex layout works.
+  const settingsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (loading) return;
+    const el = settingsRef.current;
+    if (!el) return;
+    document.body.classList.add("settings-scroll-lock");
+    const update = () => {
+      const top = el.getBoundingClientRect().top;
+      el.style.height = `${window.innerHeight - top}px`;
+    };
+    requestAnimationFrame(update);
+    window.addEventListener("resize", update);
+    return () => {
+      document.body.classList.remove("settings-scroll-lock");
+      window.removeEventListener("resize", update);
+    };
+  }, [loading]);
+
   const updateField = useCallback(
     (key: string, value: string | number | boolean) => {
       setConfigItems((prev) => setConfigValue(prev, key, value));
@@ -1420,10 +1444,15 @@ export default function Settings() {
   }
 
   return (
-    <div>
+    <div ref={settingsRef} style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Fixed header: heading + tab bar + save buttons */}
+      <div style={{
+        flexShrink: 0,
+        padding: "0 24px 12px",
+      }}>
       <h2
         style={{
-          margin: "0 0 16px 0",
+          margin: "0 0 12px 0",
           fontSize: "24px",
           fontFamily: "var(--font-heading)",
           color: "var(--color-text)",
@@ -1432,11 +1461,10 @@ export default function Settings() {
         Settings
       </h2>
 
-      {/* Tab bar */}
       <div style={{
         display: "flex",
+        alignItems: "center",
         gap: "6px",
-        marginBottom: "20px",
         flexWrap: "wrap",
       }}>
         {([
@@ -1467,7 +1495,61 @@ export default function Settings() {
             {label}
           </button>
         ))}
+
+        <span style={{ flex: 1 }} />
+
+        {saveSuccess && (
+          <span style={{ color: "var(--color-success)", fontSize: "13px", fontFamily: "var(--font-body)" }}>
+            Saved.
+          </span>
+        )}
+        {reconnectMsg && (
+          <span style={{ color: "var(--color-success)", fontSize: "13px", fontFamily: "var(--font-body)" }}>
+            {reconnectMsg}
+          </span>
+        )}
+        {error && (
+          <span style={{ color: "var(--color-danger)", fontSize: "13px", fontFamily: "var(--font-body)" }}>
+            Error: {error}
+          </span>
+        )}
+
+        <button
+          style={{
+            ...btnPrimary,
+            fontSize: "13px",
+            padding: "8px 16px",
+            opacity: saving ? 0.6 : 1,
+            cursor: saving ? "wait" : "pointer",
+          }}
+          onClick={handleSave}
+          disabled={saving || reconnecting}
+        >
+          {saving && !reconnecting ? "Saving..." : "Save"}
+        </button>
+
+        <button
+          style={{
+            ...btnPrimary,
+            fontSize: "13px",
+            padding: "8px 16px",
+            background: "var(--color-bg-secondary)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            opacity: reconnecting ? 0.6 : 1,
+            cursor: reconnecting ? "wait" : "pointer",
+          }}
+          onClick={handleSaveAndReconnect}
+          disabled={saving || reconnecting}
+        >
+          {reconnecting ? "Reconnecting..." : "Save & Reconnect"}
+        </button>
       </div>
+      </div>
+
+      {/* Scrollable tab content — no padding here so scrollbar sits at page edge */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+      <div style={{ padding: "16px 24px 24px" }}>
 
       {activeTab === "station" && (<>
       {/* Optional Features */}
@@ -2613,79 +2695,8 @@ export default function Settings() {
 
       {activeTab === "database" && (<DatabaseTab isMobile={isMobile} />)}
 
-      {/* Save buttons and status */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: isMobile ? "8px" : "12px",
-        flexWrap: "wrap",
-        ...(isMobile ? { flexDirection: "column", alignItems: "stretch" } : {}),
-      }}>
-        <button
-          style={{
-            ...btnPrimary,
-            opacity: saving ? 0.6 : 1,
-            cursor: saving ? "wait" : "pointer",
-            ...(isMobile ? { fontSize: "13px", padding: "10px 16px" } : {}),
-          }}
-          onClick={handleSave}
-          disabled={saving || reconnecting}
-        >
-          {saving && !reconnecting ? "Saving..." : "Save Settings"}
-        </button>
-
-        <button
-          style={{
-            ...btnPrimary,
-            background: "var(--color-bg-secondary)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-            opacity: reconnecting ? 0.6 : 1,
-            cursor: reconnecting ? "wait" : "pointer",
-            ...(isMobile ? { fontSize: "13px", padding: "10px 16px" } : {}),
-          }}
-          onClick={handleSaveAndReconnect}
-          disabled={saving || reconnecting}
-        >
-          {reconnecting ? "Reconnecting..." : "Save & Reconnect"}
-        </button>
-
-        {saveSuccess && (
-          <span
-            style={{
-              color: "var(--color-success)",
-              fontSize: "14px",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            Settings saved successfully.
-          </span>
-        )}
-
-        {reconnectMsg && (
-          <span
-            style={{
-              color: "var(--color-success)",
-              fontSize: "14px",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            {reconnectMsg}
-          </span>
-        )}
-
-        {error && (
-          <span
-            style={{
-              color: "var(--color-danger)",
-              fontSize: "14px",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            Error: {error}
-          </span>
-        )}
-      </div>
+      </div>{/* end padding wrapper */}
+      </div>{/* end scrollable */}
     </div>
   );
 }

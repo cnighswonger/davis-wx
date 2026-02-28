@@ -270,19 +270,22 @@ export default function History() {
   ];
 
   return (
-    <div>
-      <h2
-        className="dashboard-heading"
-        style={{
-          margin: "0 0 16px 0",
-          fontSize: "24px",
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
-        }}
-      >
-        History
-      </h2>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+        <h2
+          className="dashboard-heading"
+          style={{
+            margin: "0 0 16px 0",
+            fontSize: "24px",
+            fontFamily: "var(--font-heading)",
+            color: "var(--color-text)",
+          }}
+        >
+          History
+        </h2>
+      </div>
 
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
       {/* Controls card */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <div
@@ -540,6 +543,7 @@ export default function History() {
         {!loading && !error && data.length > 0 && (
           <HighchartsReact highcharts={Highcharts} options={chartOptions} />
         )}
+      </div>
       </div>
     </div>
   );

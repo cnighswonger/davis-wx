@@ -141,7 +141,7 @@ export default function About() {
   const pad = isMobile ? "12px" : "20px";
 
   return (
-    <div style={{ maxWidth: "720px", margin: "0 auto", padding: pad }}>
+    <div style={{ flex: 1, overflowY: "auto", minHeight: 0, maxWidth: "720px", margin: "0 auto", padding: pad }}>
       {/* Header */}
       <h2
         style={{

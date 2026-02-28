@@ -534,7 +534,34 @@ export default function Astronomy() {
 
   if (!astronomy) {
     return (
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+        <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+          <h2
+            style={{
+              margin: "0 0 16px 0",
+              fontSize: "24px",
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-text)",
+            }}
+          >
+            Astronomy
+          </h2>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
+        <div style={cardStyle}>
+          <div style={emptyState}>
+            Astronomy data is not yet available. Ensure the backend is running
+            and a valid location is configured.
+          </div>
+        </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
         <h2
           style={{
             margin: "0 0 16px 0",
@@ -545,29 +572,9 @@ export default function Astronomy() {
         >
           Astronomy
         </h2>
-        <div style={cardStyle}>
-          <div style={emptyState}>
-            Astronomy data is not yet available. Ensure the backend is running
-            and a valid location is configured.
-          </div>
-        </div>
       </div>
-    );
-  }
 
-  return (
-    <div>
-      <h2
-        style={{
-          margin: "0 0 16px 0",
-          fontSize: "24px",
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
-        }}
-      >
-        Astronomy
-      </h2>
-
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
       <div
         style={{
           display: "grid",
@@ -577,6 +584,7 @@ export default function Astronomy() {
       >
         <SunSection sun={astronomy.sun} />
         <MoonSection moon={astronomy.moon} />
+      </div>
       </div>
     </div>
   );

@@ -54,7 +54,7 @@ export default function AppShell({
             "header header"
             "sidebar main"
           `,
-          minHeight: '100vh',
+          height: '100vh',
           background: enabled ? 'transparent' : 'var(--color-bg)',
           position: 'relative',
           zIndex: 3,
@@ -93,8 +93,9 @@ export default function AppShell({
             className="app-main-content"
             style={{
               flex: 1,
-              overflowY: 'auto',
-              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
             {nowcastWarning && (
@@ -103,7 +104,7 @@ export default function AppShell({
                 onClick={dismissNowcastWarning}
                 style={{
                   padding: '10px 16px',
-                  marginBottom: 16,
+                  margin: '24px 24px 0 24px',
                   background: 'var(--color-warning-bg, #664d03)',
                   color: 'var(--color-warning-text, #fff3cd)',
                   border: '1px solid var(--color-warning-border, #997404)',

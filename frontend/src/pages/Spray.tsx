@@ -1290,7 +1290,29 @@ export default function Spray() {
 
   if (loading) {
     return (
-      <div style={{ padding: 20 }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, padding: 20 }}>
+        <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
+          <h2
+            style={{
+              margin: "0 0 16px 0",
+              fontSize: 24,
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-text)",
+            }}
+          >
+            Spray Advisor
+          </h2>
+        </div>
+        <p style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-body)" }}>
+          Loading...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ flexShrink: 0, padding: "24px 24px 0" }}>
         <h2
           style={{
             margin: "0 0 16px 0",
@@ -1301,26 +1323,9 @@ export default function Spray() {
         >
           Spray Advisor
         </h2>
-        <p style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-body)" }}>
-          Loading...
-        </p>
       </div>
-    );
-  }
 
-  return (
-    <div>
-      <h2
-        style={{
-          margin: "0 0 16px 0",
-          fontSize: 24,
-          fontFamily: "var(--font-heading)",
-          color: "var(--color-text)",
-        }}
-      >
-        Spray Advisor
-      </h2>
-
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
       {/* Current conditions */}
       <ConditionsStrip conditions={conditions} />
 
@@ -1493,6 +1498,7 @@ export default function Spray() {
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );
