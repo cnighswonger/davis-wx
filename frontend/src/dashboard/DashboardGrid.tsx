@@ -34,6 +34,7 @@ import TrendModal from "../components/common/TrendModal.tsx";
 import NowcastBanner from "../components/panels/NowcastBanner.tsx";
 import { useWeatherData } from "../context/WeatherDataContext.tsx";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
+import { useFeatureFlags } from "../context/FeatureFlagsContext.tsx";
 
 const COMPACT_THRESHOLD = 240;
 
@@ -146,6 +147,7 @@ export default function DashboardGrid() {
     resetToDefault,
   } = useDashboardLayout();
   const { currentConditions } = useWeatherData();
+  const { flags } = useFeatureFlags();
   const isMobile = useIsMobile();
   const [showCatalog, setShowCatalog] = useState(false);
   const [gridWidth, setGridWidth] = useState(0);
@@ -235,7 +237,7 @@ export default function DashboardGrid() {
           </button>
         </h2>
 
-        <NowcastBanner />
+        {flags.nowcastEnabled && <NowcastBanner />}
 
         <div ref={gridRef} className="dashboard-grid" style={gridStyle}>
           {layout.tiles.map((placement) => {
