@@ -8,6 +8,7 @@ import { ALL_SCENES, SCENE_LABELS, SCENE_GRADIENTS } from "../components/Weather
 import { API_BASE } from "../utils/constants.ts";
 import { getTimezone, setTimezone as storeTimezone, resolveTimezone, getTimezoneOptions } from "../utils/timezone.ts";
 import { useIsMobile } from "../hooks/useIsMobile.ts";
+import { useFeatureFlags } from "../context/FeatureFlagsContext.tsx";
 import StepLocation from "../components/setup/StepLocation.tsx";
 
 // --- Shared styles ---
@@ -1115,6 +1116,7 @@ export default function Settings() {
   const [ports, setPorts] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"station" | "display" | "services" | "alerts" | "nowcast" | "spray" | "usage" | "database">("station");
 
+  const { flags, refresh: refreshFeatureFlags } = useFeatureFlags();
   const { themeName, setThemeName } = useTheme();
   const [timezone, setTimezoneState] = useState(getTimezone);
   const {
@@ -1219,6 +1221,13 @@ export default function Settings() {
       .catch(() => {});
   }, []);
 
+  // Reset active tab if the current tab's feature gets disabled.
+  useEffect(() => {
+    if (activeTab === "nowcast" && !flags.nowcastEnabled) setActiveTab("station");
+    if (activeTab === "spray" && !flags.sprayEnabled) setActiveTab("station");
+    if (activeTab === "usage" && !flags.nowcastEnabled) setActiveTab("station");
+  }, [flags.nowcastEnabled, flags.sprayEnabled, activeTab]);
+
   const updateField = useCallback(
     (key: string, value: string | number | boolean) => {
       setConfigItems((prev) => setConfigValue(prev, key, value));
@@ -1241,12 +1250,13 @@ export default function Settings() {
       const updated = await updateConfig(items);
       setConfigItems(updated);
       setSaveSuccess(true);
+      await refreshFeatureFlags();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
-  }, [configItems]);
+  }, [configItems, refreshFeatureFlags]);
 
   const handleSaveAndReconnect = useCallback(async () => {
     setSaving(true);
@@ -1434,9 +1444,9 @@ export default function Settings() {
           ["display", "Display"],
           ["services", "Services"],
           ["alerts", "Alerts"],
-          ["nowcast", "Nowcast"],
-          ["spray", "Spray"],
-          ["usage", "Usage"],
+          ...(flags.nowcastEnabled ? [["nowcast", "Nowcast"] as const] : []),
+          ...(flags.sprayEnabled ? [["spray", "Spray"] as const] : []),
+          ...(flags.nowcastEnabled ? [["usage", "Usage"] as const] : []),
           ["database", "Database"],
         ] as const).map(([key, label]) => (
           <button
@@ -1460,6 +1470,40 @@ export default function Settings() {
       </div>
 
       {activeTab === "station" && (<>
+      {/* Optional Features */}
+      <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
+        <h3 style={sectionTitle}>Optional Features</h3>
+        <p style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "16px", fontFamily: "var(--font-body)", marginTop: 0 }}>
+          Enable optional features to add their pages and settings tabs.
+        </p>
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("nowcast_enabled") === true}
+              onChange={(e) => updateField("nowcast_enabled", e.target.checked)}
+            />
+            AI Nowcast
+          </label>
+          <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px", fontFamily: "var(--font-body)" }}>
+            Hyper-local AI-powered weather forecasting using Claude. Requires an Anthropic API key.
+          </span>
+        </div>
+        <div style={fieldGroup}>
+          <label style={checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={val("spray_enabled") === true}
+              onChange={(e) => updateField("spray_enabled", e.target.checked)}
+            />
+            Spray Advisor
+          </label>
+          <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px", fontFamily: "var(--font-body)" }}>
+            Agricultural spray application recommendations based on weather conditions and product constraints.
+          </span>
+        </div>
+      </div>
+
       {/* Station section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>Station</h3>
@@ -2313,17 +2357,6 @@ export default function Settings() {
       {/* AI Nowcast section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>AI Nowcast</h3>
-
-        <div style={fieldGroup}>
-          <label style={checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={val("nowcast_enabled") === true}
-              onChange={(e) => updateField("nowcast_enabled", e.target.checked)}
-            />
-            Enable AI Nowcast
-          </label>
-        </div>
 
         <div style={fieldGroup}>
           <label style={checkboxLabel}>

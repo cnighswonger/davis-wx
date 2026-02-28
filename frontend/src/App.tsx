@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { WeatherBackgroundProvider } from './context/WeatherBackgroundContext';
 import { WeatherDataProvider, useWeatherData } from './context/WeatherDataContext';
 import { AlertProvider } from './context/AlertContext';
+import { FeatureFlagsProvider, useFeatureFlags } from './context/FeatureFlagsContext';
 import { DashboardLayoutProvider } from './dashboard/DashboardLayoutContext';
 import AlertToast from './components/AlertToast';
 import AppShell from './components/layout/AppShell';
@@ -20,6 +21,7 @@ import { fetchSetupStatus } from './api/client';
 
 function AppContent() {
   const { connected, currentConditions } = useWeatherData();
+  const { flags } = useFeatureFlags();
   const lastUpdate = currentConditions?.timestamp
     ? new Date(currentConditions.timestamp)
     : null;
@@ -32,8 +34,8 @@ function AppContent() {
         <Route path="/history" element={<History />} />
         <Route path="/forecast" element={<Forecast />} />
         <Route path="/astronomy" element={<Astronomy />} />
-        <Route path="/nowcast" element={<Nowcast />} />
-        <Route path="/spray" element={<Spray />} />
+        <Route path="/nowcast" element={flags.nowcastEnabled ? <Nowcast /> : <Navigate to="/" replace />} />
+        <Route path="/spray" element={flags.sprayEnabled ? <Spray /> : <Navigate to="/" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/about" element={<About />} />
       </Routes>
@@ -99,11 +101,13 @@ function App() {
       <WeatherBackgroundProvider>
         <BrowserRouter>
           <WeatherDataProvider>
-            <AlertProvider>
-              <DashboardLayoutProvider>
-                <AppContent />
-              </DashboardLayoutProvider>
-            </AlertProvider>
+            <FeatureFlagsProvider>
+              <AlertProvider>
+                <DashboardLayoutProvider>
+                  <AppContent />
+                </DashboardLayoutProvider>
+              </AlertProvider>
+            </FeatureFlagsProvider>
           </WeatherDataProvider>
         </BrowserRouter>
       </WeatherBackgroundProvider>

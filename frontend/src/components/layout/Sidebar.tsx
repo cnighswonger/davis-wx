@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 
 interface SidebarProps {
   open: boolean;
@@ -24,6 +25,14 @@ const navItems: NavItem[] = [
 ];
 
 export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
+  const { flags } = useFeatureFlags();
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.to === '/nowcast') return flags.nowcastEnabled;
+    if (item.to === '/spray') return flags.sprayEnabled;
+    return true;
+  });
+
   return (
     <>
       {/* Overlay for mobile */}
@@ -63,7 +72,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         }}
       >
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '0 8px', flex: 1 }}>
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
