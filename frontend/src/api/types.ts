@@ -273,6 +273,29 @@ export interface NowcastVerification {
   notes: string | null;
 }
 
+// --- NWS Active Alerts ---
+
+export interface NWSActiveAlert {
+  event: string;
+  severity: "Extreme" | "Severe" | "Moderate" | "Minor" | "Unknown";
+  certainty: string;
+  urgency: string;
+  headline: string;
+  description: string;
+  instruction: string;
+  onset: string;
+  expires: string;
+  sender_name: string;
+  alert_id: string;
+  message_type: string;
+  response: string;
+}
+
+export interface NWSActiveAlertsResponse {
+  alerts: NWSActiveAlert[];
+  count: number;
+}
+
 // --- WebSocket Messages ---
 
 export interface WSSensorUpdate {

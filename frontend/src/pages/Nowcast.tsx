@@ -10,10 +10,12 @@ import {
   fetchNowcastVerifications,
   fetchNowcastKnowledge,
   updateNowcastKnowledge,
+  fetchNWSAlerts,
 } from "../api/client.ts";
 import type {
   NowcastVerification,
   NowcastKnowledgeEntry,
+  NWSActiveAlert,
 } from "../api/types.ts";
 
 const cardStyle: React.CSSProperties = {
@@ -257,6 +259,22 @@ export default function Nowcast() {
     if (verificationsExpanded) loadVerifications();
   }, [verificationsExpanded, loadVerifications]);
 
+  // NWS alerts state
+  const [nwsAlerts, setNwsAlerts] = useState<NWSActiveAlert[]>([]);
+  const [alertsExpanded, setAlertsExpanded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      fetchNWSAlerts()
+        .then((r) => { if (!cancelled) setNwsAlerts(r.alerts); })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 180_000); // 3 minutes
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   // Knowledge state
   const [knowledgeExpanded, setKnowledgeExpanded] = useState(false);
   const [knowledge, setKnowledge] = useState<NowcastKnowledgeEntry[]>([]);
@@ -387,6 +405,69 @@ export default function Nowcast() {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "0 24px 24px" }}>
+
+      {/* NWS Active Alerts */}
+      {nwsAlerts.length > 0 && nwsAlerts.map((alert) => {
+        const isWarning = alert.severity === "Extreme" || alert.severity === "Severe";
+        const isWatch = alert.severity === "Moderate";
+        const bg = isWarning
+          ? "var(--color-danger, #dc2626)"
+          : isWatch
+            ? "#d97706"
+            : "#ca8a04";
+        const expanded = alertsExpanded.has(alert.alert_id);
+        return (
+          <div
+            key={alert.alert_id}
+            style={{
+              background: bg,
+              color: "#fff",
+              borderRadius: "var(--gauge-border-radius)",
+              padding: isMobile ? "10px 12px" : "12px 16px",
+              marginBottom: "12px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontFamily: "var(--font-body)",
+            }}
+            onClick={() => setAlertsExpanded((prev) => {
+              const next = new Set(prev);
+              if (next.has(alert.alert_id)) next.delete(alert.alert_id);
+              else next.add(alert.alert_id);
+              return next;
+            })}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 700, fontSize: "15px" }}>
+                {alert.event}
+              </span>
+              <span style={{ fontSize: "11px", opacity: 0.85 }}>
+                {alert.sender_name}
+              </span>
+            </div>
+            <div style={{ fontSize: "13px", marginTop: "4px", opacity: 0.95 }}>
+              {alert.headline}
+            </div>
+            {expanded && (
+              <div style={{ marginTop: "10px", fontSize: "13px", lineHeight: 1.5, opacity: 0.95 }}>
+                {alert.instruction && (
+                  <div style={{ marginBottom: "8px" }}>
+                    <strong>Action:</strong> {alert.instruction}
+                  </div>
+                )}
+                <div style={{ whiteSpace: "pre-wrap" }}>{alert.description}</div>
+                <div style={{ marginTop: "8px", fontSize: "11px", opacity: 0.7 }}>
+                  Onset: {new Date(alert.onset).toLocaleString()} | Expires: {new Date(alert.expires).toLocaleString()}
+                </div>
+              </div>
+            )}
+            {!expanded && (
+              <div style={{ fontSize: "11px", marginTop: "4px", opacity: 0.7 }}>
+                Tap for details
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Summary */}
       <div style={{ ...cardStyle, borderLeft: "4px solid var(--color-accent)" }}>

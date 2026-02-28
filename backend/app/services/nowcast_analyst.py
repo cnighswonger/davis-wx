@@ -57,10 +57,26 @@ RADAR ANALYSIS (when radar imagery is provided):
 - Do NOT describe image colors/pixels — translate what you see into weather
   terms (e.g., "A band of moderate rain approaching from the southwest").
 
+NWS ACTIVE ALERTS (when provided):
+- Watches, warnings, and advisories active for the station location are
+  included in the data.  Reference them explicitly:
+  * WARNINGS (Extreme/Severe) indicate imminent or occurring hazard —
+    ALWAYS include the threat in the "special" field with actionable guidance.
+  * WATCHES (Moderate) indicate potential hazard — mention in summary and
+    the relevant forecast element (precipitation, wind, etc.).
+  * ADVISORIES (Minor) indicate moderate hazard — mention in the relevant
+    forecast element.
+- Cross-reference alert timing with your radar and model analysis.
+- When a warning is active, correlate local station observations and nearby
+  station data to provide hyper-local situational awareness (e.g., "Barometer
+  dropping rapidly consistent with approaching storm cited in warning").
+
 SPECIAL CONDITIONS:
 - The "special" field is for conditions that ARE occurring or imminent.
   Set it to null when no special conditions exist. Do NOT discuss why a
   condition is absent — only report what IS happening.
+- When NWS warnings are active, the "special" field MUST include the threat
+  with specific local correlation evidence and actionable guidance.
 - FROST: Only mention when forecast air temp is 36°F or below.
   Never mention frost when temps are above 40°F.
 - FOG: Only mention when visibility reduction is expected or occurring.
@@ -184,6 +200,18 @@ def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
     if data.nws_summary:
         parts.append("=== NWS FORECAST SUMMARY ===")
         parts.append(data.nws_summary)
+        parts.append("")
+
+    # NWS active alerts
+    if data.nws_alerts:
+        parts.append("=== NWS ACTIVE ALERTS (watches/warnings/advisories for this location) ===")
+        for alert in data.nws_alerts:
+            parts.append(f"  [{alert['severity'].upper()}] {alert['event']}")
+            parts.append(f"    Headline: {alert['headline']}")
+            parts.append(f"    Urgency: {alert['urgency']} | Certainty: {alert['certainty']}")
+            parts.append(f"    Onset: {alert['onset']} | Expires: {alert['expires']}")
+            if alert.get("instruction"):
+                parts.append(f"    Action: {alert['instruction'][:300]}")
         parts.append("")
 
     # Knowledge base

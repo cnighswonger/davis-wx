@@ -115,6 +115,7 @@ class CollectedData:
     knowledge_entries: list[str] = field(default_factory=list)
     radar_images: list[RadarImage] = field(default_factory=list)
     nearby_stations: Any = None  # Optional[NearbyStationsResult] — avoid circular import
+    nws_alerts: list[dict[str, Any]] = field(default_factory=list)
     spray_schedules: list[dict[str, Any]] = field(default_factory=list)
     spray_outcomes: list[dict[str, Any]] = field(default_factory=list)
     collected_at: str = ""
@@ -457,6 +458,15 @@ async def collect_all(
             max_aprs=nearby_max_aprs,
         )
 
+    # Fetch active NWS alerts (short cache, always enabled when location is set).
+    nws_alerts: list[dict[str, Any]] = []
+    if lat and lon:
+        from .alerts_nws import fetch_nws_active_alerts
+        from dataclasses import asdict
+        alert_data = await fetch_nws_active_alerts(lat, lon)
+        if alert_data:
+            nws_alerts = [asdict(a) for a in alert_data.alerts]
+
     # Gather spray schedules and outcome history when AI spray advisory is enabled.
     spray = gather_spray_schedules(db) if spray_ai_enabled else []
     spray_history = gather_spray_outcomes(db) if spray_ai_enabled else []
@@ -468,6 +478,7 @@ async def collect_all(
         knowledge_entries=knowledge,
         radar_images=radar_images,
         nearby_stations=nearby,
+        nws_alerts=nws_alerts,
         spray_schedules=spray,
         spray_outcomes=spray_history,
         collected_at=_local_now_iso(station_timezone),

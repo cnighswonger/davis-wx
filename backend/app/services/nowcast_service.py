@@ -426,6 +426,7 @@ class NowcastService:
             sources.append("wu_pws_nearby")
         if self._nearby_aprs_enabled:
             sources.append("cwop_aprs_nearby")
+        sources.append("nws_active_alerts")
         return sources
 
     def _store_proposed_knowledge(self, db: Session, proposed: dict[str, str]) -> None:

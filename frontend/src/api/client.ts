@@ -170,7 +170,7 @@ export function forceArchive(): Promise<{ success: boolean }> {
 
 // --- Nowcast ---
 
-import type { NowcastData, NowcastKnowledgeEntry, NowcastVerification } from "./types.ts";
+import type { NowcastData, NowcastKnowledgeEntry, NowcastVerification, NWSActiveAlertsResponse } from "./types.ts";
 import type { SprayProduct, SpraySchedule, SprayEvaluation, SprayConditions, SprayOutcome, SprayProductStats } from "./types.ts";
 
 export function fetchNowcast(): Promise<NowcastData | null> {
@@ -209,6 +209,10 @@ export function fetchNowcastVerifications(
 
 export function generateNowcast(): Promise<NowcastData> {
   return request<NowcastData>("/api/nowcast/generate", { method: "POST" });
+}
+
+export function fetchNWSAlerts(): Promise<NWSActiveAlertsResponse> {
+  return request<NWSActiveAlertsResponse>("/api/nowcast/alerts");
 }
 
 // --- Spray Advisor ---

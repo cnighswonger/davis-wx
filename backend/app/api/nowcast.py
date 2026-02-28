@@ -67,6 +67,33 @@ def get_radar_image():
     )
 
 
+@router.get("/nowcast/alerts")
+async def get_nws_alerts(db: Session = Depends(get_db)):
+    """Return currently active NWS alerts for the station location."""
+    from ..models.station_config import StationConfigModel
+    from ..services.alerts_nws import fetch_nws_active_alerts
+    from dataclasses import asdict
+
+    rows = db.query(StationConfigModel).filter(
+        StationConfigModel.key.in_(["latitude", "longitude"])
+    ).all()
+    cfg = {r.key: r.value for r in rows}
+
+    try:
+        lat = float(cfg.get("latitude", "0"))
+        lon = float(cfg.get("longitude", "0"))
+    except ValueError:
+        lat, lon = 0.0, 0.0
+
+    if lat == 0.0 and lon == 0.0:
+        return {"alerts": [], "count": 0}
+
+    result = await fetch_nws_active_alerts(lat, lon)
+    if result is None:
+        return {"alerts": [], "count": 0}
+    return {"alerts": [asdict(a) for a in result.alerts], "count": result.count}
+
+
 @router.get("/nowcast/history")
 def get_nowcast_history(
     limit: int = 20,
