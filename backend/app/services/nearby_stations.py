@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 # --- Constants ---
 
 IEM_CURRENTS_URL = "https://mesonet.agron.iastate.edu/api/1/currents.json"
-NWS_POINTS_URL = "https://api.weather.gov/points"
 WU_NEARBY_URL = "https://api.weather.com/v3/location/near"
 WU_OBS_URL = "https://api.weather.com/v2/pws/observations/current"
 HTTP_TIMEOUT = 15.0
@@ -77,9 +76,6 @@ class _CacheEntry:
 
 _nearby_cache: dict[str, _CacheEntry] = {}
 
-# State code cache (location doesn't change during runtime).
-_state_cache: dict[str, str] = {}
-
 
 # --- Geo utilities ---
 
@@ -107,29 +103,16 @@ def _bearing_cardinal(lat1: float, lon1: float, lat2: float, lon2: float) -> str
 # --- State resolution ---
 
 async def _resolve_state(lat: float, lon: float) -> Optional[str]:
-    """Resolve 2-letter US state code from coordinates via NWS points API.
+    """Resolve 2-letter US state code for IEM network lookup.
 
-    Cached permanently (location doesn't change).
+    Delegates to forecast_nws which caches the /points response —
+    no extra API call when the NWS forecast has already been fetched.
     """
-    key = f"{lat:.2f},{lon:.2f}"
-    if key in _state_cache:
-        return _state_cache[key]
-
-    try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            resp = await client.get(
-                f"{NWS_POINTS_URL}/{lat:.4f},{lon:.4f}",
-                headers={"User-Agent": "DavisWxStation/1.0 (weather@localhost)"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            state = data["properties"]["relativeLocation"]["properties"]["state"]
-            _state_cache[key] = state
-            logger.info("Resolved state for %.2f,%.2f: %s", lat, lon, state)
-            return state
-    except Exception as exc:
-        logger.warning("Failed to resolve state from NWS: %s", exc)
-        return None
+    from .forecast_nws import resolve_state
+    state = await resolve_state(lat, lon)
+    if state:
+        logger.info("Resolved state for %.2f,%.2f: %s", lat, lon, state)
+    return state
 
 
 # --- IEM ASOS fetch ---

@@ -64,6 +64,9 @@ _cache: dict[tuple[float, float], _CacheEntry] = {}
 # Radar station cache — effectively resolves once per location.
 _radar_station_cache: dict[tuple[float, float], str] = {}
 
+# State code cache — resolved from /points relativeLocation.
+_state_cache: dict[tuple[float, float], str] = {}
+
 
 def _cache_key(lat: float, lon: float) -> tuple[float, float]:
     """Produce a stable cache key from coordinates."""
@@ -125,12 +128,20 @@ async def _resolve_grid_point(
         logger.warning("NWS points response missing grid data for (%s, %s)", lat, lon)
         return None
 
-    # Cache the nearest NEXRAD radar station for velocity imagery.
+    # Cache ancillary data from the /points response.
+    key = _cache_key(lat, lon)
     radar_station = props.get("radarStation", "")
     if radar_station:
-        key = _cache_key(lat, lon)
         _radar_station_cache[key] = radar_station
         logger.debug("Radar station for (%s, %s): %s", lat, lon, radar_station)
+
+    # Cache the state code (used by nearby_stations for IEM network lookup).
+    try:
+        state = props["relativeLocation"]["properties"]["state"]
+        if state:
+            _state_cache[key] = state
+    except (KeyError, TypeError):
+        pass
 
     return (office, int(grid_x), int(grid_y))
 
@@ -264,21 +275,17 @@ async def fetch_nws_forecast(
     return forecast
 
 
-async def resolve_radar_station(lat: float, lon: float) -> Optional[str]:
-    """Return the nearest NEXRAD radar station ID for a location.
+async def _ensure_points_resolved(lat: float, lon: float) -> None:
+    """Ensure the /points API has been called for this location.
 
-    Checks the in-memory cache first.  If not cached, makes a single
-    /points call to discover the station (same call used for grid point
-    resolution, so the result gets cached for both purposes).
-
-    Returns a 4-character station ID (e.g. "KRAX") or None.
+    All ancillary caches (radar station, state code) are populated as a
+    side effect of ``_resolve_grid_point``.  This is a no-op if the data
+    is already cached.
     """
     key = _cache_key(lat, lon)
-    cached = _radar_station_cache.get(key)
-    if cached:
-        return cached
+    if key in _radar_station_cache or key in _state_cache:
+        return  # Already resolved
 
-    # Trigger a /points lookup which populates the radar station cache.
     headers = {
         "User-Agent": NWS_USER_AGENT,
         "Accept": "application/geo+json",
@@ -293,4 +300,35 @@ async def resolve_radar_station(lat: float, lon: float) -> Optional[str]:
     ) as client:
         await _resolve_grid_point(client, lat, lon)
 
+
+async def resolve_radar_station(lat: float, lon: float) -> Optional[str]:
+    """Return the nearest NEXRAD radar station ID for a location.
+
+    Checks the in-memory cache first.  If not cached, makes a single
+    /points call to discover the station (same call used for grid point
+    resolution, so the result gets cached for both purposes).
+
+    Returns a 4-character station ID (e.g. "KRAX") or None.
+    """
+    key = _cache_key(lat, lon)
+    cached = _radar_station_cache.get(key)
+    if cached:
+        return cached
+
+    await _ensure_points_resolved(lat, lon)
     return _radar_station_cache.get(key)
+
+
+async def resolve_state(lat: float, lon: float) -> Optional[str]:
+    """Return the 2-letter US state code for a location.
+
+    Uses the same NWS /points cache as radar station resolution —
+    no extra API call when the forecast has already been fetched.
+    """
+    key = _cache_key(lat, lon)
+    cached = _state_cache.get(key)
+    if cached:
+        return cached
+
+    await _ensure_points_resolved(lat, lon)
+    return _state_cache.get(key)

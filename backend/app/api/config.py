@@ -44,7 +44,7 @@ _DEFAULTS: dict[str, object] = {
     "nowcast_model": "claude-haiku-4-5-20251001",
     "nowcast_interval": 900,
     "nowcast_horizon": 2,
-    "nowcast_max_tokens": 2500,
+    "nowcast_max_tokens": 3000,
     "nowcast_radius": 25,
     "nowcast_knowledge_auto_accept_hours": 48,
     "nowcast_radar_enabled": True,
