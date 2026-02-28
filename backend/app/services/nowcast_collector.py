@@ -65,6 +65,12 @@ RADAR_PRODUCTS: dict[str, dict[str, Any]] = {
         "label": "NEXRAD Composite Reflectivity",
         "layers": ["nexrad"],
     },
+    "nexrad_velocity": {
+        "label": "Storm Relative Velocity (nearest NEXRAD)",
+        "layers": ["ridge"],
+        "requires_site": True,
+        "extra_params": {"ridge_product": "N0S"},
+    },
 }
 
 
@@ -328,14 +334,26 @@ async def fetch_radar_image(
         return None
 
 
-async def fetch_radar_images(lat: float, lon: float) -> list[RadarImage]:
+async def fetch_radar_images(
+    lat: float, lon: float, radar_station: str = "",
+) -> list[RadarImage]:
     """Fetch all configured radar products. Returns only successful fetches."""
     images = []
     for pid, cfg in RADAR_PRODUCTS.items():
+        # Products requiring a specific NEXRAD site (e.g. velocity)
+        # are skipped when no radar station is available.
+        if cfg.get("requires_site") and not radar_station:
+            logger.debug("Skipping %s — no radar station resolved", pid)
+            continue
+
+        extra = dict(cfg.get("extra_params") or {})
+        if cfg.get("requires_site") and radar_station:
+            extra["ridge_radar"] = radar_station
+
         img = await fetch_radar_image(
             lat=lat, lon=lon, product_id=pid,
             layers=cfg.get("layers"),
-            extra_params=cfg.get("extra_params"),
+            extra_params=extra or None,
         )
         if img is not None:
             images.append(img)
@@ -439,7 +457,12 @@ async def collect_all(
     model = await fetch_model_guidance(lat, lon, horizon_hours)
     nws_summary = gather_nws_summary(nws_forecast)
     knowledge = gather_knowledge(db)
-    radar_images = await fetch_radar_images(lat, lon) if radar_enabled else []
+    # Resolve nearest NEXRAD site for velocity imagery.
+    radar_station = ""
+    if radar_enabled:
+        from .forecast_nws import resolve_radar_station
+        radar_station = await resolve_radar_station(lat, lon) or ""
+    radar_images = await fetch_radar_images(lat, lon, radar_station) if radar_enabled else []
 
     # Fetch nearby station observations if either source is enabled.
     nearby = None

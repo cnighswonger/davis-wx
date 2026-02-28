@@ -57,6 +57,18 @@ RADAR ANALYSIS (when radar imagery is provided):
 - Do NOT describe image colors/pixels — translate what you see into weather
   terms (e.g., "A band of moderate rain approaching from the southwest").
 
+VELOCITY RADAR (when Storm Relative Velocity imagery is provided):
+- Green shades = motion TOWARD radar; red = AWAY. Brighter = faster.
+- CRITICAL: Gate-to-gate shear (bright green adjacent to bright red) = rotation.
+- Mesocyclone signature: rotation 2-6 nm diameter, velocity difference >30 kt.
+- TVS (Tornado Vortex Signature): tight rotation <1 nm, velocity >50 kt.
+- Report distance/bearing from station, storm motion, and estimated time to
+  closest approach.
+- Cross-reference with reflectivity: rotation embedded in strong echoes
+  (>50 dBZ) indicates higher threat level.
+- If no rotation signatures are detected, state "No rotation signatures
+  detected on velocity imagery."
+
 NWS ACTIVE ALERTS (when provided):
 - Watches, warnings, and advisories active for the station location are
   included in the data.  Reference them explicitly:

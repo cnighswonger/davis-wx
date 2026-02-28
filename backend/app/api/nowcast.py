@@ -67,6 +67,20 @@ def get_radar_image():
     )
 
 
+@router.get("/nowcast/radar/{product_id}")
+def get_radar_product(product_id: str):
+    """Return a cached radar image by product ID (e.g. nexrad_velocity)."""
+    img = get_cached_radar(product_id)
+    if img is None:
+        raise HTTPException(status_code=404, detail=f"No cached radar image for '{product_id}'")
+    png_bytes = base64.b64decode(img.png_base64)
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @router.get("/nowcast/alerts")
 async def get_nws_alerts(db: Session = Depends(get_db)):
     """Return currently active NWS alerts for the station location."""

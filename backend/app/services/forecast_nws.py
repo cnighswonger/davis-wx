@@ -61,6 +61,9 @@ class _CacheEntry:
 # Module-level cache keyed by (lat, lon) rounded to 4 decimal places.
 _cache: dict[tuple[float, float], _CacheEntry] = {}
 
+# Radar station cache — effectively resolves once per location.
+_radar_station_cache: dict[tuple[float, float], str] = {}
+
 
 def _cache_key(lat: float, lon: float) -> tuple[float, float]:
     """Produce a stable cache key from coordinates."""
@@ -121,6 +124,13 @@ async def _resolve_grid_point(
     if office is None or grid_x is None or grid_y is None:
         logger.warning("NWS points response missing grid data for (%s, %s)", lat, lon)
         return None
+
+    # Cache the nearest NEXRAD radar station for velocity imagery.
+    radar_station = props.get("radarStation", "")
+    if radar_station:
+        key = _cache_key(lat, lon)
+        _radar_station_cache[key] = radar_station
+        logger.debug("Radar station for (%s, %s): %s", lat, lon, radar_station)
 
     return (office, int(grid_x), int(grid_y))
 
@@ -252,3 +262,35 @@ async def fetch_nws_forecast(
     )
 
     return forecast
+
+
+async def resolve_radar_station(lat: float, lon: float) -> Optional[str]:
+    """Return the nearest NEXRAD radar station ID for a location.
+
+    Checks the in-memory cache first.  If not cached, makes a single
+    /points call to discover the station (same call used for grid point
+    resolution, so the result gets cached for both purposes).
+
+    Returns a 4-character station ID (e.g. "KRAX") or None.
+    """
+    key = _cache_key(lat, lon)
+    cached = _radar_station_cache.get(key)
+    if cached:
+        return cached
+
+    # Trigger a /points lookup which populates the radar station cache.
+    headers = {
+        "User-Agent": NWS_USER_AGENT,
+        "Accept": "application/geo+json",
+    }
+    lat = round(lat, 4)
+    lon = round(lon, 4)
+
+    async with httpx.AsyncClient(
+        headers=headers,
+        timeout=REQUEST_TIMEOUT,
+        follow_redirects=True,
+    ) as client:
+        await _resolve_grid_point(client, lat, lon)
+
+    return _radar_station_cache.get(key)

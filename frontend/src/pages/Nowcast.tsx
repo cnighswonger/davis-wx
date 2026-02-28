@@ -511,21 +511,66 @@ export default function Nowcast() {
               alignItems: "flex-start",
             }}
           >
-            <img
-              src="/api/nowcast/radar"
-              alt="NEXRAD composite reflectivity"
+            <div
               style={{
-                width: isMobile ? "100%" : "280px",
-                height: "auto",
-                borderRadius: "8px",
-                border: "1px solid var(--color-border)",
-                marginBottom: isMobile ? "12px" : 0,
+                display: "flex",
+                flexDirection: isMobile ? "column" : "row",
+                gap: "12px",
                 flexShrink: 0,
+                marginBottom: isMobile ? "12px" : 0,
               }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
+            >
+              <div style={{ textAlign: "center" }}>
+                <img
+                  src="/api/nowcast/radar"
+                  alt="NEXRAD composite reflectivity"
+                  style={{
+                    width: isMobile ? "100%" : "240px",
+                    height: "auto",
+                    borderRadius: "8px",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).parentElement!.style.display = "none";
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    marginTop: "4px",
+                  }}
+                >
+                  Reflectivity
+                </div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <img
+                  src="/api/nowcast/radar/nexrad_velocity"
+                  alt="Storm Relative Velocity"
+                  style={{
+                    width: isMobile ? "100%" : "240px",
+                    height: "auto",
+                    borderRadius: "8px",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).parentElement!.style.display = "none";
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "var(--font-body)",
+                    color: "var(--color-text-muted)",
+                    marginTop: "4px",
+                  }}
+                >
+                  Velocity
+                </div>
+              </div>
+            </div>
             <p
               style={{
                 margin: 0,
