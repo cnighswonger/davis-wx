@@ -428,6 +428,8 @@ async def collect_all(
     nearby_radius: int = 25,
     nearby_max_iem: int = 5,
     nearby_max_wu: int = 5,
+    nearby_aprs_enabled: bool = False,
+    nearby_max_aprs: int = 10,
     wu_api_key: str = "",
     spray_ai_enabled: bool = False,
 ) -> CollectedData:
@@ -440,7 +442,7 @@ async def collect_all(
 
     # Fetch nearby station observations if either source is enabled.
     nearby = None
-    if nearby_iem_enabled or nearby_wu_enabled:
+    if nearby_iem_enabled or nearby_wu_enabled or nearby_aprs_enabled:
         from .nearby_stations import fetch_nearby_stations
         nearby = await fetch_nearby_stations(
             lat=lat,
@@ -451,6 +453,8 @@ async def collect_all(
             wu_api_key=wu_api_key,
             iem_enabled=nearby_iem_enabled,
             wu_enabled=nearby_wu_enabled,
+            aprs_enabled=nearby_aprs_enabled,
+            max_aprs=nearby_max_aprs,
         )
 
     # Gather spray schedules and outcome history when AI spray advisory is enabled.

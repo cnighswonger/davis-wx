@@ -46,8 +46,11 @@ class NowcastService:
         self._nearby_wu_enabled: bool = False
         self._nearby_max_iem: int = 5
         self._nearby_max_wu: int = 5
+        self._nearby_aprs_enabled: bool = False
+        self._nearby_max_aprs: int = 10
         self._wu_api_key: str = ""
         self._nearby_radius: int = 25
+        self._cwop_callsign: str = ""
         self._spray_ai_enabled: bool = False
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
@@ -62,8 +65,10 @@ class NowcastService:
                 "longitude", "nowcast_knowledge_auto_accept_hours",
                 "station_timezone", "nowcast_radar_enabled",
                 "nowcast_nearby_iem_enabled", "nowcast_nearby_wu_enabled",
+                "nowcast_nearby_aprs_enabled",
                 "nowcast_wu_api_key", "nowcast_nearby_max_iem",
-                "nowcast_nearby_max_wu", "nowcast_radius",
+                "nowcast_nearby_max_wu", "nowcast_nearby_max_aprs",
+                "nowcast_radius", "cwop_callsign",
                 "spray_ai_enabled",
             ]
             rows = db.query(StationConfigModel).filter(
@@ -115,6 +120,14 @@ class NowcastService:
                 self._nearby_max_wu = int(cfg.get("nowcast_nearby_max_wu", "5"))
             except ValueError:
                 self._nearby_max_wu = 5
+            self._nearby_aprs_enabled = cfg.get(
+                "nowcast_nearby_aprs_enabled", "false"
+            ).lower() == "true"
+            try:
+                self._nearby_max_aprs = int(cfg.get("nowcast_nearby_max_aprs", "10"))
+            except ValueError:
+                self._nearby_max_aprs = 10
+            self._cwop_callsign = cfg.get("cwop_callsign", "")
             try:
                 self._nearby_radius = int(cfg.get("nowcast_radius", "25"))
             except ValueError:
@@ -183,11 +196,31 @@ class NowcastService:
         finally:
             db.close()
 
+    async def _manage_aprs_collector(self) -> None:
+        """Start or stop the APRS collector based on current config."""
+        from . import aprs_collector
+
+        should_run = (
+            self._enabled
+            and self._nearby_aprs_enabled
+            and self._latitude != 0.0
+            and self._longitude != 0.0
+        )
+
+        if should_run and not aprs_collector.is_running():
+            await aprs_collector.start(
+                self._latitude, self._longitude,
+                self._nearby_radius, self._cwop_callsign,
+            )
+        elif not should_run and aprs_collector.is_running():
+            await aprs_collector.stop()
+
     async def start(self) -> None:
         """Main loop — runs forever as a background task."""
         logger.info("Nowcast service started")
         self.reload_config()
         self._seed_from_db()
+        await self._manage_aprs_collector()
         while True:
             try:
                 await self._tick()
@@ -198,6 +231,7 @@ class NowcastService:
     async def _tick(self) -> None:
         """Single iteration: check config, maybe generate, auto-accept knowledge."""
         self.reload_config()
+        await self._manage_aprs_collector()
 
         if not self._enabled:
             return
@@ -237,6 +271,8 @@ class NowcastService:
                 nearby_radius=self._nearby_radius,
                 nearby_max_iem=self._nearby_max_iem,
                 nearby_max_wu=self._nearby_max_wu,
+                nearby_aprs_enabled=self._nearby_aprs_enabled,
+                nearby_max_aprs=self._nearby_max_aprs,
                 wu_api_key=self._wu_api_key,
                 spray_ai_enabled=self._spray_ai_enabled,
             )
@@ -388,6 +424,8 @@ class NowcastService:
             sources.append("iem_asos_nearby")
         if self._nearby_wu_enabled and self._wu_api_key:
             sources.append("wu_pws_nearby")
+        if self._nearby_aprs_enabled:
+            sources.append("cwop_aprs_nearby")
         return sources
 
     def _store_proposed_knowledge(self, db: Session, proposed: dict[str, str]) -> None:

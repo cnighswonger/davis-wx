@@ -2491,6 +2491,20 @@ export default function Settings() {
             </label>
           </div>
 
+          <div style={fieldGroup}>
+            <label style={checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={val("nowcast_nearby_aprs_enabled") === true}
+                onChange={(e) => updateField("nowcast_nearby_aprs_enabled", e.target.checked)}
+              />
+              CWOP / APRS-IS stations
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", display: "block", marginTop: "2px", marginLeft: "24px" }}>
+                Citizen weather stations via APRS-IS — free, no API key needed
+              </span>
+            </label>
+          </div>
+
           {val("nowcast_nearby_wu_enabled") === true && (
             <div style={{ ...fieldGroup, marginLeft: "24px" }}>
               <label style={labelStyle}>WU API Key</label>
@@ -2536,6 +2550,21 @@ export default function Settings() {
                   <option value="5">5</option>
                   <option value="8">8</option>
                   <option value="10">10</option>
+                </select>
+              </div>
+            )}
+            {val("nowcast_nearby_aprs_enabled") === true && (
+              <div style={fieldGroup}>
+                <label style={labelStyle}>Max APRS Stations</label>
+                <select
+                  style={selectStyle}
+                  value={String(val("nowcast_nearby_max_aprs") || "10")}
+                  onChange={(e) => updateField("nowcast_nearby_max_aprs", parseInt(e.target.value))}
+                >
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="15">15</option>
+                  <option value="20">20</option>
                 </select>
               </div>
             )}

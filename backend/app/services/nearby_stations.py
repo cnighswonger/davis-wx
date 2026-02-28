@@ -13,6 +13,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -63,6 +64,7 @@ class NearbyStationsResult:
     stations: list[NearbyObservation] = field(default_factory=list)
     iem_count: int = 0
     wu_count: int = 0
+    aprs_count: int = 0
     fetched_at: float = 0.0
 
 
@@ -345,6 +347,51 @@ async def _fetch_wu_nearby(
 
 # --- Combined orchestrator ---
 
+def _fetch_aprs_nearby(
+    lat: float,
+    lon: float,
+    radius_miles: int,
+    max_stations: int,
+) -> list[NearbyObservation]:
+    """Read CWOP/APRS-IS observations from the in-memory collector cache.
+
+    Returns NearbyObservation objects sorted nearest-first.
+    This is instant (no network I/O) — reads from the background listener cache.
+    """
+    from . import aprs_collector
+
+    aprs_obs = aprs_collector.get_observations(lat, lon, radius_miles, max_stations)
+    results: list[NearbyObservation] = []
+
+    for obs in aprs_obs:
+        dist = _haversine_miles(lat, lon, obs.latitude, obs.longitude)
+        results.append(NearbyObservation(
+            source="cwop_aprs",
+            station_id=obs.callsign,
+            station_name=obs.callsign,
+            latitude=obs.latitude,
+            longitude=obs.longitude,
+            distance_miles=round(dist, 1),
+            bearing_cardinal=_bearing_cardinal(lat, lon, obs.latitude, obs.longitude),
+            timestamp=datetime.fromtimestamp(obs.timestamp, tz=timezone.utc).isoformat(),
+            temp_f=obs.temp_f,
+            humidity_pct=obs.humidity_pct,
+            wind_speed_mph=obs.wind_speed_mph,
+            wind_dir_deg=obs.wind_dir_deg,
+            wind_gust_mph=obs.wind_gust_mph,
+            pressure_inhg=obs.pressure_inhg,
+            precip_in=obs.precip_in,
+        ))
+
+    if results:
+        logger.info(
+            "Fetched %d CWOP/APRS stations within %d miles",
+            len(results), radius_miles,
+        )
+
+    return results
+
+
 async def fetch_nearby_stations(
     lat: float,
     lon: float,
@@ -354,6 +401,8 @@ async def fetch_nearby_stations(
     wu_api_key: str = "",
     iem_enabled: bool = True,
     wu_enabled: bool = True,
+    aprs_enabled: bool = False,
+    max_aprs: int = 10,
 ) -> NearbyStationsResult:
     """Fetch nearby station data from all enabled sources, with caching.
 
@@ -367,6 +416,7 @@ async def fetch_nearby_stations(
 
     iem_stations: list[NearbyObservation] = []
     wu_stations: list[NearbyObservation] = []
+    aprs_stations: list[NearbyObservation] = []
 
     tasks: list[asyncio.Task] = []
     task_labels: list[str] = []
@@ -396,13 +446,21 @@ async def fetch_nearby_stations(
             elif label == "wu":
                 wu_stations = result
 
-    combined = iem_stations + wu_stations
+    # APRS fetch is synchronous (reads from in-memory cache), no task needed.
+    if aprs_enabled:
+        try:
+            aprs_stations = _fetch_aprs_nearby(lat, lon, radius_miles, max_aprs)
+        except Exception as exc:
+            logger.warning("Nearby APRS fetch raised: %s", exc)
+
+    combined = iem_stations + wu_stations + aprs_stations
     combined.sort(key=lambda o: o.distance_miles)
 
     data = NearbyStationsResult(
         stations=combined,
         iem_count=len(iem_stations),
         wu_count=len(wu_stations),
+        aprs_count=len(aprs_stations),
         fetched_at=time.time(),
     )
 
