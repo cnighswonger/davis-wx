@@ -258,6 +258,30 @@ class NowcastService:
                 logger.warning("Nowcast generation returned no result")
                 return
 
+            # Retry once with +10% tokens if response was truncated and unparseable.
+            if result.parse_failed:
+                retry_tokens = int(self._max_tokens * 1.1)
+                logger.warning(
+                    "Nowcast truncated and unparseable, retrying with %d tokens (+10%%)",
+                    retry_tokens,
+                )
+                result = await generate_nowcast(
+                    data=data,
+                    model=self._model,
+                    api_key_from_db=self._api_key,
+                    horizon_hours=self._horizon,
+                    max_tokens=retry_tokens,
+                )
+                if result is None or result.parse_failed:
+                    logger.error(
+                        "Nowcast retry also failed — discarding result, keeping previous nowcast"
+                    )
+                    await self._broadcast_warning(
+                        f"Nowcast response truncated even after retry ({retry_tokens} tokens). "
+                        "Consider increasing Max Output Tokens in Settings > Nowcast."
+                    )
+                    return
+
             # Store to database.
             self._store_result(db, result)
 
@@ -341,6 +365,17 @@ class NowcastService:
             })
         except Exception as exc:
             logger.debug("Nowcast WS broadcast failed: %s", exc)
+
+    async def _broadcast_warning(self, message: str) -> None:
+        """Push a warning toast to all connected WebSocket clients."""
+        try:
+            from ..ws.handler import ws_manager
+            await ws_manager.broadcast({
+                "type": "nowcast_warning",
+                "data": {"message": message},
+            })
+        except Exception as exc:
+            logger.debug("Nowcast warning WS broadcast failed: %s", exc)
 
     def _sources_list(self, result: AnalystResult) -> list[str]:
         """Build list of data sources used."""

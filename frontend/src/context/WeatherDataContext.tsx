@@ -42,6 +42,10 @@ interface WeatherDataContextValue {
   connected: boolean;
   /** Whether our browser WebSocket to the backend is open. */
   wsConnected: boolean;
+  /** Warning message from nowcast service (truncation retry failure, etc). */
+  nowcastWarning: string | null;
+  /** Dismiss the current nowcast warning. */
+  dismissNowcastWarning: () => void;
   /** Manually refresh forecast data. */
   refreshForecast: () => void;
   /** Manually refresh nowcast data (fetches cached). */
@@ -71,8 +75,11 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
   const [nowcast, setNowcast] = useState<NowcastData | null>(null);
   const [connected, setConnected] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [nowcastWarning, setNowcastWarning] = useState<string | null>(null);
 
   const [ws, setWs] = useState<WebSocketManager | null>(null);
+
+  const dismissNowcastWarning = useCallback(() => setNowcastWarning(null), []);
 
   // Refresh forecast data from REST endpoint.
   const refreshForecast = useCallback(() => {
@@ -158,6 +165,11 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       setNowcast(data as NowcastData);
     });
 
+    manager.onMessage("nowcast_warning", (data) => {
+      const msg = (data as { message: string }).message;
+      setNowcastWarning(msg);
+    });
+
     manager.onMessage("connection_status", (data) => {
       setConnected(data as boolean);
     });
@@ -181,6 +193,8 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     nowcast,
     connected,
     wsConnected,
+    nowcastWarning,
+    dismissNowcastWarning,
     refreshForecast,
     refreshNowcast,
     triggerNowcast,

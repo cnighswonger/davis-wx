@@ -300,12 +300,17 @@ export interface WSNowcastUpdate {
   data: NowcastData;
 }
 
+export interface WSNowcastWarning {
+  type: "nowcast_warning";
+  message: string;
+}
+
 export interface WSConnectionStatus {
   type: "connection_status";
   connected: boolean;
 }
 
-export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
+export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSNowcastWarning | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
 
 // --- Spray Advisor ---
 

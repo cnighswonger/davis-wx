@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import WeatherBackground from '../WeatherBackground';
 import { useWeatherBackground } from '../../context/WeatherBackgroundContext';
+import { useWeatherData } from '../../context/WeatherDataContext';
 
 interface AppShellProps {
   children: ReactNode;
@@ -22,6 +23,14 @@ export default function AppShell({
     catch { return false; }
   });
   const { enabled } = useWeatherBackground();
+  const { nowcastWarning, dismissNowcastWarning } = useWeatherData();
+
+  // Auto-dismiss warning after 30 seconds.
+  useEffect(() => {
+    if (!nowcastWarning) return;
+    const timer = setTimeout(dismissNowcastWarning, 30_000);
+    return () => clearTimeout(timer);
+  }, [nowcastWarning, dismissNowcastWarning]);
 
   const toggleCollapse = () => {
     setSidebarCollapsed((prev) => {
@@ -88,6 +97,30 @@ export default function AppShell({
               padding: '24px',
             }}
           >
+            {nowcastWarning && (
+              <div
+                role="alert"
+                onClick={dismissNowcastWarning}
+                style={{
+                  padding: '10px 16px',
+                  marginBottom: 16,
+                  background: 'var(--color-warning-bg, #664d03)',
+                  color: 'var(--color-warning-text, #fff3cd)',
+                  border: '1px solid var(--color-warning-border, #997404)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontFamily: 'var(--font-body)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <span style={{ flexShrink: 0 }}>{'\u26A0'}</span>
+                <span style={{ flex: 1 }}>{nowcastWarning}</span>
+                <span style={{ flexShrink: 0, opacity: 0.7, fontSize: 11 }}>click to dismiss</span>
+              </div>
+            )}
             {children}
           </div>
           <Footer lastUpdate={lastUpdate} />

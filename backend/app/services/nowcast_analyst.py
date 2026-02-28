@@ -292,6 +292,8 @@ class AnalystResult:
     output_tokens: int
     radar_analysis: Optional[str] = None
     spray_advisory: Optional[dict[str, Any]] = None
+    truncated: bool = False
+    parse_failed: bool = False
 
 
 def _build_user_content(
@@ -378,7 +380,8 @@ async def generate_nowcast(
     input_tokens = response.usage.input_tokens if response.usage else 0
     output_tokens = response.usage.output_tokens if response.usage else 0
 
-    if response.stop_reason == "max_tokens":
+    truncated = response.stop_reason == "max_tokens"
+    if truncated:
         logger.warning("Nowcast response truncated at max_tokens=%d (%d output tokens)", max_tokens, output_tokens)
 
     # Parse JSON from response — Claude may wrap in markdown code fences,
@@ -406,7 +409,7 @@ async def generate_nowcast(
         parsed, _ = decoder.raw_decode(json_text)
     except (json.JSONDecodeError, ValueError) as exc:
         logger.error("Nowcast JSON parse failed: %s | raw[:300]: %s", exc, raw_text[:300])
-        # Store raw response as a minimal result so it's not lost.
+        # Return a minimal result flagged as failed so the service can retry.
         return AnalystResult(
             summary=raw_text[:500],
             current_vs_model="",
@@ -417,6 +420,8 @@ async def generate_nowcast(
             raw_response=raw_text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            truncated=truncated,
+            parse_failed=True,
         )
 
     # Extract proposed knowledge entry if present.
@@ -442,4 +447,5 @@ async def generate_nowcast(
         output_tokens=output_tokens,
         radar_analysis=parsed.get("radar_analysis"),
         spray_advisory=spray_advisory,
+        truncated=truncated,
     )
