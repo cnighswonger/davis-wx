@@ -69,6 +69,52 @@ VELOCITY RADAR (when Storm Relative Velocity imagery is provided):
 - If no rotation signatures are detected, state "No rotation signatures
   detected on velocity imagery."
 
+SEVERE WEATHER CORRELATION PROTOCOL:
+When ANY of the following triggers are present, activate this protocol:
+  - NWS warning or watch is active for this location
+  - Velocity radar shows gate-to-gate shear or rotation signatures
+  - Station barometric pressure dropping >0.06 inHg/hr
+  - Nearby stations showing wind shifts or pressure drops propagating
+    toward this station
+
+STEP 1 — Assess the threat:
+  a. Identify the primary threat type (tornado, severe thunderstorm,
+     flash flood, damaging winds, large hail).
+  b. Locate the threat on radar: distance and bearing from station.
+  c. Estimate storm motion using model wind fields or echo movement.
+  d. Calculate estimated time to closest approach.
+
+STEP 2 — Correlate local observations:
+  a. Station pressure trend: rapid drop (>0.06 inHg/hr) indicates
+     approaching mesoscale low or gust front.
+  b. Wind direction shifts: veering (clockwise) ahead of warm front;
+     backing (counterclockwise) with approaching storm outflow.
+  c. Temperature/dewpoint: sudden dewpoint surge = outflow boundary.
+     Rapid cooling = precipitation or downdraft arrival.
+  d. Nearby station propagation: if stations to the W/SW show pressure
+     drops or wind shifts, calculate propagation speed and ETA to this
+     station.
+
+STEP 3 — Populate the severe_weather output object:
+  - threat_level: "WATCH" (conditions possible) | "WARNING" (imminent
+    or occurring) | "EMERGENCY" (confirmed life-threatening, e.g.
+    confirmed tornado + radar rotation + NWS tornado warning)
+  - Provide distance, bearing, ETA, specific local evidence, and
+    clear recommended action.
+  - ALWAYS cross-reference: a warning without local supporting evidence
+    should note "NWS warning active but no local confirming signatures
+    yet — continue monitoring."
+  - A rotation signature WITHOUT an NWS warning should note the
+    observation and recommend monitoring — do not create false alarms.
+
+STEP 4 — Escalation indicators (note in severe_weather.local_evidence):
+  - Pressure drop rate accelerating
+  - Multiple nearby stations showing same trend (spatial coherence)
+  - Radar echoes intensifying and/or rotation tightening
+  - Wind gusts exceeding forecast values
+
+When NONE of the triggers above are present, set severe_weather to null.
+
 NWS ACTIVE ALERTS (when provided):
 - Watches, warnings, and advisories active for the station location are
   included in the data.  Reference them explicitly:
@@ -115,6 +161,16 @@ OUTPUT FORMAT — respond with ONLY a JSON object (no markdown, no commentary):
   "farming_impact": "Brief agriculture-relevant note (field conditions, frost risk, spray windows, etc.)",
   "data_quality": "Assessment of input data sufficiency and any gaps",
   "proposed_knowledge": null or {"category": "bias|timing|terrain|seasonal", "content": "Learned insight for future reference"},
+  "severe_weather": null or {
+    "threat_level": "WATCH|WARNING|EMERGENCY",
+    "primary_threat": "Tornado / Severe Thunderstorm / Flash Flood / etc.",
+    "summary": "Concise correlated situation assessment with local evidence",
+    "distance_miles": null or number,
+    "bearing": null or "SW",
+    "estimated_arrival": null or "~45 minutes",
+    "local_evidence": ["Pressure dropping 0.08 inHg/hr", "Wind shift at nearby station"],
+    "recommended_action": "Specific protective action"
+  },
   "spray_advisory": null or {
     "summary": "Overall spray conditions assessment for the next several hours",
     "recommendations": [
@@ -332,6 +388,7 @@ class AnalystResult:
     output_tokens: int
     radar_analysis: Optional[str] = None
     spray_advisory: Optional[dict[str, Any]] = None
+    severe_weather: Optional[dict[str, Any]] = None
     truncated: bool = False
     parse_failed: bool = False
 
@@ -475,6 +532,11 @@ async def generate_nowcast(
     if spray_advisory is not None and not isinstance(spray_advisory, dict):
         spray_advisory = None
 
+    # Extract severe weather correlation if present.
+    severe_weather = parsed.get("severe_weather")
+    if severe_weather is not None and not isinstance(severe_weather, dict):
+        severe_weather = None
+
     return AnalystResult(
         summary=parsed.get("summary", ""),
         current_vs_model=parsed.get("current_vs_model", ""),
@@ -487,5 +549,6 @@ async def generate_nowcast(
         output_tokens=output_tokens,
         radar_analysis=parsed.get("radar_analysis"),
         spray_advisory=spray_advisory,
+        severe_weather=severe_weather,
         truncated=truncated,
     )

@@ -281,13 +281,23 @@ class NowcastService:
                 logger.warning("Nowcast skipped: no station data available")
                 return
 
+            # Increase token budget when NWS alerts are active to ensure
+            # the severe_weather correlation output is never truncated.
+            effective_max_tokens = self._max_tokens
+            if data.nws_alerts:
+                effective_max_tokens = self._max_tokens + 500
+                logger.info(
+                    "Active NWS alerts detected, increasing max_tokens to %d",
+                    effective_max_tokens,
+                )
+
             # Call Claude.
             result = await generate_nowcast(
                 data=data,
                 model=self._model,
                 api_key_from_db=self._api_key,
                 horizon_hours=self._horizon,
-                max_tokens=self._max_tokens,
+                max_tokens=effective_max_tokens,
             )
 
             if result is None:
@@ -385,6 +395,7 @@ class NowcastService:
             "sources_used": self._sources_list(result),
             "radar_analysis": result.radar_analysis,
             "spray_advisory": result.spray_advisory,
+            "severe_weather": result.severe_weather,
             "input_tokens": result.input_tokens,
             "output_tokens": result.output_tokens,
         }

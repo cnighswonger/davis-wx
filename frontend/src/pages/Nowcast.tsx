@@ -469,6 +469,109 @@ export default function Nowcast() {
         );
       })}
 
+      {/* Severe Weather Correlation (AI analysis — distinct from raw NWS alerts above) */}
+      {nowcast.severe_weather && (() => {
+        const sw = nowcast.severe_weather as {
+          threat_level?: string;
+          primary_threat?: string;
+          summary?: string;
+          distance_miles?: number | null;
+          bearing?: string | null;
+          estimated_arrival?: string | null;
+          local_evidence?: string[];
+          recommended_action?: string;
+        };
+        const level = (sw.threat_level || "WARNING").toUpperCase();
+        const bg =
+          level === "EMERGENCY"
+            ? "#7f1d1d"
+            : level === "WARNING"
+              ? "var(--color-danger, #dc2626)"
+              : "#d97706";
+        return (
+          <div
+            style={{
+              background: bg,
+              color: "#fff",
+              borderRadius: "var(--gauge-border-radius)",
+              padding: isMobile ? "14px 14px" : "16px 20px",
+              marginBottom: "16px",
+              fontSize: "14px",
+              fontFamily: "var(--font-body)",
+              lineHeight: 1.5,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "8px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: "4px",
+                  background: "rgba(255,255,255,0.2)",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {level}
+              </span>
+              <span style={{ fontWeight: 700, fontSize: "16px" }}>
+                {sw.primary_threat}
+              </span>
+            </div>
+            <div style={{ marginBottom: "10px" }}>{sw.summary}</div>
+            {(sw.distance_miles != null || sw.estimated_arrival) && (
+              <div
+                style={{
+                  fontSize: "13px",
+                  marginBottom: "8px",
+                  opacity: 0.9,
+                }}
+              >
+                {sw.distance_miles != null && sw.bearing && (
+                  <span>Distance: ~{sw.distance_miles} mi {sw.bearing}</span>
+                )}
+                {sw.distance_miles != null && sw.estimated_arrival && " | "}
+                {sw.estimated_arrival && (
+                  <span>ETA: {sw.estimated_arrival}</span>
+                )}
+              </div>
+            )}
+            {sw.local_evidence && sw.local_evidence.length > 0 && (
+              <div style={{ fontSize: "13px", marginBottom: "10px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "4px", opacity: 0.85 }}>
+                  Local Evidence:
+                </div>
+                {sw.local_evidence.map((e, i) => (
+                  <div key={i} style={{ paddingLeft: "12px", opacity: 0.9 }}>
+                    - {e}
+                  </div>
+                ))}
+              </div>
+            )}
+            {sw.recommended_action && (
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: "15px",
+                  borderTop: "1px solid rgba(255,255,255,0.3)",
+                  paddingTop: "10px",
+                  marginTop: "4px",
+                }}
+              >
+                ACTION: {sw.recommended_action}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Summary */}
       <div style={{ ...cardStyle, borderLeft: "4px solid var(--color-accent)" }}>
         <p

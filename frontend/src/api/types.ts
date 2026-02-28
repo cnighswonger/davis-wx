@@ -244,6 +244,16 @@ export interface NowcastData {
       detail: string;
     }>;
   } | null;
+  severe_weather: {
+    threat_level: "WATCH" | "WARNING" | "EMERGENCY";
+    primary_threat: string;
+    summary: string;
+    distance_miles: number | null;
+    bearing: string | null;
+    estimated_arrival: string | null;
+    local_evidence: string[];
+    recommended_action: string;
+  } | null;
   data_quality: string;
   sources_used: string[];
   input_tokens: number;
