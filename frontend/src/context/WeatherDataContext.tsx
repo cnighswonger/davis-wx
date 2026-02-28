@@ -46,6 +46,8 @@ interface WeatherDataContextValue {
   nowcastWarning: string | null;
   /** Dismiss the current nowcast warning. */
   dismissNowcastWarning: () => void;
+  /** True when NWS alerts are active and nowcast is running faster cycles. */
+  alertMode: boolean;
   /** Manually refresh forecast data. */
   refreshForecast: () => void;
   /** Manually refresh nowcast data (fetches cached). */
@@ -76,6 +78,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
   const [connected, setConnected] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [nowcastWarning, setNowcastWarning] = useState<string | null>(null);
+  const [alertMode, setAlertMode] = useState(false);
 
   const [ws, setWs] = useState<WebSocketManager | null>(null);
 
@@ -174,6 +177,14 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
       setConnected(data as boolean);
     });
 
+    manager.onMessage("severe_weather_status", (data) => {
+      const status = data as { alert_mode: boolean; is_new_alert?: boolean };
+      setAlertMode(status.alert_mode);
+      if (status.is_new_alert) {
+        setNowcastWarning("Updating nowcast — new NWS alert detected");
+      }
+    });
+
     manager.connect();
 
     return () => {
@@ -195,6 +206,7 @@ export function WeatherDataProvider({ children }: WeatherDataProviderProps) {
     wsConnected,
     nowcastWarning,
     dismissNowcastWarning,
+    alertMode,
     refreshForecast,
     refreshNowcast,
     triggerNowcast,

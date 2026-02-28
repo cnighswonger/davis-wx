@@ -343,7 +343,17 @@ export interface WSConnectionStatus {
   connected: boolean;
 }
 
-export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSNowcastWarning | WSConnectionStatus | WSAlertTriggered | WSAlertCleared;
+export interface WSSevereWeatherStatus {
+  type: "severe_weather_status";
+  data: {
+    alert_mode: boolean;
+    is_new_alert?: boolean;
+    alert_count?: number;
+    cycle_interval?: number;
+  };
+}
+
+export type WSMessage = WSSensorUpdate | WSForecastUpdate | WSNowcastUpdate | WSNowcastWarning | WSConnectionStatus | WSAlertTriggered | WSAlertCleared | WSSevereWeatherStatus;
 
 // --- Spray Advisor ---
 

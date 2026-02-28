@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 # Check interval — the service wakes every 60s to see if it's time to run.
 CHECK_INTERVAL = 60
 
+# During active NWS alerts, shorten the nowcast cycle for faster updates.
+ALERT_MODE_INTERVAL = 300  # 5 minutes
+
 
 class NowcastService:
     """Scheduled nowcast generation service."""
@@ -54,6 +57,8 @@ class NowcastService:
         self._spray_ai_enabled: bool = False
         self._last_run: float = 0.0
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
+        self._prev_alert_ids: set[str] = set()  # alert_ids from last cycle
+        self._alert_mode: bool = False  # True when NWS alerts are active
 
     def reload_config(self) -> None:
         """Read nowcast config from the station_config table."""
@@ -240,7 +245,34 @@ class NowcastService:
             return  # No location configured
 
         now = time.monotonic()
-        if now - self._last_run < self._interval:
+
+        # Mid-cycle alert check — detect NEW alerts between cycles
+        # (uses alerts_nws 2-min cache, so this is cheap).
+        if self._latitude and self._longitude:
+            from .alerts_nws import fetch_nws_active_alerts
+            alert_data = await fetch_nws_active_alerts(
+                self._latitude, self._longitude,
+            )
+            if alert_data:
+                current_ids = {a.alert_id for a in alert_data.alerts}
+                new_alerts = current_ids - self._prev_alert_ids
+                if new_alerts:
+                    logger.warning(
+                        "New NWS alert detected mid-cycle, triggering immediate nowcast"
+                    )
+                    self._last_run = now
+                    await self._generate()
+                    self._auto_accept_knowledge()
+                    self._verify_expired()
+                    return
+
+        # Use shorter interval when NWS alerts are active.
+        effective_interval = (
+            min(self._interval, ALERT_MODE_INTERVAL)
+            if self._alert_mode
+            else self._interval
+        )
+        if now - self._last_run < effective_interval:
             return
 
         self._last_run = now
@@ -280,6 +312,21 @@ class NowcastService:
             if not data.station.has_data:
                 logger.warning("Nowcast skipped: no station data available")
                 return
+
+            # Track alert state changes.
+            current_alert_ids = {a["alert_id"] for a in data.nws_alerts}
+            new_alerts = current_alert_ids - self._prev_alert_ids
+            was_alert_mode = self._alert_mode
+            self._prev_alert_ids = current_alert_ids
+            self._alert_mode = bool(current_alert_ids)
+
+            if new_alerts:
+                logger.warning("New NWS alert(s) detected: %d new", len(new_alerts))
+                await self._broadcast_alert_status(data.nws_alerts, is_new=True)
+            elif self._alert_mode and not was_alert_mode:
+                await self._broadcast_alert_status(data.nws_alerts, is_new=False)
+            elif was_alert_mode and not self._alert_mode:
+                await self._broadcast_alert_status([], is_new=False)
 
             # Increase token budget when NWS alerts are active to ensure
             # the severe_weather correlation output is never truncated.
@@ -423,6 +470,24 @@ class NowcastService:
             })
         except Exception as exc:
             logger.debug("Nowcast warning WS broadcast failed: %s", exc)
+
+    async def _broadcast_alert_status(
+        self, alerts: list, is_new: bool = False,
+    ) -> None:
+        """Notify frontend of severe weather mode changes."""
+        try:
+            from ..ws.handler import ws_manager
+            await ws_manager.broadcast({
+                "type": "severe_weather_status",
+                "data": {
+                    "alert_mode": bool(alerts),
+                    "is_new_alert": is_new,
+                    "alert_count": len(alerts),
+                    "cycle_interval": ALERT_MODE_INTERVAL if alerts else self._interval,
+                },
+            })
+        except Exception as exc:
+            logger.debug("Alert status WS broadcast failed: %s", exc)
 
     def _sources_list(self, result: AnalystResult) -> list[str]:
         """Build list of data sources used."""

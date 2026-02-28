@@ -239,7 +239,7 @@ function CategoryBadge({ category }: { category: string }) {
 }
 
 export default function Nowcast() {
-  const { nowcast, triggerNowcast } = useWeatherData();
+  const { nowcast, triggerNowcast, alertMode } = useWeatherData();
   const isMobile = useIsMobile();
 
   // Verification state
@@ -271,9 +271,10 @@ export default function Nowcast() {
         .catch(() => {});
     };
     poll();
-    const id = setInterval(poll, 180_000); // 3 minutes
+    const interval = alertMode ? 60_000 : 180_000;
+    const id = setInterval(poll, interval);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [alertMode]);
 
   // Knowledge state
   const [knowledgeExpanded, setKnowledgeExpanded] = useState(false);
