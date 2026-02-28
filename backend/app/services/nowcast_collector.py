@@ -56,7 +56,7 @@ IEM_RADMAP_TIMEOUT = 20.0
 RADAR_IMAGE_WIDTH = 480
 RADAR_IMAGE_HEIGHT = 480
 RADAR_BBOX_RADIUS = 1.5  # degrees (~100 miles at mid-latitudes)
-RADAR_CACHE_TTL = 300  # 5 minutes (matches NEXRAD scan rate)
+RADAR_CACHE_TTL = 3600  # 1 hour — keep image available between nowcast cycles
 
 # Product configuration registry — maps product_id to fetch parameters.
 # Add entries here for future products (velocity, dual-pol, etc.).
