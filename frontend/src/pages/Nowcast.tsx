@@ -96,22 +96,30 @@ function RadarImg({ src, alt, label, isMobile }: { src: string; alt: string; lab
           }}
           onError={() => setFailed(true)}
         />
-        <div
+        {/* Station crosshair */}
+        <svg
           style={{
             position: "absolute",
             top: "50%",
             left: "50%",
-            width: "8px",
-            height: "8px",
-            marginTop: "-4px",
-            marginLeft: "-4px",
-            borderRadius: "50%",
-            background: "red",
-            border: "1.5px solid white",
-            boxShadow: "0 0 3px rgba(0,0,0,0.8)",
+            transform: "translate(-50%, -50%)",
             pointerEvents: "none",
           }}
-        />
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+        >
+          <circle cx="10" cy="10" r="4" fill="none" stroke="white" strokeWidth="2.5" />
+          <circle cx="10" cy="10" r="4" fill="none" stroke="red" strokeWidth="1.5" />
+          <line x1="10" y1="0" x2="10" y2="6" stroke="white" strokeWidth="2.5" />
+          <line x1="10" y1="0" x2="10" y2="6" stroke="red" strokeWidth="1.5" />
+          <line x1="10" y1="14" x2="10" y2="20" stroke="white" strokeWidth="2.5" />
+          <line x1="10" y1="14" x2="10" y2="20" stroke="red" strokeWidth="1.5" />
+          <line x1="0" y1="10" x2="6" y2="10" stroke="white" strokeWidth="2.5" />
+          <line x1="0" y1="10" x2="6" y2="10" stroke="red" strokeWidth="1.5" />
+          <line x1="14" y1="10" x2="20" y2="10" stroke="white" strokeWidth="2.5" />
+          <line x1="14" y1="10" x2="20" y2="10" stroke="red" strokeWidth="1.5" />
+        </svg>
       </div>
       <div
         style={{
