@@ -1,4 +1,4 @@
-"""ORM models for AI nowcast history, verification, and knowledge base."""
+"""ORM models for AI nowcast history, verification, knowledge base, and event archiving."""
 
 from datetime import datetime, timezone
 
@@ -63,3 +63,68 @@ class NowcastKnowledge(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")  # "pending", "accepted", "rejected"
     auto_accept_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class NowcastRadarImage(Base):
+    """Persisted radar image (standard or zoom) associated with a nowcast cycle."""
+
+    __tablename__ = "nowcast_radar_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nowcast_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("nowcast_history.id"), nullable=False, index=True
+    )
+    image_type: Mapped[str] = mapped_column(Text, nullable=False)  # "standard" | "zoom"
+    product_id: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    png_base64: Mapped[str] = mapped_column(Text, nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    bbox_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON [lon_min, lat_min, lon_max, lat_max]
+    fetched_at: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class NowcastAlertSnapshot(Base):
+    """NWS alert text archived with each nowcast cycle for post-event review."""
+
+    __tablename__ = "nowcast_alert_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nowcast_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("nowcast_history.id"), nullable=False, index=True
+    )
+    alert_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(Text, nullable=False)
+    certainty: Mapped[str] = mapped_column(Text, nullable=False)
+    urgency: Mapped[str] = mapped_column(Text, nullable=False)
+    headline: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    instruction: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    onset: Mapped[str] = mapped_column(Text, nullable=False)
+    expires: Mapped[str] = mapped_column(Text, nullable=False)
+    sender_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    message_type: Mapped[str] = mapped_column(Text, nullable=False, default="Alert")
+    response: Mapped[str] = mapped_column(Text, nullable=False, default="None")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class NowcastNearbySnapshot(Base):
+    """Nearby station observations archived during alert mode for post-event review."""
+
+    __tablename__ = "nowcast_nearby_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nowcast_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("nowcast_history.id"), nullable=False, index=True
+    )
+    observations_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array
+    station_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )

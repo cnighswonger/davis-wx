@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..models.database import get_db
-from ..models.nowcast import NowcastHistory, NowcastKnowledge, NowcastVerification
+from ..models.nowcast import NowcastHistory, NowcastKnowledge, NowcastRadarImage, NowcastVerification
 from ..services.nowcast_service import nowcast_service
 from ..services.nowcast_collector import get_cached_radar
 
@@ -53,32 +53,46 @@ async def generate_now():
     return result
 
 
-@router.get("/nowcast/radar")
-def get_radar_image():
-    """Return the cached NEXRAD radar image as PNG binary."""
-    img = get_cached_radar()
-    if img is None:
-        raise HTTPException(status_code=404, detail="No cached radar image available")
-    png_bytes = base64.b64decode(img.png_base64)
+def _serve_radar(product_id: str, db: Session) -> Response:
+    """Serve radar from in-memory cache, falling back to DB."""
+    img = get_cached_radar(product_id)
+    if img is not None:
+        png_bytes = base64.b64decode(img.png_base64)
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+    # DB fallback — latest standard image for this product.
+    db_img = (
+        db.query(NowcastRadarImage)
+        .filter(
+            NowcastRadarImage.product_id == product_id,
+            NowcastRadarImage.image_type == "standard",
+        )
+        .order_by(NowcastRadarImage.created_at.desc())
+        .first()
+    )
+    if db_img is None:
+        raise HTTPException(status_code=404, detail=f"No radar image for '{product_id}'")
+    png_bytes = base64.b64decode(db_img.png_base64)
     return Response(
         content=png_bytes,
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=300"},
     )
+
+
+@router.get("/nowcast/radar")
+def get_radar_image(db: Session = Depends(get_db)):
+    """Return the NEXRAD composite reflectivity radar image as PNG binary."""
+    return _serve_radar("nexrad_composite", db)
 
 
 @router.get("/nowcast/radar/{product_id}")
-def get_radar_product(product_id: str):
-    """Return a cached radar image by product ID (e.g. nexrad_velocity)."""
-    img = get_cached_radar(product_id)
-    if img is None:
-        raise HTTPException(status_code=404, detail=f"No cached radar image for '{product_id}'")
-    png_bytes = base64.b64decode(img.png_base64)
-    return Response(
-        content=png_bytes,
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=300"},
-    )
+def get_radar_product(product_id: str, db: Session = Depends(get_db)):
+    """Return a radar image by product ID (e.g. nexrad_velocity)."""
+    return _serve_radar(product_id, db)
 
 
 @router.get("/nowcast/alerts")

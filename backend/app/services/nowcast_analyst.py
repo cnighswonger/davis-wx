@@ -8,13 +8,14 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import anthropic
 
 from .nowcast_collector import (
     CollectedData,
+    RadarImage,
     RADAR_PRODUCTS,
     fetch_radar_image,
 )
@@ -268,8 +269,8 @@ def _resolve_api_key(db_key: str) -> Optional[str]:
 async def _handle_zoom_request(
     tool_input: dict,
     radar_station: str,
-) -> list[dict]:
-    """Fetch a zoomed radar image and return content blocks for tool_result."""
+) -> tuple[list[dict], Optional[RadarImage]]:
+    """Fetch a zoomed radar image and return content blocks + image for persistence."""
     product = tool_input["product"]
     center_lat = tool_input["center_lat"]
     center_lon = tool_input["center_lon"]
@@ -282,7 +283,7 @@ async def _handle_zoom_request(
     if cfg.get("requires_site") and radar_station:
         extra["ridge_radar"] = radar_station
     elif cfg.get("requires_site") and not radar_station:
-        return [{"type": "text", "text": "Velocity zoom unavailable — no NEXRAD station resolved. Proceed with existing imagery."}]
+        return [{"type": "text", "text": "Velocity zoom unavailable — no NEXRAD station resolved. Proceed with existing imagery."}], None
 
     img = await fetch_radar_image(
         lat=center_lat, lon=center_lon,
@@ -294,11 +295,11 @@ async def _handle_zoom_request(
     )
 
     if img is None:
-        return [{"type": "text", "text": "Zoom request failed — radar image unavailable. Proceed with existing imagery."}]
+        return [{"type": "text", "text": "Zoom request failed — radar image unavailable. Proceed with existing imagery."}], None
 
     bbox = img.bbox
     miles_ns = (bbox[3] - bbox[1]) * 69
-    return [
+    content = [
         {
             "type": "image",
             "source": {
@@ -318,6 +319,7 @@ async def _handle_zoom_request(
             ),
         },
     ]
+    return content, img
 
 
 def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
@@ -497,6 +499,7 @@ class AnalystResult:
     radar_analysis: Optional[str] = None
     spray_advisory: Optional[dict[str, Any]] = None
     severe_weather: Optional[dict[str, Any]] = None
+    zoom_images: list[RadarImage] = field(default_factory=list)
     truncated: bool = False
     parse_failed: bool = False
 
@@ -579,6 +582,7 @@ async def generate_nowcast(
         tools = [ZOOM_RADAR_TOOL] if data.radar_images else []
         total_input = 0
         total_output = 0
+        collected_zoom_images: list[RadarImage] = []
 
         for _turn in range(MAX_ZOOM_REQUESTS + 1):
             create_kwargs: dict[str, Any] = dict(
@@ -610,9 +614,11 @@ async def generate_nowcast(
                     tool_block.input.get("radius_deg", 0),
                 )
 
-                result_content = await _handle_zoom_request(
+                result_content, zoom_img = await _handle_zoom_request(
                     tool_block.input, radar_station,
                 )
+                if zoom_img is not None:
+                    collected_zoom_images.append(zoom_img)
 
                 # Append assistant turn + tool result for next iteration.
                 messages.append({"role": "assistant", "content": response.content})
@@ -684,6 +690,7 @@ async def generate_nowcast(
             raw_response=raw_text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            zoom_images=collected_zoom_images,
             truncated=truncated,
             parse_failed=True,
         )
@@ -717,5 +724,6 @@ async def generate_nowcast(
         radar_analysis=parsed.get("radar_analysis"),
         spray_advisory=spray_advisory,
         severe_weather=severe_weather,
+        zoom_images=collected_zoom_images,
         truncated=truncated,
     )

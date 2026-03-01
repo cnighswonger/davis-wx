@@ -15,8 +15,11 @@ from sqlalchemy.orm import Session
 
 from ..models.database import SessionLocal
 from ..models.station_config import StationConfigModel
-from ..models.nowcast import NowcastHistory, NowcastKnowledge
-from .nowcast_collector import collect_all
+from ..models.nowcast import (
+    NowcastHistory, NowcastKnowledge,
+    NowcastRadarImage, NowcastAlertSnapshot, NowcastNearbySnapshot,
+)
+from .nowcast_collector import collect_all, CollectedData
 from .nowcast_analyst import generate_nowcast, AnalystResult
 from .nowcast_verifier import verify_expired_nowcasts
 from .forecast_nws import fetch_nws_forecast
@@ -391,7 +394,7 @@ class NowcastService:
                     return
 
             # Store to database.
-            self._store_result(db, result, effective_model)
+            self._store_result(db, result, effective_model, data)
 
             # Handle proposed knowledge entry.
             if result.proposed_knowledge:
@@ -415,7 +418,9 @@ class NowcastService:
         finally:
             db.close()
 
-    def _store_result(self, db: Session, result: AnalystResult, model_used: str) -> None:
+    def _store_result(
+        self, db: Session, result: AnalystResult, model_used: str, data: CollectedData,
+    ) -> None:
         """Write nowcast result to the database and update in-memory cache."""
         now = datetime.now(timezone.utc)
         valid_until = now + timedelta(hours=self._horizon)
@@ -441,6 +446,64 @@ class NowcastService:
         )
         db.add(record)
         db.flush()  # get record.id
+
+        # --- Layer 1: Always persist radar images ---
+        for img in data.radar_images:
+            db.add(NowcastRadarImage(
+                nowcast_id=record.id,
+                image_type="standard",
+                product_id=img.product_id,
+                label=img.label,
+                png_base64=img.png_base64,
+                width=img.width,
+                height=img.height,
+                bbox_json=json.dumps(list(img.bbox)),
+                fetched_at=img.fetched_at,
+            ))
+
+        # --- Layer 2: Always persist zoom images ---
+        for img in result.zoom_images:
+            db.add(NowcastRadarImage(
+                nowcast_id=record.id,
+                image_type="zoom",
+                product_id=img.product_id,
+                label=img.label,
+                png_base64=img.png_base64,
+                width=img.width,
+                height=img.height,
+                bbox_json=json.dumps(list(img.bbox)),
+                fetched_at=img.fetched_at,
+            ))
+
+        # --- Layer 3: Nearby station snapshots (alert mode only) ---
+        if self._alert_mode and data.nearby_stations:
+            stations = getattr(data.nearby_stations, "stations", [])
+            if stations:
+                from dataclasses import asdict
+                db.add(NowcastNearbySnapshot(
+                    nowcast_id=record.id,
+                    observations_json=json.dumps([asdict(s) for s in stations]),
+                    station_count=len(stations),
+                ))
+
+        # --- Layer 4: NWS alert text (always when alerts exist) ---
+        for alert in data.nws_alerts:
+            db.add(NowcastAlertSnapshot(
+                nowcast_id=record.id,
+                alert_id=alert["alert_id"],
+                event=alert["event"],
+                severity=alert["severity"],
+                certainty=alert["certainty"],
+                urgency=alert["urgency"],
+                headline=alert["headline"],
+                description=alert["description"],
+                instruction=alert.get("instruction", ""),
+                onset=alert["onset"],
+                expires=alert["expires"],
+                sender_name=alert.get("sender_name", ""),
+                message_type=alert.get("message_type", "Alert"),
+                response=alert.get("response", "None"),
+            ))
 
         # Update in-memory cache for fast API access.
         self._latest = {
