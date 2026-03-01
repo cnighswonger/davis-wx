@@ -76,6 +76,38 @@ function ConfidenceBadge({ level }: { level: string }) {
   );
 }
 
+function RadarImg({ src, alt, label, isMobile }: { src: string; alt: string; label: string; isMobile: boolean }) {
+  const [failed, setFailed] = useState(false);
+  // Reset error state when src changes (new nowcast generated).
+  useEffect(() => { setFailed(false); }, [src]);
+  if (failed) return null;
+  return (
+    <div style={{ textAlign: "center" }}>
+      <img
+        src={src}
+        alt={alt}
+        style={{
+          width: isMobile ? "100%" : "240px",
+          height: "auto",
+          borderRadius: "8px",
+          border: "1px solid var(--color-border)",
+        }}
+        onError={() => setFailed(true)}
+      />
+      <div
+        style={{
+          fontSize: "11px",
+          fontFamily: "var(--font-body)",
+          color: "var(--color-text-muted)",
+          marginTop: "4px",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
 function timeAgo(isoString: string): string {
   const diff = Date.now() - new Date(isoString).getTime();
   const minutes = Math.floor(diff / 60000);
@@ -605,90 +637,55 @@ export default function Nowcast() {
       </div>
 
       {/* Radar */}
-      {nowcast.radar_analysis && (
-        <div style={cardStyle}>
-          <h4 style={sectionTitle}>Radar Analysis</h4>
-          <div
-            style={{
-              display: isMobile ? "block" : "flex",
-              gap: "16px",
-              alignItems: "flex-start",
-            }}
-          >
+      {nowcast.radar_analysis && (() => {
+        const cacheBust = encodeURIComponent(nowcast.created_at || "");
+        return (
+          <div style={cardStyle}>
+            <h4 style={sectionTitle}>Radar Analysis</h4>
             <div
               style={{
-                display: "flex",
-                flexDirection: isMobile ? "column" : "row",
-                gap: "12px",
-                flexShrink: 0,
-                marginBottom: isMobile ? "12px" : 0,
+                display: isMobile ? "block" : "flex",
+                gap: "16px",
+                alignItems: "flex-start",
               }}
             >
-              <div style={{ textAlign: "center" }}>
-                <img
-                  src="/api/nowcast/radar"
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: isMobile ? "column" : "row",
+                  gap: "12px",
+                  flexShrink: 0,
+                  marginBottom: isMobile ? "12px" : 0,
+                }}
+              >
+                <RadarImg
+                  src={`/api/nowcast/radar?t=${cacheBust}`}
                   alt="NEXRAD composite reflectivity"
-                  style={{
-                    width: isMobile ? "100%" : "240px",
-                    height: "auto",
-                    borderRadius: "8px",
-                    border: "1px solid var(--color-border)",
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).parentElement!.style.display = "none";
-                  }}
+                  label="Reflectivity"
+                  isMobile={isMobile}
                 />
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontFamily: "var(--font-body)",
-                    color: "var(--color-text-muted)",
-                    marginTop: "4px",
-                  }}
-                >
-                  Reflectivity
-                </div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <img
-                  src="/api/nowcast/radar/nexrad_velocity"
+                <RadarImg
+                  src={`/api/nowcast/radar/nexrad_velocity?t=${cacheBust}`}
                   alt="Storm Relative Velocity"
-                  style={{
-                    width: isMobile ? "100%" : "240px",
-                    height: "auto",
-                    borderRadius: "8px",
-                    border: "1px solid var(--color-border)",
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).parentElement!.style.display = "none";
-                  }}
+                  label="Velocity"
+                  isMobile={isMobile}
                 />
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontFamily: "var(--font-body)",
-                    color: "var(--color-text-muted)",
-                    marginTop: "4px",
-                  }}
-                >
-                  Velocity
-                </div>
               </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontFamily: "var(--font-body)",
+                  color: "var(--color-text)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {nowcast.radar_analysis}
+              </p>
             </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "14px",
-                fontFamily: "var(--font-body)",
-                color: "var(--color-text)",
-                lineHeight: 1.5,
-              }}
-            >
-              {nowcast.radar_analysis}
-            </p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Special conditions */}
       {elements.special && (
