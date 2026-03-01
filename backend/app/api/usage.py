@@ -8,6 +8,7 @@ Two tiers:
 import logging
 import os
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends
@@ -43,6 +44,26 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 def _get_config_value(db: Session, key: str, default: str = "") -> str:
     row = db.query(StationConfigModel).filter_by(key=key).first()
     return row.value if row else default
+
+
+def _resolve_tz(db: Session):
+    """Return the station timezone (ZoneInfo) or UTC as fallback."""
+    tz_name = _get_config_value(db, "station_timezone", "")
+    if tz_name:
+        try:
+            return ZoneInfo(tz_name)
+        except Exception:
+            pass
+    return timezone.utc
+
+
+def _local_boundaries(db: Session) -> tuple[datetime, datetime]:
+    """Return (today_start, month_start) in UTC, aligned to station timezone."""
+    tz = _resolve_tz(db)
+    now_local = datetime.now(tz)
+    today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    return today_start, month_start
 
 
 def _resolve_admin_key(db: Session) -> str | None:
@@ -128,9 +149,7 @@ def _model_breakdown(db: Session, start: datetime | None = None, end: datetime |
 @router.get("/local")
 def get_local_usage(db: Session = Depends(get_db)):
     """Aggregate token usage from local nowcast_history."""
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    today_start, month_start = _local_boundaries(db)
 
     return {
         "today": _aggregate_period(db, start=today_start),
@@ -157,8 +176,7 @@ def get_usage_status(db: Session = Depends(get_db)):
     paused = _get_config_value(db, "usage_budget_paused", "false").lower() == "true"
 
     # Get current month cost estimate
-    now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _, month_start = _local_boundaries(db)
     month_stats = _aggregate_period(db, start=month_start)
 
     return {
@@ -178,17 +196,19 @@ def get_usage_status(db: Session = Depends(get_db)):
 ANTHROPIC_API_BASE = "https://api.anthropic.com/v1/organizations"
 
 
-def _period_to_range(period: str) -> tuple[str, str]:
+def _period_to_range(period: str, db: Session) -> tuple[str, str]:
     """Convert a period string to ISO datetime range."""
     now = datetime.now(timezone.utc)
     if period == "today":
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start, _ = _local_boundaries(db)
+        start = today_start
     elif period == "7d":
         start = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "30d":
         start = (now - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
     else:
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        _, month_start = _local_boundaries(db)
+        start = month_start
 
     return start.strftime("%Y-%m-%dT%H:%M:%SZ"), now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -200,7 +220,7 @@ async def get_anthropic_usage(period: str = "7d", db: Session = Depends(get_db))
     if not admin_key:
         return {"error": "No Admin API key configured", "data": []}
 
-    starting_at, ending_at = _period_to_range(period)
+    starting_at, ending_at = _period_to_range(period, db)
     bucket_width = "1d" if period != "today" else "1h"
 
     params = {
@@ -237,7 +257,7 @@ async def get_anthropic_cost(period: str = "30d", db: Session = Depends(get_db))
     if not admin_key:
         return {"error": "No Admin API key configured", "data": []}
 
-    starting_at, ending_at = _period_to_range(period)
+    starting_at, ending_at = _period_to_range(period, db)
 
     params = {
         "starting_at": starting_at,
@@ -283,8 +303,7 @@ def check_budget(db: Session) -> bool:
 
     auto_pause = _get_config_value(db, "usage_budget_auto_pause", "false").lower() == "true"
 
-    now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _, month_start = _local_boundaries(db)
     month_stats = _aggregate_period(db, start=month_start)
     current_cost = month_stats["estimated_cost_usd"]
 
