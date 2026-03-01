@@ -154,7 +154,7 @@ class WundergroundUploader:
             "PASSWORD": station_key,
             "dateutc": "now",
             "action": "updateraw",
-            "softwaretype": "davis-wx",
+            "softwaretype": "kanfei",
         }
 
         for wu_param, path in FIELD_MAP.items():

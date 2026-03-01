@@ -115,7 +115,7 @@ class CwopUploader:
 
         login_line = (
             f"user {self._callsign} pass {self._passcode} "
-            f"vers davis-wx 1.0\r\n"
+            f"vers kanfei 1.0\r\n"
         )
         packet_line = (
             f"{self._callsign}>APRS,TCPIP*:{packet}\r\n"

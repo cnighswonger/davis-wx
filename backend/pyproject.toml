@@ -1,7 +1,7 @@
 [project]
-name = "davis-wx-station"
+name = "kanfei"
 version = "0.1.0"
-description = "Davis Weather Station cross-platform application"
+description = "Kanfei — Davis Weather Station dashboard and logger"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.0",

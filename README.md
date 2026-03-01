@@ -28,8 +28,8 @@ Supports the full range of classic Davis stations: Vantage Pro 2, Weather Wizard
 Prerequisites: **Python 3.10+** and **Node.js 18+**
 
 ```bash
-git clone https://github.com/cnighswonger/davis-wx.git
-cd davis-wx
+git clone https://github.com/cnighswonger/kanfei.git
+cd kanfei
 
 python station.py setup
 python station.py run

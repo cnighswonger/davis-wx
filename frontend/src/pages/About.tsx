@@ -265,7 +265,7 @@ export default function About() {
         <h3 style={sectionTitle}>Links</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <a
-            href="https://github.com/placeholder/davis-wx-ui"
+            href="https://github.com/cnighswonger/kanfei"
             target="_blank"
             rel="noopener noreferrer"
             style={{

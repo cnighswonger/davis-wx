@@ -17,7 +17,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Reuse the same NWS identity and base URL as forecast_nws.py.
-NWS_USER_AGENT = "(davis-wx-ui, github.com/davis-wx-ui)"
+NWS_USER_AGENT = "(kanfei, github.com/cnighswonger/kanfei)"
 NWS_BASE_URL = "https://api.weather.gov"
 REQUEST_TIMEOUT = 15.0
 

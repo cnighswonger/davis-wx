@@ -255,7 +255,7 @@ async def _listen_loop(
 
                 # Send read-only login with filter.
                 login = (
-                    f"user N0CALL pass -1 vers davis-wx 1.0 "
+                    f"user N0CALL pass -1 vers kanfei 1.0 "
                     f"filter r/{lat:.4f}/{lon:.4f}/{radius_km} t/w\r\n"
                 )
                 writer.write(login.encode())

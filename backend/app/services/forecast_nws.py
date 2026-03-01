@@ -17,7 +17,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # NWS requires a User-Agent header identifying the application.
-NWS_USER_AGENT = "(davis-wx-ui, github.com/davis-wx-ui)"
+NWS_USER_AGENT = "(kanfei, github.com/cnighswonger/kanfei)"
 
 NWS_BASE_URL = "https://api.weather.gov"
 
