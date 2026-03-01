@@ -21,7 +21,7 @@ import { fetchSetupStatus } from './api/client';
 
 function AppContent() {
   const { connected, currentConditions } = useWeatherData();
-  const { flags } = useFeatureFlags();
+  const { flags, loading: flagsLoading } = useFeatureFlags();
   const lastUpdate = currentConditions?.timestamp
     ? new Date(currentConditions.timestamp)
     : null;
@@ -34,8 +34,8 @@ function AppContent() {
         <Route path="/history" element={<History />} />
         <Route path="/forecast" element={<Forecast />} />
         <Route path="/astronomy" element={<Astronomy />} />
-        <Route path="/nowcast" element={flags.nowcastEnabled ? <Nowcast /> : <Navigate to="/" replace />} />
-        <Route path="/spray" element={flags.sprayEnabled ? <Spray /> : <Navigate to="/" replace />} />
+        <Route path="/nowcast" element={flags.nowcastEnabled ? <Nowcast /> : flagsLoading ? null : <Navigate to="/" replace />} />
+        <Route path="/spray" element={flags.sprayEnabled ? <Spray /> : flagsLoading ? null : <Navigate to="/" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/about" element={<About />} />
       </Routes>
