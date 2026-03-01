@@ -282,7 +282,7 @@ class NowcastService:
 
     async def _generate(self) -> None:
         """Gather data and call Claude to generate a nowcast."""
-        logger.info("Generating nowcast (model=%s, horizon=%dh)", self._model, self._horizon)
+        logger.info("Collecting nowcast data (horizon=%dh)", self._horizon)
 
         db = SessionLocal()
         try:
@@ -348,6 +348,10 @@ class NowcastService:
                 )
 
             # Call Claude.
+            logger.info(
+                "Generating nowcast (model=%s, max_tokens=%d)",
+                effective_model, effective_max_tokens,
+            )
             result = await generate_nowcast(
                 data=data,
                 model=effective_model,
