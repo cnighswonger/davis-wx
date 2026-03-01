@@ -1,6 +1,6 @@
-# Project: Davis Weather Station Web UI
+# Project: Kanfei
 
-Web dashboard and logger daemon for Davis weather stations (Vantage Pro, Weather Monitor II, etc.). Serial communication via a custom protocol driver, with a FastAPI backend and React/TypeScript frontend.
+Self-hosted weather station dashboard and data logger for Davis Instruments stations (Vantage Pro 2, Weather Monitor II, etc.). Serial communication via a custom protocol driver, with a FastAPI backend and React/TypeScript frontend. Includes AI-powered nowcasting with severe weather awareness and agricultural spray advisory.
 
 ## Repository Structure
 
@@ -29,7 +29,7 @@ Web dashboard and logger daemon for Davis weather stations (Vantage Pro, Weather
 ## Build
 
 - Frontend: `cd frontend && npm run build`
-- Backend: Python 3.11+, dependencies in `backend/requirements.txt`
+- Backend: Python 3.10+, dependencies in `backend/pyproject.toml`
 - Debian package: `dpkg-buildpackage -us -uc -b` from repo root (on `deb` branch)
 - **GitHub release filenames**: GitHub silently converts `~` to `.` in uploaded asset filenames. Debian uses `~` in pre-release versions (e.g., `0.1.0~alpha4`) but the download will be `0.1.0.alpha4`. Use the actual GitHub filename in install instructions, not the local `.deb` filename.
 
@@ -39,3 +39,7 @@ Web dashboard and logger daemon for Davis weather stations (Vantage Pro, Weather
 - Upload services (WU, CWOP) reload config from DB each cycle — Settings UI changes take effect immediately
 - Logger daemon owns the serial port; web app communicates via IPC (TCP JSON messages)
 - Hardware config (archive/sample periods) cached at connect time to avoid serial contention
+- Nowcast service auto-escalates model from Haiku to Sonnet during active NWS alerts
+- Nowcast cycle shortens from 15min to 5min during alert mode; new alerts trigger immediate regeneration
+- NWS `/points` data (grid point, radar station, state code) cached centrally in `forecast_nws.py`
+- First-enable disclaimer gate required before nowcast can be activated (stored in `nowcast_disclaimer_accepted` config)
