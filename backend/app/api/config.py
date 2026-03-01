@@ -40,6 +40,7 @@ _DEFAULTS: dict[str, object] = {
     "cwop_upload_interval": 300,
     "station_timezone": "",
     "nowcast_enabled": False,
+    "nowcast_disclaimer_accepted": False,
     "nowcast_api_key": "",
     "nowcast_model": "claude-haiku-4-5-20251001",
     "nowcast_interval": 900,

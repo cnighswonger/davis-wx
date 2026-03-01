@@ -1131,6 +1131,9 @@ export default function Settings() {
   } = useWeatherBackground();
   const [scenesExpanded, setScenesExpanded] = useState(false);
 
+  // --- Nowcast disclaimer ---
+  const [showNowcastDisclaimer, setShowNowcastDisclaimer] = useState(false);
+
   // --- Alert thresholds ---
   const [alertThresholds, setAlertThresholds] = useState<AlertThreshold[]>([]);
   const [alertSaving, setAlertSaving] = useState(false);
@@ -1563,7 +1566,13 @@ export default function Settings() {
             <input
               type="checkbox"
               checked={val("nowcast_enabled") === true}
-              onChange={(e) => updateField("nowcast_enabled", e.target.checked)}
+              onChange={(e) => {
+                if (e.target.checked && val("nowcast_disclaimer_accepted") !== true) {
+                  setShowNowcastDisclaimer(true);
+                } else {
+                  updateField("nowcast_enabled", e.target.checked);
+                }
+              }}
             />
             AI Nowcast
           </label>
@@ -1585,6 +1594,113 @@ export default function Settings() {
           </span>
         </div>
       </div>
+
+      {/* Nowcast disclaimer modal */}
+      {showNowcastDisclaimer && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-bg-card-solid, var(--color-bg-card))",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--gauge-border-radius, 16px)",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+              padding: isMobile ? "16px" : "24px",
+              width: "92vw",
+              maxWidth: 520,
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 16px 0",
+                fontSize: "18px",
+                fontFamily: "var(--font-heading)",
+                color: "var(--color-text)",
+              }}
+            >
+              AI Nowcast — Important Notice
+            </h3>
+            <div
+              style={{
+                fontSize: "13px",
+                fontFamily: "var(--font-body)",
+                color: "var(--color-text-secondary)",
+                lineHeight: "1.6",
+                marginBottom: "20px",
+              }}
+            >
+              <p style={{ margin: "0 0 12px 0" }}>
+                The AI Nowcast feature provides <strong>experimental, AI-generated</strong> weather
+                analysis. Please read and acknowledge the following before enabling:
+              </p>
+              <ul style={{ margin: "0 0 12px 0", paddingLeft: "20px" }}>
+                <li style={{ marginBottom: "8px" }}>
+                  This is <strong>supplemental to, not a substitute for</strong>, official
+                  National Weather Service (NWS) warnings and forecasts.
+                </li>
+                <li style={{ marginBottom: "8px" }}>
+                  There is <strong>no guarantee of accuracy, timeliness, or completeness</strong>.
+                  AI analysis may contain errors or miss critical weather developments.
+                </li>
+                <li style={{ marginBottom: "8px" }}>
+                  <strong>Always follow official NWS guidance first</strong>, especially during
+                  severe weather events.
+                </li>
+                <li style={{ marginBottom: "8px" }}>
+                  By enabling this feature, <strong>you assume full responsibility</strong> for
+                  any decisions made based on its output.
+                </li>
+              </ul>
+              <p style={{ margin: 0 }}>
+                Nowcast requires an Anthropic API key and will incur usage costs based on the
+                selected model and update interval.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "14px",
+                  padding: "10px 20px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text)",
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowNowcastDisclaimer(false)}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...btnPrimary,
+                  padding: "10px 20px",
+                }}
+                onClick={() => {
+                  updateField("nowcast_disclaimer_accepted", true);
+                  updateField("nowcast_enabled", true);
+                  setShowNowcastDisclaimer(false);
+                }}
+              >
+                I Understand and Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Station section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>

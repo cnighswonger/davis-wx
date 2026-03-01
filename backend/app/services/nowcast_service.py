@@ -338,10 +338,19 @@ class NowcastService:
                     effective_max_tokens,
                 )
 
+            # Escalate model during active NWS alerts — Haiku is fast
+            # but lacks reasoning depth for severe weather correlation.
+            effective_model = self._model
+            if data.nws_alerts and "haiku" in self._model.lower():
+                effective_model = "claude-sonnet-4-5-20250929"
+                logger.warning(
+                    "Active NWS alerts: escalating model from Haiku to Sonnet"
+                )
+
             # Call Claude.
             result = await generate_nowcast(
                 data=data,
-                model=self._model,
+                model=effective_model,
                 api_key_from_db=self._api_key,
                 horizon_hours=self._horizon,
                 max_tokens=effective_max_tokens,
@@ -360,7 +369,7 @@ class NowcastService:
                 )
                 result = await generate_nowcast(
                     data=data,
-                    model=self._model,
+                    model=effective_model,
                     api_key_from_db=self._api_key,
                     horizon_hours=self._horizon,
                     max_tokens=retry_tokens,
@@ -376,7 +385,7 @@ class NowcastService:
                     return
 
             # Store to database.
-            self._store_result(db, result)
+            self._store_result(db, result, effective_model)
 
             # Handle proposed knowledge entry.
             if result.proposed_knowledge:
@@ -400,7 +409,7 @@ class NowcastService:
         finally:
             db.close()
 
-    def _store_result(self, db: Session, result: AnalystResult) -> None:
+    def _store_result(self, db: Session, result: AnalystResult, model_used: str) -> None:
         """Write nowcast result to the database and update in-memory cache."""
         now = datetime.now(timezone.utc)
         valid_until = now + timedelta(hours=self._horizon)
@@ -415,7 +424,7 @@ class NowcastService:
             created_at=now,
             valid_from=now,
             valid_until=valid_until,
-            model_used=self._model,
+            model_used=model_used,
             summary=result.summary,
             details=json.dumps(result.elements),
             confidence=json.dumps(confidence),
@@ -433,7 +442,7 @@ class NowcastService:
             "created_at": now.isoformat(),
             "valid_from": now.isoformat(),
             "valid_until": valid_until.isoformat(),
-            "model_used": self._model,
+            "model_used": model_used,
             "summary": result.summary,
             "elements": result.elements,
             "farming_impact": result.farming_impact,
