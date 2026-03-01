@@ -8,10 +8,11 @@ Supports the full range of classic Davis stations: Vantage Pro 2, Weather Wizard
 
 - **Real-time dashboard** with SVG gauges for temperature, barometric pressure, wind speed/direction, humidity, rain, and solar/UV on a drag-resize 12-column grid
 - **Historical charts** (Highcharts) with selectable sensor, date range, and resolution (raw, 5m, hourly, daily)
-- **AI-powered nowcast** using Claude API with NEXRAD radar analysis, nearby station observations (ASOS/AWOS, WU PWS), verification engine, and self-improving knowledge base
+- **AI-powered nowcast** using Claude API with NEXRAD radar (reflectivity + storm relative velocity), NWS active alerts, nearby station observations (ASOS/AWOS, WU PWS, CWOP/APRS-IS), severe weather correlation protocol, verification engine, and self-improving knowledge base — auto-escalates from Haiku to Sonnet during active NWS alerts
 - **Spray Advisor** with rule-based go/no-go engine, AI-enhanced recommendations, outcome feedback, and per-product threshold tuning
 - **Forecasting**: Zambretti barometric algorithm (local) blended with NWS API data (optional)
 - **Astronomy**: sunrise/sunset arc, twilight times (civil/nautical/astronomical), moon phase with illumination
+- **Severe weather awareness**: NWS active alert monitoring, adaptive 5-minute nowcast cycles during alerts, mid-cycle immediate regeneration on new alerts, threat correlation across radar/station/NWS data, and first-enable disclaimer gate
 - **Data uploads**: Weather Underground PWS and CWOP/APRS-IS for NWS citizen weather data
 - **Database admin**: stats, JSON export, full SQLite backup, sensor data compaction, and tiered purge
 - **Usage tracking**: local token aggregation with optional Anthropic Admin API for real-time cost data and budget auto-pause
@@ -137,7 +138,12 @@ frontend/src/
 | GET/PUT | `/api/config` | Read/update configuration |
 | GET | `/api/nowcast` | Latest AI nowcast |
 | POST | `/api/nowcast/generate` | Trigger a new nowcast |
+| GET | `/api/nowcast/radar` | Cached NEXRAD composite reflectivity image |
+| GET | `/api/nowcast/radar/{id}` | Cached radar product by ID (e.g. `nexrad_velocity`) |
+| GET | `/api/nowcast/alerts` | Active NWS alerts for station location |
+| GET | `/api/nowcast/history` | Recent nowcast history |
 | GET | `/api/nowcast/knowledge` | Knowledge base entries |
+| PUT | `/api/nowcast/knowledge/{id}` | Accept or reject a knowledge entry |
 | GET | `/api/nowcast/verifications` | Verification records |
 | GET | `/api/spray/products` | Spray product definitions |
 | GET | `/api/spray/schedules` | Spray schedules with evaluations |
