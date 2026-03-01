@@ -32,6 +32,27 @@ CHECK_INTERVAL = 60
 # During active NWS alerts, shorten the nowcast cycle for faster updates.
 ALERT_MODE_INTERVAL = 300  # 5 minutes
 
+# Severity tiers for alert-driven behavior.
+# Extreme/Severe: Sonnet escalation + 5-min cycles + token boost
+# Moderate:       Haiku stays    + 5-min cycles + token boost
+# Minor:          Haiku stays    + normal cycles + no boost
+_ESCALATION_SEVERITIES = {"Extreme", "Severe"}
+_FAST_CYCLE_SEVERITIES = {"Extreme", "Severe", "Moderate"}
+
+
+def _max_alert_severity(alerts: list[dict]) -> str:
+    """Return the highest severity among active NWS alerts, or empty string."""
+    order = {"Extreme": 0, "Severe": 1, "Moderate": 2, "Minor": 3, "Unknown": 4}
+    best = ""
+    best_rank = 999
+    for a in alerts:
+        sev = a.get("severity", "Unknown")
+        rank = order.get(sev, 4)
+        if rank < best_rank:
+            best = sev
+            best_rank = rank
+    return best
+
 
 class NowcastService:
     """Scheduled nowcast generation service."""
@@ -62,6 +83,7 @@ class NowcastService:
         self._latest: Optional[dict] = None  # cached latest nowcast for quick API access
         self._prev_alert_ids: set[str] = set()  # alert_ids from last cycle
         self._alert_mode: bool = False  # True when NWS alerts are active
+        self._alert_severity: str = ""  # highest severity among active alerts
 
     def reload_config(self) -> None:
         """Read nowcast config from the station_config table."""
@@ -269,10 +291,10 @@ class NowcastService:
                     self._verify_expired()
                     return
 
-        # Use shorter interval when NWS alerts are active.
+        # Use shorter interval for Moderate+ NWS alerts only.
         effective_interval = (
             min(self._interval, ALERT_MODE_INTERVAL)
-            if self._alert_mode
+            if self._alert_mode and self._alert_severity in _FAST_CYCLE_SEVERITIES
             else self._interval
         )
         if now - self._last_run < effective_interval:
@@ -322,6 +344,7 @@ class NowcastService:
             was_alert_mode = self._alert_mode
             self._prev_alert_ids = current_alert_ids
             self._alert_mode = bool(current_alert_ids)
+            self._alert_severity = _max_alert_severity(data.nws_alerts)
 
             if new_alerts:
                 logger.warning("New NWS alert(s) detected: %d new", len(new_alerts))
@@ -331,23 +354,26 @@ class NowcastService:
             elif was_alert_mode and not self._alert_mode:
                 await self._broadcast_alert_status([], is_new=False)
 
-            # Increase token budget when NWS alerts are active to ensure
-            # the severe_weather correlation output is never truncated.
+            # Tiered response based on alert severity:
+            #   Extreme/Severe: Sonnet + token boost + 5-min cycles
+            #   Moderate:       Haiku  + token boost + 5-min cycles
+            #   Minor:          Haiku  + normal tokens + normal cycles
             effective_max_tokens = self._max_tokens
-            if data.nws_alerts:
+            effective_model = self._model
+            severity = self._alert_severity
+
+            if severity in _FAST_CYCLE_SEVERITIES:
                 effective_max_tokens = self._max_tokens + 500
                 logger.info(
-                    "Active NWS alerts detected, increasing max_tokens to %d",
-                    effective_max_tokens,
+                    "NWS %s alert: increasing max_tokens to %d",
+                    severity, effective_max_tokens,
                 )
 
-            # Escalate model during active NWS alerts — Haiku is fast
-            # but lacks reasoning depth for severe weather correlation.
-            effective_model = self._model
-            if data.nws_alerts and "haiku" in self._model.lower():
+            if severity in _ESCALATION_SEVERITIES and "haiku" in self._model.lower():
                 effective_model = "claude-sonnet-4-5-20250929"
                 logger.warning(
-                    "Active NWS alerts: escalating model from Haiku to Sonnet"
+                    "NWS %s alert: escalating model from Haiku to Sonnet",
+                    severity,
                 )
 
             # Call Claude.
@@ -561,7 +587,9 @@ class NowcastService:
                     "alert_mode": bool(alerts),
                     "is_new_alert": is_new,
                     "alert_count": len(alerts),
-                    "cycle_interval": ALERT_MODE_INTERVAL if alerts else self._interval,
+                    "cycle_interval": ALERT_MODE_INTERVAL
+                        if alerts and self._alert_severity in _FAST_CYCLE_SEVERITIES
+                        else self._interval,
                 },
             })
         except Exception as exc:
