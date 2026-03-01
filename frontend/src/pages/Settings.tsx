@@ -1133,6 +1133,19 @@ export default function Settings() {
 
   // --- Nowcast disclaimer ---
   const [showNowcastDisclaimer, setShowNowcastDisclaimer] = useState(false);
+  const [disclaimerCountdown, setDisclaimerCountdown] = useState(0);
+
+  useEffect(() => {
+    if (!showNowcastDisclaimer) return;
+    setDisclaimerCountdown(5);
+    const id = setInterval(() => {
+      setDisclaimerCountdown((c) => {
+        if (c <= 1) { clearInterval(id); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [showNowcastDisclaimer]);
 
   // --- Alert thresholds ---
   const [alertThresholds, setAlertThresholds] = useState<AlertThreshold[]>([]);
@@ -1685,17 +1698,23 @@ export default function Settings() {
                 Cancel
               </button>
               <button
+                disabled={disclaimerCountdown > 0}
                 style={{
                   ...btnPrimary,
                   padding: "10px 20px",
+                  opacity: disclaimerCountdown > 0 ? 0.5 : 1,
+                  cursor: disclaimerCountdown > 0 ? "not-allowed" : "pointer",
                 }}
                 onClick={() => {
+                  if (disclaimerCountdown > 0) return;
                   updateField("nowcast_disclaimer_accepted", true);
                   updateField("nowcast_enabled", true);
                   setShowNowcastDisclaimer(false);
                 }}
               >
-                I Understand and Accept
+                {disclaimerCountdown > 0
+                  ? `Please read (${disclaimerCountdown}s)`
+                  : "I Understand and Accept"}
               </button>
             </div>
           </div>
