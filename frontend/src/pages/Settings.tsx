@@ -2783,14 +2783,17 @@ export default function Settings() {
             </label>
             <select
               style={selectStyle}
-              value={String(val("nowcast_max_tokens") || "2500")}
+              value={String(val("nowcast_max_tokens") || "3500")}
               onChange={(e) => updateField("nowcast_max_tokens", parseInt(e.target.value))}
             >
               <option value="1500">1500</option>
               <option value="2000">2000</option>
               <option value="2500">2500</option>
               <option value="3000">3000</option>
+              <option value="3500">3500</option>
               <option value="4000">4000</option>
+              <option value="4500">4500</option>
+              <option value="5000">5000</option>
             </select>
           </div>
 
