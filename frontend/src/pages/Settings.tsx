@@ -2574,6 +2574,10 @@ export default function Settings() {
       {/* AI Nowcast section */}
       <div style={{ ...cardStyle, padding: isMobile ? "12px" : "20px" }}>
         <h3 style={sectionTitle}>AI Nowcast</h3>
+        <p style={{ fontSize: "12px", color: "var(--color-text-muted)", fontFamily: "var(--font-body)", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+          NWS alerts, forecast integration, NEXRAD radar, and nearby ASOS/AWOS stations require a US location.
+          International stations can still use the base nowcast with local sensor data and CWOP/APRS-IS neighbors.
+        </p>
 
         <div style={fieldGroup}>
           <label style={checkboxLabel}>
