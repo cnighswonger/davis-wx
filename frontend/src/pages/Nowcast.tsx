@@ -83,17 +83,36 @@ function RadarImg({ src, alt, label, isMobile }: { src: string; alt: string; lab
   if (failed) return null;
   return (
     <div style={{ textAlign: "center" }}>
-      <img
-        src={src}
-        alt={alt}
-        style={{
-          width: isMobile ? "100%" : "240px",
-          height: "auto",
-          borderRadius: "8px",
-          border: "1px solid var(--color-border)",
-        }}
-        onError={() => setFailed(true)}
-      />
+      <div style={{ position: "relative", display: "inline-block" }}>
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            width: isMobile ? "100%" : "240px",
+            height: "auto",
+            borderRadius: "8px",
+            border: "1px solid var(--color-border)",
+            display: "block",
+          }}
+          onError={() => setFailed(true)}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: "8px",
+            height: "8px",
+            marginTop: "-4px",
+            marginLeft: "-4px",
+            borderRadius: "50%",
+            background: "red",
+            border: "1.5px solid white",
+            boxShadow: "0 0 3px rgba(0,0,0,0.8)",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
       <div
         style={{
           fontSize: "11px",
