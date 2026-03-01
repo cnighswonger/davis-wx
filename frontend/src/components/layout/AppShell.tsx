@@ -1,10 +1,11 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import WeatherBackground from '../WeatherBackground';
 import { useWeatherBackground } from '../../context/WeatherBackgroundContext';
 import { useWeatherData } from '../../context/WeatherDataContext';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface AppShellProps {
   children: ReactNode;
@@ -24,6 +25,38 @@ export default function AppShell({
   });
   const { enabled } = useWeatherBackground();
   const { nowcastWarning, dismissNowcastWarning } = useWeatherData();
+  const isMobile = useIsMobile();
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const scrollYRef = useRef(0);
+
+  // Auto-hide header on mobile when scrolling down; show on scroll up.
+  useEffect(() => {
+    if (!isMobile) {
+      setHeaderHidden(false);
+      return;
+    }
+
+    const mainContent = document.querySelector('.app-main-content');
+    if (!mainContent) return;
+
+    const onScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target || target.scrollTop === undefined) return;
+      const y = target.scrollTop;
+      const prev = scrollYRef.current;
+      scrollYRef.current = y;
+
+      if (y <= 10) {
+        setHeaderHidden(false);
+        return;
+      }
+      if (y - prev > 8) setHeaderHidden(true);
+      else if (prev - y > 8) setHeaderHidden(false);
+    };
+
+    mainContent.addEventListener('scroll', onScroll, true);
+    return () => mainContent.removeEventListener('scroll', onScroll, true);
+  }, [isMobile]);
 
   // Auto-dismiss warning after 30 seconds.
   useEffect(() => {
@@ -67,6 +100,7 @@ export default function AppShell({
             connected={connected}
             onMenuToggle={() => setSidebarOpen((prev) => !prev)}
             sidebarOpen={sidebarOpen}
+            hidden={isMobile && headerHidden}
           />
         </div>
 
@@ -82,7 +116,8 @@ export default function AppShell({
         <main
           style={{
             gridArea: 'main',
-            marginTop: '56px',
+            marginTop: (isMobile && headerHidden) ? 0 : '56px',
+            transition: isMobile ? 'margin-top 0.3s ease' : undefined,
             display: 'flex',
             flexDirection: 'column',
             minHeight: 0,

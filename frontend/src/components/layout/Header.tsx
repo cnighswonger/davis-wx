@@ -96,9 +96,10 @@ interface HeaderProps {
   connected: boolean;
   onMenuToggle: () => void;
   sidebarOpen: boolean;
+  hidden?: boolean;
 }
 
-export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderProps) {
+export default function Header({ connected, onMenuToggle, sidebarOpen, hidden = false }: HeaderProps) {
   const { themeName, setThemeName } = useTheme();
   const { currentConditions, forecast } = useWeatherData();
   const extremes = currentConditions?.daily_extremes;
@@ -122,6 +123,8 @@ export default function Header({ connected, onMenuToggle, sidebarOpen }: HeaderP
         padding: '0 20px',
         zIndex: 100,
         fontFamily: 'var(--font-body)',
+        transform: hidden ? 'translateY(-100%)' : 'translateY(0)',
+        transition: 'transform 0.3s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
