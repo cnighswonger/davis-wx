@@ -358,6 +358,7 @@ class NowcastService:
                 api_key_from_db=self._api_key,
                 horizon_hours=self._horizon,
                 max_tokens=effective_max_tokens,
+                radar_station=data.radar_station,
             )
 
             if result is None:
@@ -377,6 +378,7 @@ class NowcastService:
                     api_key_from_db=self._api_key,
                     horizon_hours=self._horizon,
                     max_tokens=retry_tokens,
+                    radar_station=data.radar_station,
                 )
                 if result is None or result.parse_failed:
                     logger.error(

@@ -13,7 +13,11 @@ from typing import Any, Optional
 
 import anthropic
 
-from .nowcast_collector import CollectedData
+from .nowcast_collector import (
+    CollectedData,
+    RADAR_PRODUCTS,
+    fetch_radar_image,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +72,16 @@ VELOCITY RADAR (when Storm Relative Velocity imagery is provided):
   (>50 dBZ) indicates higher threat level.
 - If no rotation signatures are detected, state "No rotation signatures
   detected on velocity imagery."
+
+RADAR ZOOM TOOL:
+When radar imagery is provided, you have access to a zoom_radar tool that fetches
+a higher-resolution image of a specific area. Use it when:
+- You spot potential gate-to-gate shear but need finer resolution to confirm
+- A reflectivity feature (hook echo, BWER, line segment) warrants closer inspection
+- You want to examine a specific storm cell approaching the station
+You may make up to 2 zoom requests per analysis. Choose the center point and radius
+carefully — smaller radius = higher pixel resolution. Typical zoom: 0.2-0.4 degrees.
+After examining zoomed imagery, incorporate findings into your analysis.
 
 SEVERE WEATHER CORRELATION PROTOCOL:
 When ANY of the following triggers are present, activate this protocol:
@@ -202,6 +216,45 @@ SPRAY APPLICATION ADVISORY (when spray schedules are provided):
 """
 
 
+MAX_ZOOM_REQUESTS = 2
+
+ZOOM_RADAR_TOOL = {
+    "name": "zoom_radar",
+    "description": (
+        "Request a zoomed-in radar image for closer analysis of a specific area. "
+        "Use when you spot a feature that needs higher resolution — potential rotation, "
+        "hook echo, line segment, or any signature worth examining at finer detail. "
+        "Maximum 2 zoom requests per analysis."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "product": {
+                "type": "string",
+                "enum": ["reflectivity", "velocity"],
+                "description": "Which radar product to zoom into",
+            },
+            "center_lat": {
+                "type": "number",
+                "description": "Latitude for the center of the zoomed view",
+            },
+            "center_lon": {
+                "type": "number",
+                "description": "Longitude for the center of the zoomed view",
+            },
+            "radius_deg": {
+                "type": "number",
+                "description": (
+                    "Bounding box radius in degrees (0.15 to 0.75). "
+                    "Smaller = tighter zoom / higher resolution."
+                ),
+            },
+        },
+        "required": ["product", "center_lat", "center_lon", "radius_deg"],
+    },
+}
+
+
 def _resolve_api_key(db_key: str) -> Optional[str]:
     """Check ANTHROPIC_API_KEY env var first, fall back to DB config value."""
     env_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -210,6 +263,61 @@ def _resolve_api_key(db_key: str) -> Optional[str]:
     if db_key:
         return db_key
     return None
+
+
+async def _handle_zoom_request(
+    tool_input: dict,
+    radar_station: str,
+) -> list[dict]:
+    """Fetch a zoomed radar image and return content blocks for tool_result."""
+    product = tool_input["product"]
+    center_lat = tool_input["center_lat"]
+    center_lon = tool_input["center_lon"]
+    radius = max(0.15, min(0.75, tool_input["radius_deg"]))
+
+    product_id = "nexrad_composite" if product == "reflectivity" else "nexrad_velocity"
+    cfg = RADAR_PRODUCTS.get(product_id, {})
+
+    extra = dict(cfg.get("extra_params") or {})
+    if cfg.get("requires_site") and radar_station:
+        extra["ridge_radar"] = radar_station
+    elif cfg.get("requires_site") and not radar_station:
+        return [{"type": "text", "text": "Velocity zoom unavailable — no NEXRAD station resolved. Proceed with existing imagery."}]
+
+    img = await fetch_radar_image(
+        lat=center_lat, lon=center_lon,
+        product_id=f"{product_id}_zoom",
+        layers=cfg.get("layers"),
+        extra_params=extra or None,
+        radius_deg=radius,
+        skip_cache=True,
+    )
+
+    if img is None:
+        return [{"type": "text", "text": "Zoom request failed — radar image unavailable. Proceed with existing imagery."}]
+
+    bbox = img.bbox
+    miles_ns = (bbox[3] - bbox[1]) * 69
+    return [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": img.png_base64,
+            },
+        },
+        {
+            "type": "text",
+            "text": (
+                f"Zoomed {img.label}: {radius:.2f}\u00b0 radius centered on "
+                f"({center_lat:.3f}, {center_lon:.3f}). "
+                f"Covers {bbox[1]:.2f}N to {bbox[3]:.2f}N, "
+                f"{abs(bbox[0]):.2f}W to {abs(bbox[2]):.2f}W "
+                f"(~{miles_ns:.0f} miles N-S)."
+            ),
+        },
+    ]
 
 
 def _build_user_message(data: CollectedData, horizon_hours: int) -> str:
@@ -438,8 +546,14 @@ async def generate_nowcast(
     api_key_from_db: str,
     horizon_hours: int = 2,
     max_tokens: int = 2500,
+    radar_station: str = "",
 ) -> Optional[AnalystResult]:
     """Call Claude API to generate a nowcast from collected data.
+
+    When radar images are present, the analyst has access to a zoom_radar tool
+    for requesting higher-resolution imagery of specific areas (up to
+    MAX_ZOOM_REQUESTS per generation).  Token usage is accumulated across
+    all conversation turns.
 
     Args:
         data: Collected data snapshot from all sources.
@@ -447,6 +561,7 @@ async def generate_nowcast(
         api_key_from_db: API key from database config (env var checked first).
         horizon_hours: Forecast window in hours.
         max_tokens: Maximum output tokens for the API call.
+        radar_station: NEXRAD station ID for velocity zoom requests.
 
     Returns:
         AnalystResult on success, None if API unavailable or key missing.
@@ -460,12 +575,59 @@ async def generate_nowcast(
 
     try:
         client = anthropic.AsyncAnthropic(api_key=api_key)
-        response = await client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
-        )
+        messages: list[dict] = [{"role": "user", "content": user_content}]
+        tools = [ZOOM_RADAR_TOOL] if data.radar_images else []
+        total_input = 0
+        total_output = 0
+
+        for _turn in range(MAX_ZOOM_REQUESTS + 1):
+            create_kwargs: dict[str, Any] = dict(
+                model=model,
+                max_tokens=max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=messages,
+            )
+            if tools:
+                create_kwargs["tools"] = tools
+
+            response = await client.messages.create(**create_kwargs)
+            total_input += response.usage.input_tokens if response.usage else 0
+            total_output += response.usage.output_tokens if response.usage else 0
+
+            if response.stop_reason == "tool_use":
+                tool_block = next(
+                    (b for b in response.content if b.type == "tool_use"),
+                    None,
+                )
+                if tool_block is None or tool_block.name != "zoom_radar":
+                    break  # Unexpected tool — fall through to parse
+
+                logger.info(
+                    "Analyst zoom request: %s %.3f,%.3f r=%.2f\u00b0",
+                    tool_block.input.get("product"),
+                    tool_block.input.get("center_lat", 0),
+                    tool_block.input.get("center_lon", 0),
+                    tool_block.input.get("radius_deg", 0),
+                )
+
+                result_content = await _handle_zoom_request(
+                    tool_block.input, radar_station,
+                )
+
+                # Append assistant turn + tool result for next iteration.
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": tool_block.id,
+                        "content": result_content,
+                    }],
+                })
+                continue
+
+            break  # stop_reason is "end_turn" or "max_tokens" — done
+
     except anthropic.AuthenticationError:
         logger.error("Nowcast failed: invalid Anthropic API key")
         return None
@@ -473,9 +635,14 @@ async def generate_nowcast(
         logger.error("Nowcast Claude API call failed: %s", exc)
         return None
 
-    raw_text = response.content[0].text if response.content else ""
-    input_tokens = response.usage.input_tokens if response.usage else 0
-    output_tokens = response.usage.output_tokens if response.usage else 0
+    # Extract final text from the last response.
+    raw_text = ""
+    for block in response.content:
+        if hasattr(block, "text"):
+            raw_text = block.text
+            break
+    input_tokens = total_input
+    output_tokens = total_output
 
     truncated = response.stop_reason == "max_tokens"
     if truncated:

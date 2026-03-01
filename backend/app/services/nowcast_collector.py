@@ -64,12 +64,14 @@ RADAR_PRODUCTS: dict[str, dict[str, Any]] = {
     "nexrad_composite": {
         "label": "NEXRAD Composite Reflectivity",
         "layers": ["nexrad"],
+        "bbox_radius": 1.5,  # ~100 miles — broad storm context
     },
     "nexrad_velocity": {
         "label": "Storm Relative Velocity (nearest NEXRAD)",
         "layers": ["ridge"],
         "requires_site": True,
         "extra_params": {"ridge_product": "N0S"},
+        "bbox_radius": 0.5,  # ~35 miles — tighter for meso detection
     },
 }
 
@@ -120,6 +122,7 @@ class CollectedData:
     nws_summary: Optional[str] = None
     knowledge_entries: list[str] = field(default_factory=list)
     radar_images: list[RadarImage] = field(default_factory=list)
+    radar_station: str = ""
     nearby_stations: Any = None  # Optional[NearbyStationsResult] — avoid circular import
     nws_alerts: list[dict[str, Any]] = field(default_factory=list)
     spray_schedules: list[dict[str, Any]] = field(default_factory=list)
@@ -275,20 +278,27 @@ async def fetch_radar_image(
     product_id: str = "nexrad_composite",
     layers: list[str] | None = None,
     extra_params: dict[str, str] | None = None,
+    radius_deg: float | None = None,
+    skip_cache: bool = False,
 ) -> Optional[RadarImage]:
     """Fetch a radar image from the IEM RadMap API.
 
+    Args:
+        radius_deg: Override bounding-box radius (degrees). Defaults to RADAR_BBOX_RADIUS.
+        skip_cache: If True, bypass cache read/write (used for one-off zoom requests).
+
     Returns RadarImage on success, None on failure (logged, never raises).
     """
-    cached = _radar_cache.get(product_id)
-    if cached is not None and time.time() < cached.expires_at:
-        logger.debug("Radar cache hit for %s", product_id)
-        return cached.image
+    if not skip_cache:
+        cached = _radar_cache.get(product_id)
+        if cached is not None and time.time() < cached.expires_at:
+            logger.debug("Radar cache hit for %s", product_id)
+            return cached.image
 
     if layers is None:
         layers = ["nexrad"]
 
-    bbox = _compute_bbox(lat, lon)
+    bbox = _compute_bbox(lat, lon, radius_deg or RADAR_BBOX_RADIUS)
     label = RADAR_PRODUCTS.get(product_id, {}).get("label", product_id)
 
     param_tuples = [
@@ -323,9 +333,10 @@ async def fetch_radar_image(
                 fetched_at=time.time(),
                 source_url=str(resp.url),
             )
-            _radar_cache[product_id] = _RadarCacheEntry(
-                image=image, expires_at=time.time() + RADAR_CACHE_TTL,
-            )
+            if not skip_cache:
+                _radar_cache[product_id] = _RadarCacheEntry(
+                    image=image, expires_at=time.time() + RADAR_CACHE_TTL,
+                )
             logger.info("Radar image fetched: %s (%d bytes)", product_id, len(resp.content))
             return image
 
@@ -354,6 +365,7 @@ async def fetch_radar_images(
             lat=lat, lon=lon, product_id=pid,
             layers=cfg.get("layers"),
             extra_params=extra or None,
+            radius_deg=cfg.get("bbox_radius"),
         )
         if img is not None:
             images.append(img)
@@ -500,6 +512,7 @@ async def collect_all(
         nws_summary=nws_summary,
         knowledge_entries=knowledge,
         radar_images=radar_images,
+        radar_station=radar_station,
         nearby_stations=nearby,
         nws_alerts=nws_alerts,
         spray_schedules=spray,
