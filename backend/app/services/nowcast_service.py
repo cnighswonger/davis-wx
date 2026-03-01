@@ -39,7 +39,7 @@ class NowcastService:
         self._model: str = "claude-haiku-4-5-20251001"
         self._interval: int = 900  # seconds
         self._horizon: int = 2  # hours
-        self._max_tokens: int = 2500
+        self._max_tokens: int = 3500
         self._latitude: float = 0.0
         self._longitude: float = 0.0
         self._auto_accept_hours: int = 48
@@ -93,9 +93,9 @@ class NowcastService:
             except ValueError:
                 self._horizon = 2
             try:
-                self._max_tokens = int(cfg.get("nowcast_max_tokens", "2500"))
+                self._max_tokens = int(cfg.get("nowcast_max_tokens", "3500"))
             except ValueError:
-                self._max_tokens = 2500
+                self._max_tokens = 3500
             try:
                 self._latitude = float(cfg.get("latitude", "0"))
             except ValueError:

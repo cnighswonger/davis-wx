@@ -545,7 +545,7 @@ async def generate_nowcast(
     model: str,
     api_key_from_db: str,
     horizon_hours: int = 2,
-    max_tokens: int = 2500,
+    max_tokens: int = 3500,
     radar_station: str = "",
 ) -> Optional[AnalystResult]:
     """Call Claude API to generate a nowcast from collected data.
