@@ -17,6 +17,7 @@ import Nowcast from './pages/Nowcast';
 import Spray from './pages/Spray';
 import About from './pages/About';
 import SetupWizard from './components/setup/SetupWizard';
+import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import { fetchSetupStatus } from './api/client';
 
 function AppContent() {
@@ -111,6 +112,7 @@ function App() {
           </WeatherDataProvider>
         </BrowserRouter>
       </WeatherBackgroundProvider>
+      <PWAUpdatePrompt />
     </ThemeProvider>
   );
 }

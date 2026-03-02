@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <circle cx="256" cy="256" r="256" fill="#141622"/>
+  <circle cx="256" cy="256" r="230" fill="#0f1117"/>
+  <!-- Wind curves representing "wings of the wind" -->
+  <g stroke="#3b82f6" stroke-width="18" stroke-linecap="round" fill="none">
+    <path d="M120 200 Q200 160 280 200 Q340 230 380 190"/>
+    <path d="M100 270 Q200 230 300 270 Q370 300 420 260"/>
+    <path d="M140 340 Q220 300 300 340 Q360 370 400 330"/>
+  </g>
+  <!-- Station dot -->
+  <circle cx="256" cy="270" r="14" fill="#3b82f6"/>
+  <circle cx="256" cy="270" r="8" fill="#0f1117"/>
+</svg>
